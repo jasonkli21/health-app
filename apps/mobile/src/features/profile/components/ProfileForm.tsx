@@ -27,6 +27,8 @@ type ProfileFormProps = {
   submitLabel: string;
   onCancel: () => void;
   onSubmit: (fields: BuiltProfileFields) => Promise<void>;
+  onDraftChange?: (draft: ProfileDraft) => void;
+  onRetryUncertain?: () => Promise<void>;
   onConflictReload?: () => void;
 };
 
@@ -85,22 +87,29 @@ export function ProfileForm({
   submitLabel,
   onCancel,
   onSubmit,
+  onDraftChange,
+  onRetryUncertain,
   onConflictReload,
 }: ProfileFormProps) {
   const [draft, setDraft] = useState<ProfileDraft>(() => ({ ...initialDraft }));
   const [error, setError] = useState<string | null>(null);
+  const [conflictDetected, setConflictDetected] = useState(false);
   const [saving, setSaving] = useState(false);
 
   function update(patch: Partial<ProfileDraft>) {
-    setDraft((current) => ({ ...current, ...patch }));
+    const next = { ...draft, ...patch };
+    setDraft(next);
+    onDraftChange?.(next);
     setError(null);
   }
 
   function updateValue(patch: Partial<ValueDraft>) {
-    setDraft((current) => ({
-      ...current,
-      value: { ...current.value, ...patch } as ValueDraft,
-    }));
+    const next = {
+      ...draft,
+      value: { ...draft.value, ...patch } as ValueDraft,
+    };
+    setDraft(next);
+    onDraftChange?.(next);
     setError(null);
   }
 
@@ -115,6 +124,24 @@ export function ProfileForm({
     setError(null);
     try {
       await onSubmit(result.fields);
+    } catch (requestError) {
+      const message = profileErrorMessage(requestError);
+      if (message.includes("changed after you opened it")) {
+        setConflictDetected(true);
+      }
+      setError(message);
+      AccessibilityInfo.announceForAccessibility(message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function retryUncertain() {
+    if (!onRetryUncertain) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onRetryUncertain();
     } catch (requestError) {
       const message = profileErrorMessage(requestError);
       setError(message);
@@ -322,6 +349,9 @@ export function ProfileForm({
       <Text accessibilityRole="header" style={styles.sectionTitle}>
         Permissions
       </Text>
+      <Text style={styles.hint}>
+        Both permissions are off unless you turn them on.
+      </Text>
       <View style={styles.switchRow}>
         <Text style={styles.switchLabel}>Allow AI use of this item</Text>
         <Switch
@@ -332,10 +362,12 @@ export function ProfileForm({
         />
       </View>
       <View style={styles.switchRow}>
-        <Text style={styles.switchLabel}>Allow use in other health areas</Text>
+        <Text style={styles.switchLabel}>
+          Allow use by other apps and health domains through Personal AI
+        </Text>
         <Switch
-          accessibilityLabel="Allow cross-domain use of this Profile item"
-          accessibilityHint="Off by default. Turn on only if you want this item used in other health areas."
+          accessibilityLabel="Allow use by other apps and health domains through Personal AI"
+          accessibilityHint="Off by default. Turn on only if you want other apps and health domains to use this item through Personal AI."
           value={draft.cross_domain_use_allowed}
           onValueChange={(cross_domain_use_allowed) =>
             update({ cross_domain_use_allowed })
@@ -352,18 +384,38 @@ export function ProfileForm({
           >
             {error}
           </Text>
-          {onConflictReload && error.includes("changed after you opened it") ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Reload latest Profile version"
-              onPress={onConflictReload}
-              style={styles.secondaryButton}
-            >
-              <Text style={styles.secondaryButtonText}>
-                Reload latest version
-              </Text>
-            </Pressable>
-          ) : null}
+        </View>
+      ) : null}
+
+      {onConflictReload && conflictDetected ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Reload latest Profile version"
+          onPress={onConflictReload}
+          style={styles.secondaryButton}
+        >
+          <Text style={styles.secondaryButtonText}>Reload latest version</Text>
+        </Pressable>
+      ) : null}
+
+      {onRetryUncertain ? (
+        <View style={styles.recovery}>
+          <Text style={styles.hint}>
+            A previous save may have completed. Recover that result before
+            submitting edited details.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Retry original Profile save"
+            accessibilityState={{ disabled: saving, busy: saving }}
+            onPress={() => void retryUncertain()}
+            disabled={saving}
+            style={[styles.secondaryButton, saving && styles.disabledButton]}
+          >
+            <Text style={styles.secondaryButtonText}>
+              {saving ? "Checking original save…" : "Retry original save"}
+            </Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -445,6 +497,7 @@ const styles = StyleSheet.create({
   },
   switchLabel: { color: "#24342b", flex: 1, fontSize: 16, lineHeight: 22 },
   error: { color: "#9b1c1c", fontSize: 16, lineHeight: 23, marginVertical: 8 },
+  recovery: { gap: 8 },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 16 },
   primaryButton: {
     alignItems: "center",

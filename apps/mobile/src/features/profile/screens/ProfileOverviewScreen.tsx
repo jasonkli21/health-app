@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -12,6 +12,7 @@ import {
   type ProfileItem,
 } from "../model";
 import { ActionButton, LoadingMessage, StatusMessage } from "../components/Ui";
+import { RequestScope, requestNextPage } from "../requestScope";
 
 const PAGE_SIZE = 50;
 
@@ -25,57 +26,74 @@ export default function ProfileOverviewScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
+  const requestScope = useRef(new RequestScope());
+  const scopeKey = `overview:${category ?? "all"}:${refresh}`;
 
   useFocusEffect(
     useCallback(() => {
-      let current = true;
+      const scope = requestScope.current.start(scopeKey);
       setLoading(true);
       setError(null);
       setItems([]);
       setNextCursor(null);
       setAsOf(null);
+      setLoadingMore(false);
       void (async () => {
         try {
           const result = await profileApi.listProfileItems({
             ...(category ? { category } : {}),
             limit: PAGE_SIZE,
           });
-          if (!current) return;
+          if (!requestScope.current.isCurrent(scope)) return;
           setItems(result.items);
           setAsOf(result.as_of);
           setNextCursor(result.next_cursor);
         } catch (requestError) {
-          if (current) setError(profileErrorMessage(requestError));
+          if (requestScope.current.isCurrent(scope)) {
+            setError(profileErrorMessage(requestError));
+          }
         } finally {
-          if (current) setLoading(false);
+          if (requestScope.current.isCurrent(scope)) setLoading(false);
         }
       })();
       return () => {
-        current = false;
+        requestScope.current.invalidate(scope);
       };
       // Retry state intentionally recreates this focus callback to refetch server truth.
       // eslint-disable-next-line react-hooks/exhaustive-deps -- retry token is an effect trigger.
-    }, [category, refresh]),
+    }, [category, refresh, scopeKey]),
   );
 
   async function loadMore() {
-    if (!nextCursor || !asOf || loadingMore) return;
-    setLoadingMore(true);
-    setError(null);
-    try {
-      const result = await profileApi.listProfileItems({
-        ...(category ? { category } : {}),
-        as_of: asOf,
-        cursor: nextCursor,
-        limit: PAGE_SIZE,
-      });
-      setItems((current) => [...current, ...result.items]);
-      setNextCursor(result.next_cursor);
-    } catch (requestError) {
-      setError(profileErrorMessage(requestError));
-    } finally {
-      setLoadingMore(false);
-    }
+    if (!nextCursor || !asOf) return;
+    const scope = requestScope.current.tokenFor(scopeKey);
+    if (!scope) return;
+    const cursor = nextCursor;
+    const pageAsOf = asOf;
+    await requestNextPage(
+      requestScope.current,
+      scope,
+      cursor,
+      () =>
+        profileApi.listProfileItems({
+          ...(category ? { category } : {}),
+          as_of: pageAsOf,
+          cursor,
+          limit: PAGE_SIZE,
+        }),
+      {
+        onStart: () => {
+          setLoadingMore(true);
+          setError(null);
+        },
+        onSuccess: (result) => {
+          setItems((current) => [...current, ...result.items]);
+          setNextCursor(result.next_cursor);
+        },
+        onError: (requestError) => setError(profileErrorMessage(requestError)),
+        onFinish: () => setLoadingMore(false),
+      },
+    );
   }
 
   const visibleGroups = category

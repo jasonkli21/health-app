@@ -1,37 +1,49 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { profileApi, profileErrorMessage } from "../api";
 import { ProfileForm } from "../components/ProfileForm";
 import { LoadingMessage, StatusMessage, ActionButton } from "../components/Ui";
+import type { BuiltProfileFields } from "../model";
 import {
-  draftFromProfile,
-  type BuiltProfileFields,
-  type ProfileItem,
-} from "../model";
+  acceptProfileRefresh,
+  EMPTY_PROFILE_EDIT_STATE,
+  recordProfileDraft,
+} from "../editState";
 
 export default function ProfileEditScreen() {
   const { itemId } = useLocalSearchParams<{ itemId: string }>();
   const router = useRouter();
-  const [item, setItem] = useState<ProfileItem | null>(null);
+  const [editState, setEditState] = useState(EMPTY_PROFILE_EDIT_STATE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
+  const explicitlyReloading = useRef(false);
+  const item = editState.item?.id === itemId ? editState.item : null;
 
   useFocusEffect(
     useCallback(() => {
       let current = true;
+      const replaceDraft = explicitlyReloading.current;
       setLoading(true);
       setError(null);
       void profileApi
         .getProfileItem({ item_id: itemId })
         .then(
           (value) => {
-            if (current) setItem(value);
+            if (current) {
+              explicitlyReloading.current = false;
+              setEditState((state) =>
+                acceptProfileRefresh(state, value, replaceDraft),
+              );
+            }
           },
           (requestError: unknown) => {
-            if (current) setError(profileErrorMessage(requestError));
+            if (current) {
+              explicitlyReloading.current = false;
+              setError(profileErrorMessage(requestError));
+            }
           },
         )
         .finally(() => {
@@ -51,7 +63,7 @@ export default function ProfileEditScreen() {
       { item_id: item.id },
       { expected_revision: item.revision, ...fields },
     );
-    setItem(updated);
+    setEditState((state) => acceptProfileRefresh(state, updated, true));
     router.replace({
       pathname: "/profile/[itemId]",
       params: { itemId: updated.id },
@@ -60,7 +72,9 @@ export default function ProfileEditScreen() {
 
   return (
     <SafeAreaView style={{ backgroundColor: "#f7f9f7", flex: 1 }}>
-      {loading ? <LoadingMessage label="Loading Profile item" /> : null}
+      {loading && !item ? (
+        <LoadingMessage label="Loading Profile item" />
+      ) : null}
       {error ? (
         <>
           <StatusMessage
@@ -74,20 +88,26 @@ export default function ProfileEditScreen() {
           />
         </>
       ) : null}
-      {!loading && item?.status === "archived" ? (
+      {item?.status === "archived" ? (
         <StatusMessage
           title="This item is archived"
           message="Archived Profile items are read-only."
         />
       ) : null}
-      {!loading && !error && item?.status === "active" ? (
+      {item?.status === "active" && editState.draft ? (
         <ProfileForm
-          key={`${item.id}:${item.revision}`}
-          initialDraft={draftFromProfile(item)}
+          key={`${item.id}:${editState.formGeneration}`}
+          initialDraft={editState.draft}
           submitLabel="Save changes"
           onCancel={() => router.back()}
           onSubmit={save}
-          onConflictReload={() => setReload((value) => value + 1)}
+          onDraftChange={(draft) =>
+            setEditState((state) => recordProfileDraft(state, draft))
+          }
+          onConflictReload={() => {
+            explicitlyReloading.current = true;
+            setReload((value) => value + 1);
+          }}
         />
       ) : null}
     </SafeAreaView>

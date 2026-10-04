@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -8,6 +8,7 @@ import { ProfileValueDisplay } from "../components/ProfileValueDisplay";
 import { ActionButton, LoadingMessage, StatusMessage } from "../components/Ui";
 import { formatInstant } from "../model";
 import type { components } from "@personal-health/api-client";
+import { RequestScope, requestNextPage } from "../requestScope";
 
 type HistoryEntry = components["schemas"]["ProfileHistoryEntry"];
 const PAGE_SIZE = 50;
@@ -21,12 +22,17 @@ export default function ProfileHistoryScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
+  const requestScope = useRef(new RequestScope());
+  const scopeKey = `history:${itemId}:${reload}`;
 
   useFocusEffect(
     useCallback(() => {
-      let current = true;
+      const scope = requestScope.current.start(scopeKey);
       setLoading(true);
       setError(null);
+      setEntries([]);
+      setNextRevision(null);
+      setLoadingMore(false);
       void profileApi
         .listProfileHistory(
           { item_id: itemId },
@@ -34,42 +40,55 @@ export default function ProfileHistoryScreen() {
         )
         .then(
           (response) => {
-            if (current) {
+            if (requestScope.current.isCurrent(scope)) {
               setEntries(response.items);
               setNextRevision(response.next_after_revision);
             }
           },
           (requestError: unknown) => {
-            if (current) setError(profileErrorMessage(requestError));
+            if (requestScope.current.isCurrent(scope)) {
+              setError(profileErrorMessage(requestError));
+            }
           },
         )
         .finally(() => {
-          if (current) setLoading(false);
+          if (requestScope.current.isCurrent(scope)) setLoading(false);
         });
       return () => {
-        current = false;
+        requestScope.current.invalidate(scope);
       };
       // Retry state intentionally recreates this focus callback to refetch server truth.
       // eslint-disable-next-line react-hooks/exhaustive-deps -- retry token is an effect trigger.
-    }, [itemId, reload]),
+    }, [itemId, reload, scopeKey]),
   );
 
   async function loadMore() {
-    if (nextRevision === null || loadingMore) return;
-    setLoadingMore(true);
-    setError(null);
-    try {
-      const response = await profileApi.listProfileHistory(
-        { item_id: itemId },
-        { after_revision: nextRevision, limit: PAGE_SIZE },
-      );
-      setEntries((current) => [...current, ...response.items]);
-      setNextRevision(response.next_after_revision);
-    } catch (requestError) {
-      setError(profileErrorMessage(requestError));
-    } finally {
-      setLoadingMore(false);
-    }
+    if (nextRevision === null) return;
+    const scope = requestScope.current.tokenFor(scopeKey);
+    if (!scope) return;
+    const afterRevision = nextRevision;
+    await requestNextPage(
+      requestScope.current,
+      scope,
+      String(afterRevision),
+      () =>
+        profileApi.listProfileHistory(
+          { item_id: itemId },
+          { after_revision: afterRevision, limit: PAGE_SIZE },
+        ),
+      {
+        onStart: () => {
+          setLoadingMore(true);
+          setError(null);
+        },
+        onSuccess: (response) => {
+          setEntries((current) => [...current, ...response.items]);
+          setNextRevision(response.next_after_revision);
+        },
+        onError: (requestError) => setError(profileErrorMessage(requestError)),
+        onFinish: () => setLoadingMore(false),
+      },
+    );
   }
 
   return (
@@ -115,7 +134,7 @@ export default function ProfileHistoryScreen() {
                 {entry.snapshot.permissions.ai_use_allowed
                   ? "allowed"
                   : "not allowed"}
-                ; cross-domain use:{" "}
+                ; use by other apps and health domains through Personal AI:{" "}
                 {entry.snapshot.permissions.cross_domain_use_allowed
                   ? "allowed"
                   : "not allowed"}

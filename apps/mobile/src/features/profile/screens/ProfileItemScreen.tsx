@@ -131,7 +131,7 @@ export default function ProfileItemScreen() {
             value={item.permissions.ai_use_allowed ? "Allowed" : "Not allowed"}
           />
           <Definition
-            label="Cross-domain use permission"
+            label="Use by other apps and health domains through Personal AI"
             value={
               item.permissions.cross_domain_use_allowed
                 ? "Allowed"

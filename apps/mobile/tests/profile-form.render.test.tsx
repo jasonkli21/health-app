@@ -113,10 +113,30 @@ describe("ProfileForm accessible first render", () => {
     expect(markup).toContain('aria-label="Unknown"');
     expect(markup).toContain('aria-label="Allow AI use of this Profile item"');
     expect(markup).toContain(
-      'aria-label="Allow cross-domain use of this Profile item"',
+      'aria-label="Allow use by other apps and health domains through Personal AI"',
+    );
+    expect(markup).toContain(
+      "Both permissions are off unless you turn them on.",
     );
     expect(markup).toContain("Save Profile item");
     expect(markup.match(/type="checkbox"/g)).toHaveLength(2);
     expect(markup).not.toMatch(/type="checkbox"[^>]*\schecked=/);
+  });
+
+  it("shows a recovery action when a create result is uncertain", async () => {
+    const { ProfileForm } = await import(
+      "../src/features/profile/components/ProfileForm"
+    );
+    const markup = renderToStaticMarkup(
+      React.createElement(ProfileForm, {
+        submitLabel: "Save Profile item",
+        onCancel: () => undefined,
+        onSubmit: async () => undefined,
+        onRetryUncertain: async () => undefined,
+      }),
+    );
+    expect(markup).toContain("A previous save may have completed.");
+    expect(markup).toContain('aria-label="Retry original Profile save"');
+    expect(markup).toContain("Retry original save");
   });
 });

@@ -91,6 +91,28 @@ describe("Profile mobile model", () => {
     });
   });
 
+  it("rejects impossible calendar dates while accepting leap days and offsets", () => {
+    for (const valid_from of [
+      "2026-02-30T12:00:00Z",
+      "2026-04-31T12:00:00Z",
+      "2025-02-29T12:00:00Z",
+      "2026-13-01T12:00:00Z",
+      "2026-01-01T24:00:00Z",
+      "2026-01-01T12:00:00+25:00",
+    ]) {
+      expect(buildProfileFields(draft({ valid_from }))).toMatchObject({
+        ok: false,
+      });
+    }
+
+    expect(
+      buildProfileFields(draft({ valid_from: "2024-02-29T12:30:00-07:00" })),
+    ).toMatchObject({
+      ok: true,
+      fields: { valid_from: "2024-02-29T19:30:00.000Z" },
+    });
+  });
+
   it("loads edit drafts without losing provenance, revision-scoped validity, notes, or permissions", () => {
     const item = {
       id: "00000000-0000-0000-0000-000000000001",
