@@ -1,3 +1,7 @@
 # Mobile tests
 
-Keep unit/component tests here or in clearly separated test subdirectories. Do not mix test files into production source directories by default.
+- `api-client.test.ts` checks generated route serialization, errors, and compile-time contract cases.
+- `profile-model.test.ts` checks Profile draft serialization, unknown/false/zero distinctions, timezone validity, and edit-draft preservation.
+- `profile-form.render.test.tsx` uses test-only native element stubs and React DOM server rendering to verify the initial accessible form labels and permissions-off defaults. It does not simulate native events or replace device accessibility checks.
+
+Keep tests in this directory or clearly separated test subdirectories. Do not mix test files into production source directories by default. Expo export in CI verifies Metro can bundle the complete native route tree; an equipped host must still perform the manual interaction and accessibility walkthrough documented in the local development guide.

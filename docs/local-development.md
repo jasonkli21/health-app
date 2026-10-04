@@ -20,10 +20,12 @@ In another terminal:
 
 ```bash
 curl --fail http://127.0.0.1:8000/healthz
-pnpm mobile:start
+EXPO_PUBLIC_API_URL=http://127.0.0.1:8000 pnpm mobile:start
 ```
 
 The shell uses Expo Go; it does not require an already-built development client. Use a compatible Expo Go simulator/device installation. `pnpm --filter @personal-health/mobile ios` builds the native shell locally if Xcode is installed. Phase 8 will introduce a development build for HealthKit. A Metro bundle check alone does not verify rendering on a device.
+
+`EXPO_PUBLIC_API_URL` is compiled into the mobile app and may contain only the API address, never credentials or principal IDs. The default is `http://127.0.0.1:8000` for the local iOS simulator. For an Android emulator use `http://10.0.2.2:8000`; for a physical device, use an approved secure endpoint reachable on a private network and configure the local API/network accordingly. Do not expose this unauthenticated local-dev API to the public internet. Rebuild/restart Metro after changing the variable.
 
 After the Python environment and API dependencies are ready, export OpenAPI and build the generated TypeScript client with `pnpm --filter @personal-health/api-client generate`. This performs no database request. Check generated source with `pnpm --filter @personal-health/api-client typecheck`; CI also regenerates the tracked artifacts and fails on drift.
 
@@ -72,7 +74,7 @@ pnpm --filter @personal-health/mobile exec expo install --check
 pnpm --filter @personal-health/mobile exec expo export --platform ios --output-dir /tmp/personal-health-ios-bundle
 ```
 
-The Phase 1 API tests require `TEST_DATABASE_URL`; without it, PostgreSQL integration cases are skipped. CI provisions its own disposable PostgreSQL service. The generated client has behavioral tests in the mobile Vitest suite; the Profile component and behavior checks are added in the remainder of Phase 1. Device execution and accessibility walkthrough remain manual checks on an equipped host.
+The Phase 1 API tests require `TEST_DATABASE_URL`; without it, PostgreSQL integration cases are skipped. CI provisions its own disposable PostgreSQL service. The generated client and Profile value model have behavioral Vitest tests; a test-only React DOM render checks accessible labels and opt-in defaults in the native Profile form. It does not verify interactive behavior. Device execution, create/edit/archive/history walkthrough, keyboard behavior, and assistive-technology accessibility remain manual checks on an equipped host.
 
 Frontend resolutions are in `pnpm-lock.yaml`; install with `--frozen-lockfile`. API runtime/dev resolutions for the tested Python 3.12 macOS/Linux baseline are in `services/api/requirements-dev.lock`, consumed as pip constraints. This is not a platform-independent Python lock; test/regenerate deliberately when changing Python/platform or dependencies. Build tooling is separately pinned in `pyproject.toml`. Optional lock regeneration uses uv:
 
