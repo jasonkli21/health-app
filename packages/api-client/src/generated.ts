@@ -716,7 +716,7 @@ export class ApiError extends Error {
   }
 }
 
-export class ProfileApiClient {
+export class HealthApiClient {
   private readonly baseUrl: string;
   private readonly fetcher: FetchLike;
 
@@ -998,3 +998,5 @@ export class ProfileApiClient {
     return payload as T;
   }
 }
+
+export { HealthApiClient as ProfileApiClient };

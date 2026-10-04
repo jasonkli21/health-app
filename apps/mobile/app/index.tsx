@@ -10,10 +10,24 @@ export default function HomeScreen() {
           Personal Health
         </Text>
         <Text style={styles.body}>
-          A private place for health details you choose to remember. Start with
-          your Profile.
+          A private place for health details you choose to remember. Review your
+          daily log or the context you keep in your Profile.
         </Text>
-        <Link accessibilityRole="button" style={styles.link} href="/profile">
+        <Link accessibilityRole="button" style={styles.link} href="/today">
+          Open Today
+        </Link>
+        <Link
+          accessibilityRole="button"
+          style={styles.secondaryLink}
+          href="/add"
+        >
+          Add an entry
+        </Link>
+        <Link
+          accessibilityRole="button"
+          style={styles.secondaryLink}
+          href="/profile"
+        >
           Open your Profile
         </Link>
       </View>
@@ -31,6 +45,19 @@ const styles = StyleSheet.create({
     backgroundColor: "#245d3a",
     borderRadius: 12,
     color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+    overflow: "hidden",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  secondaryLink: {
+    alignSelf: "flex-start",
+    backgroundColor: "#fff",
+    borderColor: "#52645a",
+    borderRadius: 12,
+    borderWidth: 1,
+    color: "#24342b",
     fontSize: 16,
     fontWeight: "700",
     overflow: "hidden",

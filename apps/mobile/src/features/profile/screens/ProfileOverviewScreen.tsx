@@ -112,6 +112,17 @@ export default function ProfileOverviewScreen() {
               Optional information you choose to keep for yourself.
             </Text>
           </View>
+          <View style={styles.navActions}>
+            <ActionButton
+              label="Open Today"
+              secondary
+              onPress={() => router.push("/today")}
+            />
+            <ActionButton
+              label="Add daily entry"
+              onPress={() => router.push("/add")}
+            />
+          </View>
           <ActionButton
             label="Add Profile item"
             hint="Create an optional fact, constraint, or preference."
@@ -258,6 +269,7 @@ const styles = StyleSheet.create({
   content: { gap: 20, padding: 20, paddingBottom: 36 },
   header: { gap: 16 },
   headerCopy: { gap: 6 },
+  navActions: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   title: { color: "#17201c", fontSize: 30, fontWeight: "700" },
   subtitle: { color: "#46534d", fontSize: 16, lineHeight: 23 },
   filters: { flexDirection: "row", flexWrap: "wrap", gap: 8 },

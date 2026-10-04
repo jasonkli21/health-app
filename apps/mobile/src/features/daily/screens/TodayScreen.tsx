@@ -1,0 +1,472 @@
+import { useCallback, useRef, useState } from "react";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+import { dailyApi, dailyErrorMessage } from "../api";
+import {
+  DAILY_DOMAINS,
+  DEVICE_TIMEZONE,
+  itemTimeLabel,
+  itemTitle,
+  itemValue,
+  localCalendarDate,
+  metricLabel,
+  summaryPresentation,
+  type DailyItem,
+} from "../model";
+import {
+  ActionButton,
+  LoadingMessage,
+  StatusMessage,
+} from "../../profile/components/Ui";
+import { RequestScope, requestNextPage } from "../../profile/requestScope";
+import type { components } from "@personal-health/api-client";
+
+const PAGE_SIZE = 50;
+type TodayResult = components["schemas"]["TodayResponse"];
+
+function itemKindLabel(item: DailyItem): string {
+  if (item.object_type === "event") {
+    switch (item.event.payload.kind) {
+      case "meal":
+        return "Meal";
+      case "workout":
+        return "Workout";
+      case "sleep":
+        return "Sleep";
+      case "symptom":
+        return "Symptom";
+    }
+  }
+  return "Observation";
+}
+
+export default function TodayScreen() {
+  const router = useRouter();
+  const [dateInput, setDateInput] = useState(localCalendarDate());
+  const [timezoneInput, setTimezoneInput] = useState(DEVICE_TIMEZONE);
+  const [date, setDate] = useState(dateInput);
+  const [timezone, setTimezone] = useState(timezoneInput);
+  const [data, setData] = useState<TodayResult | null>(null);
+  const [items, setItems] = useState<DailyItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [stale, setStale] = useState(false);
+  const [refresh, setRefresh] = useState(0);
+  const requestScope = useRef(new RequestScope());
+  const queryWithResult = useRef<string | null>(null);
+  const queryKey = `${date}:${timezone}`;
+  const scopeKey = `today:${queryKey}:${refresh}`;
+
+  useFocusEffect(
+    useCallback(() => {
+      const scope = requestScope.current.start(scopeKey);
+      if (queryWithResult.current !== queryKey) {
+        setData(null);
+        setItems([]);
+        setStale(false);
+      }
+      setLoading(true);
+      setError(null);
+      setLoadingMore(false);
+      void (async () => {
+        try {
+          const result = await dailyApi.getToday({
+            date,
+            timezone,
+            limit: PAGE_SIZE,
+          });
+          if (!requestScope.current.isCurrent(scope)) return;
+          setData(result);
+          setItems(result.items);
+          queryWithResult.current = queryKey;
+          setStale(false);
+        } catch (requestError) {
+          if (requestScope.current.isCurrent(scope)) {
+            setError(dailyErrorMessage(requestError));
+            setStale(queryWithResult.current === queryKey);
+          }
+        } finally {
+          if (requestScope.current.isCurrent(scope)) setLoading(false);
+        }
+      })();
+      return () => requestScope.current.invalidate(scope);
+      // Retry reuses the same day and preserves its in-memory result while fetching.
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh is an effect trigger.
+    }, [date, timezone, refresh, scopeKey, queryKey]),
+  );
+
+  async function loadMore() {
+    if (!data?.next_cursor) return;
+    const scope = requestScope.current.tokenFor(scopeKey);
+    if (!scope) return;
+    const cursor = data.next_cursor;
+    await requestNextPage(
+      requestScope.current,
+      scope,
+      cursor,
+      () => dailyApi.getToday({ date, timezone, limit: PAGE_SIZE, cursor }),
+      {
+        onStart: () => {
+          setLoadingMore(true);
+          setError(null);
+        },
+        onSuccess: (page) => {
+          setItems((current) => [...current, ...page.items]);
+          setData((current) =>
+            current
+              ? {
+                  ...page,
+                  items: current.items,
+                  profile_context_refs: current.profile_context_refs,
+                  profile_context_truncated: current.profile_context_truncated,
+                  includes_profile_context: current.includes_profile_context,
+                }
+              : page,
+          );
+        },
+        onError: (requestError) => {
+          setError(dailyErrorMessage(requestError));
+          setStale(true);
+        },
+        onFinish: () => setLoadingMore(false),
+      },
+    );
+  }
+
+  const summariesByDomain = new Map<
+    string,
+    components["schemas"]["MetricSummaryV1"][]
+  >((data?.summaries ?? []).map((summary) => [summary.domain, []]));
+  for (const summary of data?.summaries ?? []) {
+    summariesByDomain.get(summary.domain)?.push(summary);
+  }
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.header}>
+          <Text accessibilityRole="header" style={styles.title}>
+            Today
+          </Text>
+          <Text style={styles.subtitle}>
+            A sparse view of what you chose to record for one local calendar
+            day.
+          </Text>
+          <View style={styles.nav}>
+            <ActionButton
+              label="Add entry"
+              onPress={() => router.push("/add")}
+            />
+            <ActionButton
+              label="Open Profile"
+              secondary
+              onPress={() => router.push("/profile")}
+            />
+          </View>
+        </View>
+
+        <View style={styles.filters}>
+          <Field
+            label="Calendar date"
+            value={dateInput}
+            onChange={setDateInput}
+            placeholder="YYYY-MM-DD"
+          />
+          <Field
+            label="IANA timezone"
+            value={timezoneInput}
+            onChange={setTimezoneInput}
+            placeholder="America/Los_Angeles"
+          />
+          <ActionButton
+            label="Show this day"
+            onPress={() => {
+              setDate(dateInput.trim());
+              setTimezone(timezoneInput.trim());
+            }}
+          />
+          <ActionButton
+            label="Refresh Today"
+            secondary
+            onPress={() => setRefresh((value) => value + 1)}
+          />
+        </View>
+
+        {error && !loading ? (
+          <View>
+            <StatusMessage
+              title={
+                stale ? "Showing saved Today data" : "Today could not load"
+              }
+              message={stale ? `${error} The visible result is stale.` : error}
+              tone="error"
+            />
+            <ActionButton
+              label="Retry Today request"
+              onPress={() => setRefresh((value) => value + 1)}
+            />
+          </View>
+        ) : null}
+        {loading && !data ? <LoadingMessage label="Loading Today" /> : null}
+
+        {data ? (
+          <View style={styles.result}>
+            <Text style={styles.dayHeading}>
+              {data.date} · {data.timezone}
+              {stale ? " · stale" : ""}
+            </Text>
+            <Text style={styles.explainer}>
+              These totals describe entries you logged. Missing values are not
+              treated as zero or as proof that something did not happen.
+            </Text>
+
+            <View style={styles.section}>
+              <Text accessibilityRole="header" style={styles.sectionTitle}>
+                Daily summaries
+              </Text>
+              {DAILY_DOMAINS.map((domain) => {
+                const summaries = summariesByDomain.get(domain.value) ?? [];
+                return (
+                  <View key={domain.value} style={styles.summaryGroup}>
+                    <Text style={styles.groupTitle}>
+                      {
+                        {
+                          nutrition: "Nutrition",
+                          exercise: "Exercise",
+                          sleep: "Sleep",
+                          symptoms: "Symptoms",
+                          measurements: "Measurements",
+                        }[domain.value]
+                      }
+                    </Text>
+                    {summaries.map((summary) => (
+                      <View key={summary.metric} style={styles.summaryRow}>
+                        <Text style={styles.summaryLabel}>
+                          {metricLabel(summary.metric)}
+                        </Text>
+                        <Text style={styles.summaryValue}>
+                          {summaryPresentation(summary).value}
+                        </Text>
+                        <Text style={styles.summaryMeta}>
+                          {summaryPresentation(summary).coverage}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                );
+              })}
+            </View>
+
+            {data.includes_profile_context &&
+            data.profile_context_refs.length > 0 ? (
+              <View style={styles.section}>
+                <Text accessibilityRole="header" style={styles.sectionTitle}>
+                  Profile context for this day
+                </Text>
+                <Text style={styles.explainer}>
+                  These are references to Profile items whose effective dates
+                  overlap this day.
+                </Text>
+                {data.profile_context_refs.map((profile) => (
+                  <Pressable
+                    key={profile.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open Profile item ${profile.title}`}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/profile/[itemId]",
+                        params: { itemId: profile.id },
+                      })
+                    }
+                    style={styles.profileRef}
+                  >
+                    <Text style={styles.cardTitle}>{profile.title}</Text>
+                    <Text style={styles.cardMeta}>Open Profile item</Text>
+                  </Pressable>
+                ))}
+                {data.profile_context_truncated ? (
+                  <Text style={styles.hint}>
+                    Some Profile references are not shown.
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+
+            <View style={styles.section}>
+              <Text accessibilityRole="header" style={styles.sectionTitle}>
+                Timeline
+              </Text>
+              {items.length === 0 ? (
+                <View style={styles.empty}>
+                  <Text style={styles.cardTitle}>
+                    Nothing logged for this day
+                  </Text>
+                  <Text style={styles.explainer}>
+                    An empty day means no entries were recorded here.
+                  </Text>
+                  <ActionButton
+                    label="Add your first entry"
+                    onPress={() => router.push("/add")}
+                  />
+                </View>
+              ) : (
+                items.map((item) => (
+                  <Pressable
+                    key={`${item.object_type}:${item.id}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${itemKindLabel(item)}. ${itemTitle(item)}. ${itemValue(item)}. ${itemTimeLabel(item, data.timezone)}`}
+                    accessibilityHint="Open this entry to review, edit, archive, or view its history."
+                    onPress={() =>
+                      router.push({
+                        pathname: "/daily/item/[itemId]",
+                        params: { itemId: item.id, type: item.object_type },
+                      })
+                    }
+                    style={styles.timelineItem}
+                  >
+                    <Text style={styles.kind}>{itemKindLabel(item)}</Text>
+                    <Text style={styles.cardTitle}>{itemTitle(item)}</Text>
+                    <Text style={styles.cardBody}>{itemValue(item)}</Text>
+                    <Text style={styles.cardMeta}>
+                      {itemTimeLabel(item, data.timezone)}
+                    </Text>
+                  </Pressable>
+                ))
+              )}
+              {data.next_cursor ? (
+                <ActionButton
+                  label="Load more timeline entries"
+                  onPress={() => void loadMore()}
+                  busy={loadingMore}
+                  disabled={loadingMore}
+                  secondary
+                />
+              ) : null}
+            </View>
+          </View>
+        ) : null}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <View style={styles.filterField}>
+      <Text style={styles.filterLabel}>{label}</Text>
+      <TextInput
+        accessibilityLabel={label}
+        value={value}
+        onChangeText={onChange}
+        placeholder={placeholder}
+        autoCapitalize="none"
+        style={styles.input}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: { backgroundColor: "#f7f9f7", flex: 1 },
+  content: { gap: 18, padding: 20, paddingBottom: 36 },
+  header: { gap: 12 },
+  title: { color: "#17201c", fontSize: 30, fontWeight: "700" },
+  subtitle: { color: "#46534d", fontSize: 16, lineHeight: 23 },
+  nav: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  filters: {
+    backgroundColor: "#eaf0ec",
+    borderRadius: 14,
+    gap: 12,
+    padding: 16,
+  },
+  filterField: { gap: 6 },
+  filterLabel: { color: "#203a2e", fontSize: 15, fontWeight: "700" },
+  input: {
+    backgroundColor: "#fff",
+    borderColor: "#68786f",
+    borderRadius: 10,
+    borderWidth: 1,
+    color: "#17201c",
+    fontSize: 16,
+    minHeight: 50,
+    paddingHorizontal: 14,
+  },
+  result: { gap: 16 },
+  dayHeading: { color: "#203a2e", fontSize: 19, fontWeight: "700" },
+  explainer: { color: "#46534d", fontSize: 14, lineHeight: 20 },
+  section: { gap: 10 },
+  sectionTitle: { color: "#203a2e", fontSize: 22, fontWeight: "700" },
+  summaryGroup: {
+    backgroundColor: "#fff",
+    borderColor: "#c8d2cb",
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 8,
+    padding: 14,
+  },
+  groupTitle: { color: "#245d3a", fontSize: 17, fontWeight: "700" },
+  summaryRow: {
+    borderTopColor: "#e0e6e2",
+    borderTopWidth: 1,
+    gap: 2,
+    paddingTop: 8,
+  },
+  summaryLabel: { color: "#24342b", fontSize: 15, fontWeight: "600" },
+  summaryValue: { color: "#17201c", fontSize: 18, fontWeight: "700" },
+  summaryMeta: { color: "#596860", fontSize: 13 },
+  timelineItem: {
+    backgroundColor: "#fff",
+    borderColor: "#c8d2cb",
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 5,
+    minHeight: 92,
+    padding: 15,
+  },
+  kind: {
+    color: "#245d3a",
+    fontSize: 13,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  cardTitle: { color: "#17201c", fontSize: 17, fontWeight: "700" },
+  cardBody: { color: "#34463b", fontSize: 15, lineHeight: 21 },
+  cardMeta: { color: "#596860", fontSize: 13 },
+  profileRef: {
+    backgroundColor: "#fff",
+    borderColor: "#c8d2cb",
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 4,
+    minHeight: 66,
+    padding: 14,
+  },
+  empty: {
+    alignItems: "flex-start",
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    gap: 10,
+    padding: 16,
+  },
+  hint: { color: "#4d5a54", fontSize: 14, lineHeight: 20 },
+});

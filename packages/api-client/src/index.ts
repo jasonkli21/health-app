@@ -1,4 +1,4 @@
-export { ApiError, ProfileApiClient } from "./generated";
+export { ApiError, HealthApiClient, ProfileApiClient } from "./generated";
 export type {
   FetchLike,
   FetchResponse,

@@ -166,7 +166,7 @@ lines.push(
   "  }",
   "}",
   "",
-  "export class ProfileApiClient {",
+  "export class HealthApiClient {",
   "  private readonly baseUrl: string;",
   "  private readonly fetcher: FetchLike;",
   "",
@@ -245,6 +245,8 @@ lines.push(
   "    return payload as T;",
   "  }",
   "}",
+  "",
+  "export { HealthApiClient as ProfileApiClient };",
   "",
 );
 
