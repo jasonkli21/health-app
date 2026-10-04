@@ -6,6 +6,8 @@
     "mobile:start": "pnpm --filter @personal-health/mobile start",
     "mobile:typecheck": "pnpm --filter @personal-health/mobile typecheck",
     "mobile:test": "pnpm --filter @personal-health/mobile test",
+    "api-client:generate": "pnpm --filter @personal-health/api-client generate",
+    "api-client:typecheck": "pnpm --filter @personal-health/api-client typecheck",
     "format:check": "prettier --check .",
     "mobile:lint": "pnpm --filter @personal-health/mobile lint",
     "scaffold:check": "python3 scripts/verify_scaffold.py",

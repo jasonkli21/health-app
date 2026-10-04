@@ -1,6 +1,8 @@
 from datetime import UTC, datetime
 
 import pytest
+from pydantic import ValidationError
+
 from health_api.domain.schemas import (
     ProfileCategory,
     ProfileKind,
@@ -9,7 +11,6 @@ from health_api.domain.schemas import (
     ProfileSchemaRegistry,
     ProfileValidity,
 )
-from pydantic import ValidationError
 
 
 def fact(value: object = None, **overrides: object) -> dict[str, object]:

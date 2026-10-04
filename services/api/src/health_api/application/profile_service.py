@@ -9,6 +9,12 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+from pydantic import ValidationError
+from sqlalchemy import and_, delete, or_, select
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
 from health_api.application.errors import ProfileConflict, ProfileNotFound, ProfileValidationError
 from health_api.domain.schemas import (
     ProfileMetadata,
@@ -23,11 +29,6 @@ from health_api.persistence.models import (
     ProfileItem,
     Source,
 )
-from pydantic import ValidationError
-from sqlalchemy import and_, delete, or_, select
-from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
 
 @dataclass(frozen=True)

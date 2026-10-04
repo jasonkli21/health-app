@@ -6,6 +6,10 @@ from threading import Barrier
 from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, sessionmaker
+
 from health_api.application import profile_service
 from health_api.application.errors import ProfileConflict, ProfileNotFound, ProfileValidationError
 from health_api.application.local_principal import ensure_local_principal
@@ -30,9 +34,6 @@ from health_api.persistence.models import (
     Source,
     User,
 )
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, sessionmaker
 
 
 def payload(label: str = "Diet preference", value: object = None) -> ProfilePayloadV1:

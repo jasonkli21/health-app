@@ -12,6 +12,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@personal-health/api-client": "workspace:*",
     "expo": "~57.0.26",
     "expo-router": "~57.0.24",
     "react": "19.2.3",

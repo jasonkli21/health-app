@@ -2,10 +2,11 @@
 
 from uuid import UUID
 
-from health_api.config.settings import Settings
-from health_api.persistence.models import User
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
+
+from health_api.config.settings import Settings
+from health_api.persistence.models import User
 
 
 def ensure_local_principal(session: Session, settings: Settings) -> UUID | None:

@@ -2,7 +2,18 @@
   "name": "@personal-health/api-client",
   "version": "0.0.0",
   "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "react-native": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "react-native": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
   "scripts": {
-    "generate": "node -e \"console.error('Not implemented: Phase 1 must add OpenAPI export and client generation. See README.md.'); process.exit(1)\""
+    "generate": "python ../../services/api/scripts/export_openapi.py && node scripts/generate-client.mjs && ../../node_modules/.bin/prettier --write ../../contracts/openapi/openapi.json src/generated.ts",
+    "typecheck": "../../apps/mobile/node_modules/.bin/tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler src/index.ts"
   }
 }

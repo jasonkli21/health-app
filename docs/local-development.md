@@ -25,7 +25,11 @@ pnpm mobile:start
 
 The shell uses Expo Go; it does not require an already-built development client. Use a compatible Expo Go simulator/device installation. `pnpm --filter @personal-health/mobile ios` builds the native shell locally if Xcode is installed. Phase 8 will introduce a development build for HealthKit. A Metro bundle check alone does not verify rendering on a device.
 
+After the Python environment and API dependencies are ready, export OpenAPI and build the generated TypeScript client with `pnpm --filter @personal-health/api-client generate`. This performs no database request. Check generated source with `pnpm --filter @personal-health/api-client typecheck`; CI also regenerates the tracked artifacts and fails on drift.
+
 `/healthz` is process liveness only: it requires no database, identity, objects, or AI service. Phase 1 loads the server-only settings in `.env` and adds owner-scoped Profile routes. Protected routes use the one `LOCAL_PRINCIPAL_ID` configured by the server; when it is absent, they return 401. `AUTH_MODE=dev` is accepted only in local/test settings, and the local principal is not real internet authentication. Never send owner IDs in a body/header or copy server environment variables into Expo public variables. Mobile requests use a separately configured public API URL; on a physical device, `localhost` is the phone itself. Keep development auth/API access private when allowing LAN access.
+
+Profile requests are limited to 65,536 bytes and errors do not include submitted values. Responses include a server-generated `X-Request-ID`. Lists are owner/filter/as-of scoped with a 100-item maximum; preserve the returned `as_of` when following its cursor. Unknown values use explicit `null` in the required typed payload value; `false` and `0` remain known values.
 
 ## Migrations and database tests
 
@@ -68,7 +72,7 @@ pnpm --filter @personal-health/mobile exec expo install --check
 pnpm --filter @personal-health/mobile exec expo export --platform ios --output-dir /tmp/personal-health-ios-bundle
 ```
 
-The Phase 1 API tests require `TEST_DATABASE_URL`; without it, PostgreSQL integration cases are skipped. CI provisions its own disposable PostgreSQL service. The mobile component test runner and Profile behavior checks are added in Phase 1. Device execution and accessibility walkthrough remain manual checks on an equipped host.
+The Phase 1 API tests require `TEST_DATABASE_URL`; without it, PostgreSQL integration cases are skipped. CI provisions its own disposable PostgreSQL service. The generated client has behavioral tests in the mobile Vitest suite; the Profile component and behavior checks are added in the remainder of Phase 1. Device execution and accessibility walkthrough remain manual checks on an equipped host.
 
 Frontend resolutions are in `pnpm-lock.yaml`; install with `--frozen-lockfile`. API runtime/dev resolutions for the tested Python 3.12 macOS/Linux baseline are in `services/api/requirements-dev.lock`, consumed as pip constraints. This is not a platform-independent Python lock; test/regenerate deliberately when changing Python/platform or dependencies. Build tooling is separately pinned in `pyproject.toml`. Optional lock regeneration uses uv:
 
