@@ -1,6 +1,5 @@
 import httpx
 import pytest
-
 from health_api.main import app
 
 

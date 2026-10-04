@@ -6,8 +6,6 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import AwareDatetime, ConfigDict, Field, StrictBool, StrictInt, model_validator
-
 from health_api.domain.schemas import (
     ConfirmationStatus,
     ProfileMetadata,
@@ -16,6 +14,7 @@ from health_api.domain.schemas import (
     ProfileValidity,
     StrictModel,
 )
+from pydantic import AwareDatetime, ConfigDict, Field, StrictBool, StrictInt, model_validator
 
 
 def _non_null_openapi_schema(schema: dict[str, Any]) -> None:

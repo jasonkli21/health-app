@@ -8,10 +8,9 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from sqlalchemy.exc import SQLAlchemyError
-
 from health_api.api.schemas import ErrorResponse, FieldError
 from health_api.application.errors import ProfileConflict, ProfileNotFound, ProfileValidationError
+from sqlalchemy.exc import SQLAlchemyError
 
 _SAFE_FIELD_NAMES = {
     "id",

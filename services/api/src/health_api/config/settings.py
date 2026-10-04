@@ -6,10 +6,9 @@ from functools import lru_cache
 from typing import Literal
 from uuid import UUID
 
+from health_api.domain.schemas import validate_iana_timezone
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-from health_api.domain.schemas import validate_iana_timezone
 
 
 class Settings(BaseSettings):

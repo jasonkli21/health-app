@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import json
 import re
-from pathlib import Path
-
 import tomllib
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED = (
@@ -55,11 +54,7 @@ REQUIRED = (
 
 
 def main() -> None:
-    errors = [
-        f"Missing scaffold file: {path}"
-        for path in REQUIRED
-        if not (ROOT / path).is_file()
-    ]
+    errors = [f"Missing scaffold file: {path}" for path in REQUIRED if not (ROOT / path).is_file()]
     for manifest_path in (
         "package.json",
         "apps/mobile/package.json",
@@ -82,9 +77,7 @@ def main() -> None:
     ):
         for path in source.rglob("*"):
             if path.is_file() and (
-                path.name.startswith("test_")
-                or ".test." in path.name
-                or ".spec." in path.name
+                path.name.startswith("test_") or ".test." in path.name or ".spec." in path.name
             ):
                 errors.append(f"Test in production source: {path.relative_to(ROOT)}")
     for package in (ROOT / "packages").iterdir():
@@ -96,9 +89,7 @@ def main() -> None:
                 **data.get("peerDependencies", {}),
             }
             if any(name.startswith(("react-native", "expo")) for name in dependencies):
-                errors.append(
-                    f"Native dependency in shared frontend package: {manifest}"
-                )
+                errors.append(f"Native dependency in shared frontend package: {manifest}")
         for path in package.rglob("*"):
             if "node_modules" in path.parts or path.suffix not in {
                 ".ts",
@@ -110,14 +101,10 @@ def main() -> None:
                 r"(?:from\s*|require\s*\(\s*|import\s*\(\s*)['\"](?:expo|react-native)",
                 path.read_text(),
             ):
-                errors.append(
-                    f"Native import in shared frontend source: {path.relative_to(ROOT)}"
-                )
+                errors.append(f"Native import in shared frontend source: {path.relative_to(ROOT)}")
     if errors:
         raise SystemExit("\n".join(errors))
-    print(
-        "Scaffold verification passed (files, manifests, source/test and native boundaries)."
-    )
+    print("Scaffold verification passed (files, manifests, source/test and native boundaries).")
 
 
 if __name__ == "__main__":

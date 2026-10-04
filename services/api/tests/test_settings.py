@@ -1,9 +1,8 @@
 from uuid import UUID
 
 import pytest
-from pydantic import ValidationError
-
 from health_api.config.settings import Settings
+from pydantic import ValidationError
 
 
 def test_settings_allow_an_unconfigured_local_principal_for_fail_closed_routes() -> None:
