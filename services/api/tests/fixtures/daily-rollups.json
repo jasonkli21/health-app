@@ -1,0 +1,252 @@
+{
+  "date": "2026-11-01",
+  "timezone": "America/Los_Angeles",
+  "events": [
+    {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "entry": {
+        "domain": "nutrition",
+        "time": {
+          "precision": "instant",
+          "occurred_at": "2026-11-01T08:00:00Z",
+          "timezone": "America/Los_Angeles"
+        },
+        "payload": {
+          "kind": "meal",
+          "label": "Breakfast",
+          "energy": { "value": 0, "unit": "kcal" }
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000002",
+      "entry": {
+        "domain": "nutrition",
+        "time": {
+          "precision": "date_only",
+          "local_date": "2026-11-01",
+          "timezone": "America/Los_Angeles"
+        },
+        "payload": { "kind": "meal", "label": "Dinner" }
+      }
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000003",
+      "entry": {
+        "domain": "exercise",
+        "time": {
+          "precision": "instant",
+          "occurred_at": "2026-11-02T07:30:00Z",
+          "timezone": "America/Los_Angeles"
+        },
+        "ended_at": "2026-11-02T08:30:00Z",
+        "payload": { "kind": "workout", "label": "Late walk" }
+      }
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000004",
+      "entry": {
+        "domain": "exercise",
+        "time": {
+          "precision": "date_only",
+          "local_date": "2026-11-01",
+          "timezone": "America/Los_Angeles"
+        },
+        "payload": {
+          "kind": "workout",
+          "label": "Hike",
+          "duration": { "value": 1, "unit": "h" },
+          "distance": { "value": 1, "unit": "mi" }
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000005",
+      "entry": {
+        "domain": "sleep",
+        "time": {
+          "precision": "instant",
+          "occurred_at": "2026-11-01T05:00:00Z",
+          "timezone": "America/Los_Angeles"
+        },
+        "ended_at": "2026-11-01T15:00:00Z",
+        "payload": { "kind": "sleep", "quality": 4 }
+      }
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000006",
+      "entry": {
+        "domain": "symptoms",
+        "time": {
+          "precision": "instant",
+          "occurred_at": "2026-11-01T10:00:00Z",
+          "timezone": "America/Los_Angeles"
+        },
+        "payload": { "kind": "symptom", "label": "Headache" }
+      }
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000007",
+      "entry": {
+        "domain": "symptoms",
+        "time": {
+          "precision": "instant",
+          "occurred_at": "2026-11-01T10:00:00Z",
+          "timezone": "America/Los_Angeles"
+        },
+        "payload": { "kind": "symptom", "label": "Nausea" }
+      }
+    }
+  ],
+  "observations": [
+    {
+      "id": "00000000-0000-0000-0000-000000000010",
+      "entry": {
+        "domain": "symptoms",
+        "time": {
+          "precision": "instant",
+          "occurred_at": "2026-11-01T09:00:00Z",
+          "timezone": "America/Los_Angeles"
+        },
+        "payload": { "value": { "metric": "symptom_severity", "value": 3 } }
+      }
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000011",
+      "entry": {
+        "domain": "symptoms",
+        "time": {
+          "precision": "instant",
+          "occurred_at": "2026-11-01T14:00:00Z",
+          "timezone": "America/Los_Angeles"
+        },
+        "payload": { "value": { "metric": "symptom_severity", "value": 5 } }
+      }
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000012",
+      "entry": {
+        "domain": "measurements",
+        "time": {
+          "precision": "instant",
+          "occurred_at": "2026-11-01T16:00:00Z",
+          "timezone": "America/Los_Angeles"
+        },
+        "payload": {
+          "value": { "metric": "weight", "value": 150, "unit": "lb" }
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000013",
+      "entry": {
+        "domain": "measurements",
+        "time": {
+          "precision": "instant",
+          "occurred_at": "2026-11-01T16:00:00Z",
+          "timezone": "America/Los_Angeles"
+        },
+        "payload": {
+          "value": { "metric": "temperature", "value": 98.6, "unit": "F" }
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000014",
+      "entry": {
+        "domain": "measurements",
+        "time": {
+          "precision": "instant",
+          "occurred_at": "2026-10-31T16:00:00Z",
+          "timezone": "America/Los_Angeles"
+        },
+        "payload": {
+          "value": { "metric": "weight", "value": 68, "unit": "kg" }
+        }
+      }
+    }
+  ],
+  "expected": {
+    "nutrition/energy": {
+      "known_value": 0,
+      "unit": "kcal",
+      "logged_count": 2,
+      "known_count": 1,
+      "total_count": 2,
+      "partial": true,
+      "method_version": "today-v1/sum-known-v1/unit-v1"
+    },
+    "exercise/duration": {
+      "known_value": 90,
+      "unit": "min",
+      "logged_count": 2,
+      "known_count": 2,
+      "total_count": 2,
+      "partial": false,
+      "method_version": "today-v1/sum-workout-duration-v1/unit-v1"
+    },
+    "exercise/distance": {
+      "known_value": 1609.344,
+      "unit": "m",
+      "logged_count": 2,
+      "known_count": 1,
+      "total_count": 2,
+      "partial": true,
+      "method_version": "today-v1/sum-start-day-v1/unit-v1"
+    },
+    "sleep/duration": {
+      "known_value": 480,
+      "unit": "min",
+      "logged_count": 1,
+      "known_count": 1,
+      "total_count": 1,
+      "partial": false,
+      "method_version": "today-v1/sum-overlap-v1/unit-v1"
+    },
+    "symptoms/symptom_episode_count": {
+      "known_value": 2,
+      "unit": "episodes",
+      "logged_count": 2,
+      "known_count": 2,
+      "total_count": 2,
+      "partial": false,
+      "method_version": "today-v1/count-reported-events-v1/unit-v1"
+    },
+    "symptoms/symptom_severity": {
+      "known_value": 5,
+      "unit": "score",
+      "logged_count": 2,
+      "known_count": 2,
+      "total_count": 2,
+      "partial": false,
+      "method_version": "today-v1/latest-observation-v1/unit-v1"
+    },
+    "measurements/weight": {
+      "known_value": 68.0388555,
+      "unit": "kg",
+      "logged_count": 1,
+      "known_count": 1,
+      "total_count": 1,
+      "partial": false,
+      "method_version": "today-v1/latest-observation-v1/unit-v1"
+    },
+    "measurements/temperature": {
+      "known_value": 37,
+      "unit": "C",
+      "logged_count": 1,
+      "known_count": 1,
+      "total_count": 1,
+      "partial": false,
+      "method_version": "today-v1/latest-observation-v1/unit-v1"
+    },
+    "measurements/systolic_pressure": {
+      "known_value": null,
+      "unit": "mmHg",
+      "logged_count": 0,
+      "known_count": 0,
+      "total_count": 0,
+      "partial": false,
+      "method_version": "today-v1/latest-observation-v1/unit-v1"
+    }
+  }
+}

@@ -34,3 +34,10 @@ gates as unverified; use a fresh disposable PG16 cluster for local DB tests if
 PG17 is still unavailable.
 
 - Restart reminders: the incorrectly anchored 2026-10-03 22:40 PDT entry was paused by `/root`; the valid one-time restart reminder remains 2026-10-04 03:55 PDT. Do not duplicate it.
+
+## Phase 2 implementation checkpoint (2026-10-03)
+
+- Phase 2 has started after reading the repository handoff, roadmap, detailed plan, Phase 1 evidence/review and inspecting current model/API/client/mobile sources plus Git state at `360d95a`.
+- Reconciliation is recorded at the top of `phase-2-implementation-plan.md`. Phase 1 release evidence now accurately says local implementation and independent review are complete; all external gates remain open.
+- Design uses the existing `health_objects`, `sources`, and `health_object_revisions` spine; Events/Observations will be typed owner-scoped subtypes with an additive migration. Revision snapshots will carry a serialized per-owner daily sequence to anchor a Today paging snapshot across future edits/archives. Daily source is server-owned `manual`, confirmation is `user_confirmed`; Profile behavior remains compatible.
+- P2.1 is implemented locally: strict Event/Observation v1 schemas are registered without changing Profile v1; `unit-v1` conversions and DST-aware day bounds are in `domain/daily.py`; fixed `today-v1` sparse rollups and a synthetic fall-DST golden fixture cover all five domains. Date-only rows keep their entered date and zone without inventing an instant; workout interval duration allocates by day overlap, while distance is assigned to its start day. Targeted validation: 31 domain/profile-schema tests passed; Ruff, mypy, Ruff format and fixture Prettier checks passed. P2.1 remains uncommitted as part of the current Phase 2 worktree; next package is additive persistence/atomic commands.

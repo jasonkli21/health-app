@@ -1,7 +1,7 @@
 # Phase 1 release evidence
 
 **Date:** 2026-10-03  
-**Status:** Implementation complete; independent review remains pending.  
+**Status:** Local implementation and independent review complete; external release gates remain open.
 **Scope:** Canonical Profile v1, local principal, PostgreSQL persistence, Profile API/generated client, and a Profile-only mobile flow. This is local development software, not internet-authenticated or production-ready.
 
 ## Delivered contract and storage
