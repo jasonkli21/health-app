@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import os
 from logging.config import fileConfig
 from typing import cast
 
 from alembic import context
-from health_api.config.settings import get_settings
+from health_api.config.settings import get_settings, validate_cloud_database_url
 from health_api.persistence.models import Base
 from sqlalchemy import Connection, engine_from_config, pool
 
@@ -15,9 +16,22 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def migration_database_url() -> str:
+    settings = get_settings()
+    direct_url = os.environ.get("MIGRATION_DATABASE_URL")
+    if settings.app_env == "cloud":
+        if not direct_url:
+            raise RuntimeError("MIGRATION_DATABASE_URL is required for cloud releases")
+        validate_cloud_database_url(direct_url, direct=True)
+        return direct_url
+    if direct_url:
+        return direct_url
+    return settings.database_url.get_secret_value()
+
+
 def run_migrations_offline() -> None:
     context.configure(
-        url=get_settings().database_url,
+        url=migration_database_url(),
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -37,7 +51,7 @@ def run_migrations_online() -> None:
         return
 
     configuration = config.get_section(config.config_ini_section, {})
-    configuration["sqlalchemy.url"] = get_settings().database_url
+    configuration["sqlalchemy.url"] = migration_database_url()
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",

@@ -48,6 +48,31 @@ class User(Base):
     )
 
 
+class ProviderIdentity(Base):
+    """A verified external subject mapped to one stable internal owner UUID."""
+
+    __tablename__ = "provider_identities"
+
+    issuer: Mapped[str] = mapped_column(String(256), primary_key=True)
+    subject: Mapped[str] = mapped_column(String(128), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_provider_identities_user"),
+        CheckConstraint(
+            "char_length(issuer) BETWEEN 1 AND 256", name="ck_provider_identity_issuer"
+        ),
+        CheckConstraint(
+            "char_length(subject) BETWEEN 1 AND 128", name="ck_provider_identity_subject"
+        ),
+    )
+
+
 class DailySnapshotMarker(Base):
     """Sequences that may safely anchor a complete committed Today snapshot."""
 
