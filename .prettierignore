@@ -1,0 +1,7 @@
+pnpm-lock.yaml
+services/api/requirements-dev.lock
+.venv/
+node_modules/
+.expo/
+contracts/openapi/generated/
+.data/

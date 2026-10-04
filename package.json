@@ -1,0 +1,21 @@
+{
+  "name": "personal-health",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "mobile:start": "pnpm --filter @personal-health/mobile start",
+    "mobile:typecheck": "pnpm --filter @personal-health/mobile typecheck",
+    "mobile:test": "pnpm --filter @personal-health/mobile test",
+    "format:check": "prettier --check .",
+    "mobile:lint": "pnpm --filter @personal-health/mobile lint",
+    "scaffold:check": "python3 scripts/verify_scaffold.py",
+    "format": "prettier --write ."
+  },
+  "engines": {
+    "node": ">=22.13.0",
+    "pnpm": ">=9 <10"
+  },
+  "devDependencies": {
+    "prettier": "3.6.2"
+  }
+}

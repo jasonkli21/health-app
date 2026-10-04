@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Personal Health",
+    "slug": "personal-health",
+    "scheme": "personalhealth",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "plugins": ["expo-router"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "local.personalhealth.app"
+    },
+    "android": {
+      "package": "local.personalhealth.app"
+    }
+  }
+}

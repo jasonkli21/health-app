@@ -1,0 +1,8 @@
+{
+  "name": "@personal-health/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "generate": "node -e \"console.error('Not implemented: Phase 1 must add OpenAPI export and client generation. See README.md.'); process.exit(1)\""
+  }
+}

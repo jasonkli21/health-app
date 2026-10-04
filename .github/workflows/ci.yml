@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  scaffold:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: "pnpm"
+      - run: python scripts/verify_scaffold.py
+      - run: pip install -c services/api/requirements-dev.lock -e 'services/api[dev]'
+      - run: pytest -c services/api/pyproject.toml services/api/tests
+      - run: |
+          ruff check --config services/api/pyproject.toml services/api/src services/api/tests scripts
+          ruff format --check --config services/api/pyproject.toml services/api/src services/api/tests scripts
+          mypy --config-file services/api/pyproject.toml services/api/src scripts
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm mobile:lint
+      - run: pnpm --filter @personal-health/mobile typecheck
+      # Phase 0 has no product tests. This hook must gain real tests in Phase 1.
+      - run: pnpm mobile:test
