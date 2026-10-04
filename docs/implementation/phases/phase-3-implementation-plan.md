@@ -2,6 +2,31 @@
 
 ## Implementation-time reconciliation gate
 
+### Execution reconciliation — October 4, 2026
+
+The user explicitly authorized moving to Phase 3 despite Phase 2's blocked
+database verification. Phase 2 code/review is committed through `7cc0a7d`;
+40 PostgreSQL tests, migration lifecycle/drift and query measurements remain
+unverified. This is an accepted sequencing deviation, not acceptance of those
+tests. Carry the gate into Phase 3 evidence and require it before live release.
+
+At `06b7075`, settings support only local/test development identity; engines
+use default pool settings; no Firebase/session/storage integration, production
+container or deployment automation exists. Cloud infrastructure consists of
+README placeholders. Remove redundant `NEON_DATABASE_URL`; preserve one
+`DATABASE_URL` and explicit direct migration configuration. Existing Profile
+and daily services already scope canonical data by internal owner UUID.
+
+Implement P3.1–P3.3 and the reviewable offline P3.4/P3.5 artifacts now in
+logical commits: configuration/identity persistence; verified auth and mobile
+session lifecycle; storage/container; deployment/runbook; release evidence.
+No product upload routes or future-phase features. Read current official vendor
+documentation before choosing verification libraries and deployment settings.
+Live provisioning requires supplied project/identity/region/bucket/Neon/budget
+inputs; a question is pending in the main session. Do not guess identifiers,
+spend money or claim mock/static results certify live cloud behavior. Complete
+all independent implementation and checks before reporting external blockers.
+
 **Status: planned. Dependencies: accepted Phases 1–2 and their actual release evidence.** Read [Phase 3 roadmap](../implementation-plan.md#phase-3--cloud-baseline), ADR 0002, security/deployment docs, actual principal/auth settings, migrations, daily/Profile routes and generated mobile client. Inspect local bootstrapping and locks before selecting images/config. Record drift and update plan/ADR before a material change.
 
 Real Phase 0 paths: `infra/gcp/README.md`, `infra/docker/README.md`, root `docker-compose.yml`/`.env.example`, API layered source/tests, mobile source/tests and `.github/workflows/ci.yml`. Auth, storage adapters, container/IaC/cloud resources below are **planned/provisional**. Preceding product code is assumed accepted at execution time, not already present now.
