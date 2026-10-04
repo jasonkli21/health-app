@@ -9,6 +9,12 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+from pydantic import ValidationError
+from sqlalchemy import and_, delete, or_, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from health_api.application.envelope_service import manual_source
 from health_api.application.errors import ProfileConflict, ProfileNotFound, ProfileValidationError
 from health_api.domain.schemas import (
     ProfileMetadata,
@@ -23,11 +29,6 @@ from health_api.persistence.models import (
     ProfileItem,
     Source,
 )
-from pydantic import ValidationError
-from sqlalchemy import and_, delete, or_, select
-from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
 
 @dataclass(frozen=True)
@@ -74,25 +75,6 @@ def _canonical_create_content(command: CreateProfile) -> str:
 
 def _fingerprint(command: CreateProfile) -> str:
     return hashlib.sha256(_canonical_create_content(command).encode("utf-8")).hexdigest()
-
-
-def _manual_source(session: Session, owner_id: UUID) -> Source:
-    session.execute(
-        insert(Source)
-        .values(
-            owner_id=owner_id,
-            source_key="manual",
-            source_kind="manual",
-            display_name="Manual entry",
-        )
-        .on_conflict_do_nothing(index_elements=[Source.owner_id, Source.source_key])
-    )
-    source = session.scalar(
-        select(Source).where(Source.owner_id == owner_id, Source.source_key == "manual")
-    )
-    if source is None:
-        raise RuntimeError("manual source could not be resolved")
-    return source
 
 
 def _select_aggregate(session: Session, owner_id: UUID, object_id: UUID) -> ProfileAggregate | None:
@@ -183,7 +165,7 @@ def create_profile_item(
                     raise RuntimeError("profile envelope has no profile payload")
                 return CreateProfileResult(aggregate, False)
 
-            source = _manual_source(session, owner_id)
+            source = manual_source(session, owner_id)
             payload = command.profile.model_dump(mode="json")
             health_object = HealthObject(
                 id=command.id,
@@ -433,7 +415,7 @@ def create_profile_relationship(
         )
         if endpoints != {from_object_id, to_object_id}:
             raise ProfileNotFound
-        source = _manual_source(session, owner_id)
+        source = manual_source(session, owner_id)
         relationship = HealthRelationship(
             id=uuid4(),
             owner_id=owner_id,

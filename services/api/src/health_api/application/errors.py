@@ -11,3 +11,15 @@ class ProfileConflict(Exception):
 
 class ProfileValidationError(Exception):
     pass
+
+
+class DailyNotFound(Exception):
+    pass
+
+
+class DailyConflict(Exception):
+    pass
+
+
+class DailyValidationError(Exception):
+    pass

@@ -8,9 +8,17 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from health_api.api.schemas import ErrorResponse, FieldError
-from health_api.application.errors import ProfileConflict, ProfileNotFound, ProfileValidationError
 from sqlalchemy.exc import SQLAlchemyError
+
+from health_api.api.schemas import ErrorResponse, FieldError
+from health_api.application.errors import (
+    DailyConflict,
+    DailyNotFound,
+    DailyValidationError,
+    ProfileConflict,
+    ProfileNotFound,
+    ProfileValidationError,
+)
 
 _SAFE_FIELD_NAMES = {
     "id",
@@ -34,6 +42,20 @@ _SAFE_FIELD_NAMES = {
     "limit",
     "cursor",
     "item_id",
+    "event",
+    "observation",
+    "domain",
+    "time",
+    "occurred_at",
+    "ended_at",
+    "interval_end",
+    "metric",
+    "timezone",
+    "local_date",
+    "event_id",
+    "observation_id",
+    "objects",
+    "links",
 }
 
 
@@ -104,6 +126,20 @@ def install_error_handlers(app: FastAPI) -> None:
     ) -> JSONResponse:
         return _error_response(request, 422, "validation_error", "Profile data is invalid.")
 
+    @app.exception_handler(DailyNotFound)
+    async def daily_not_found_handler(request: Request, _exc: DailyNotFound) -> JSONResponse:
+        return _error_response(request, 404, "not_found", "Daily entry was not found.")
+
+    @app.exception_handler(DailyConflict)
+    async def daily_conflict_handler(request: Request, exc: DailyConflict) -> JSONResponse:
+        return _error_response(request, 409, "conflict", str(exc) or "Daily entry conflict.")
+
+    @app.exception_handler(DailyValidationError)
+    async def daily_validation_handler(
+        request: Request, _exc: DailyValidationError
+    ) -> JSONResponse:
+        return _error_response(request, 422, "validation_error", "Daily entry is invalid.")
+
     @app.exception_handler(RequestValidationError)
     async def request_validation_handler(
         request: Request, exc: RequestValidationError
@@ -122,7 +158,7 @@ def install_error_handlers(app: FastAPI) -> None:
             request,
             503,
             "service_unavailable",
-            "Profile storage is temporarily unavailable.",
+            "Health storage is temporarily unavailable.",
         )
 
     @app.exception_handler(Exception)
