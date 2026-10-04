@@ -1,5 +1,25 @@
 # Implementation coordinator state
 
+## Current stop checkpoint — October 4, 2026
+
+The user requested finishing the current phase and stopping before the next
+phase. Phase 3 local implementation and main-session review are complete
+through `a50bb52`, including fixes `4d2dd7a`, `f6dcf59`, `19fe52e` and
+`e802439`. Root lightly re-reviewed the actual persistence/session/transport,
+logging and migration-lock changes and reran checks: **90 API tests passed,
+43 PostgreSQL tests skipped; 79 mobile tests passed across 16 files**. Configured
+Python Ruff/format (48 files), mypy (26 sources), scaffold, mobile TypeScript
+and zero-warning ESLint, client TypeScript, reproducible contract generation
+and Terraform formatting passed. The fix agent's offline Terraform validation,
+signed provider-lock and iOS bundle evidence are retained separately.
+
+Phase 3 is complete for local implementation/review only. Database acceptance,
+container build/run, real staging auth/storage/migrations/rollback/resource
+measurements and owner-supplied cloud release inputs remain open. Do not claim
+live acceptance. **Stop here; do not start Phase 4 or resume automatic sequential
+implementation without a new user instruction.** Earlier loop/resume instructions
+below are historical and superseded by this explicit stop request.
+
 Updated 2026-10-04 (PDT). Resume from this file, the phase plans, release evidence, and Git history; do not rely on conversation memory.
 
 - Current stage: Phase 3 local implementation and seven review fixes are committed through `e802439`, awaiting root re-review; P3.4 is offline IaC/runbook only, and P3.5 live acceptance is blocked on owner-supplied release inputs and staging. The user explicitly authorized skipping Phase 2's blocked database checks and continuing to Phase 3 on October 4. Phase 1 local review and Phase 2 code review are complete. Phase 2 database acceptance remains unverified (40 PostgreSQL tests, migration lifecycle/drift and query measurements); carry it forward before live release, without claiming it passed.

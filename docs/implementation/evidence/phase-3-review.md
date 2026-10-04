@@ -127,3 +127,18 @@ Follow-up `e802439` invalidates the owner epoch before SDK sign-in can install
 a different user, suppresses signed-out callbacks that could resurrect a
 rejected account, and keeps failed sign-in retryable. Two more asynchronous
 regressions pass; the final mobile count is 79.
+
+## Main-session final verification and stop
+
+Root lightly re-reviewed the committed fixes through `a50bb52`, including
+actual SDK persistence-key encoding, queued epoch/UID-safe mutations, definitive
+refresh errors, payload-consumption guards and reproducible generator, strict
+API configuration, redacted logging and advisory-lock transaction cleanup.
+The seven local code findings are addressed. Root independently reran **90
+passing API tests with 43 database skips**, **79 mobile tests**, configured
+Ruff/format/mypy/scaffold, mobile TypeScript/zero-warning ESLint, client
+TypeScript, contract regeneration and Terraform format checks successfully.
+
+The user then requested stopping after the current phase. Local code review is
+closed; database and live release acceptance remain open as listed in release
+evidence. No Phase 4 implementation is authorized to begin from this checkpoint.

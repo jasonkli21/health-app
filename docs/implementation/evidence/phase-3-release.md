@@ -1,5 +1,12 @@
 # Phase 3 release evidence
 
+**Final main-session disposition:** local implementation and code review are
+complete through `a50bb52`. Root independently verified 90 API tests passing,
+43 PostgreSQL skips, 79 mobile tests passing and the static/contract checks
+recorded in `phase-3-review.md`. Database and real staging acceptance remain
+open. The user explicitly requested stopping after this phase; Phase 4 has
+not started and must not start without a new instruction.
+
 **Checkpoint:** October 4, 2026. **Scope:** local implementation and offline
 release artifacts only. No cloud project was selected, no service was
 provisioned, and no cloud spend occurred.
