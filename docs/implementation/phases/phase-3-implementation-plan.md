@@ -10,12 +10,13 @@ database verification. Phase 2 code/review is committed through `7cc0a7d`;
 unverified. This is an accepted sequencing deviation, not acceptance of those
 tests. Carry the gate into Phase 3 evidence and require it before live release.
 
-At `06b7075`, settings support only local/test development identity; engines
-use default pool settings; no Firebase/session/storage integration, production
-container or deployment automation exists. Cloud infrastructure consists of
-README placeholders. Remove redundant `NEON_DATABASE_URL`; preserve one
-`DATABASE_URL` and explicit direct migration configuration. Existing Profile
-and daily services already scope canonical data by internal owner UUID.
+At execution start (`7e00bb1`), settings support only local/test development
+identity; engines use default pool settings; no Firebase/session/storage
+integration, production container or deployment automation exists. Cloud
+infrastructure consists of README placeholders. Remove redundant
+`NEON_DATABASE_URL`; preserve one `DATABASE_URL` and explicit direct migration
+configuration. Existing Profile and daily services already scope canonical
+data by internal owner UUID.
 
 Implement P3.1–P3.3 and the reviewable offline P3.4/P3.5 artifacts now in
 logical commits: configuration/identity persistence; verified auth and mobile
@@ -27,9 +28,9 @@ inputs; a question is pending in the main session. Do not guess identifiers,
 spend money or claim mock/static results certify live cloud behavior. Complete
 all independent implementation and checks before reporting external blockers.
 
-**Status: planned. Dependencies: accepted Phases 1–2 and their actual release evidence.** Read [Phase 3 roadmap](../implementation-plan.md#phase-3--cloud-baseline), ADR 0002, security/deployment docs, actual principal/auth settings, migrations, daily/Profile routes and generated mobile client. Inspect local bootstrapping and locks before selecting images/config. Record drift and update plan/ADR before a material change.
+**Status: local implementation complete for P3.1–P3.3; P3.4 deployment artifacts are reviewable but not statically validated or applied; P3.5 live acceptance is blocked on release inputs and staging.** Dependencies: accepted Phases 1–2, with Phase 2 PostgreSQL acceptance still deferred. Read [Phase 3 roadmap](../implementation-plan.md#phase-3--cloud-baseline), ADR 0002, security/deployment docs, actual principal/auth settings, migrations, daily/Profile routes and generated mobile client. Inspect local bootstrapping and locks before selecting images/config. Record drift and update plan/ADR before a material change. Dated outcomes and checks are in [Phase 3 release evidence](../evidence/phase-3-release.md).
 
-Real Phase 0 paths: `infra/gcp/README.md`, `infra/docker/README.md`, root `docker-compose.yml`/`.env.example`, API layered source/tests, mobile source/tests and `.github/workflows/ci.yml`. Auth, storage adapters, container/IaC/cloud resources below are **planned/provisional**. Preceding product code is assumed accepted at execution time, not already present now.
+Execution began at `7e00bb1`; Phase 2 code/review was committed through `7cc0a7d`, while 40 PostgreSQL tests, migration lifecycle/drift and query measurements were still unverified. The user explicitly authorized proceeding without closing that database gate. Phase 3 adds an issuer/subject identity map, Firebase server and mobile session integration, local/GCS object adapters, the production container, and offline IaC/runbook artifacts. It does not add product upload routes. The final local implementation commits are recorded in release evidence; no live project or budget was selected.
 
 ## Outcome and strict boundary
 
@@ -125,10 +126,31 @@ Auth is transport enforcement around existing domain ownership; never rewrite ow
 | Runtime/security        | Image checks, no secret inclusion, local container          | Cloud Run PORT/restart/HTTPS/logs/timeouts                    |
 | Release safety/cost     | IaC plan/rollback script validation                         | Staging rollout/rollback, current vendor terms/budget         |
 
+## Execution outcome — October 4, 2026
+
+P3.1 is committed at `d041477`, P3.2 at `95d7c3d`, P3.3 at `0708109`, and
+offline P3.4 artifacts at `c288982`. Deterministic auth, route-ownership,
+session lifecycle, storage containment and settings tests pass; the exact
+commands and boundaries are in [release evidence](../evidence/phase-3-release.md).
+The runtime pool budget reserves capacity for two simultaneously serving
+revisions. The migration job reads only the separate direct URL secret. The
+container uses a hash-locked production requirements file and runs as a fixed
+non-root UID/GID.
+
+Two implementation-time limits remain explicit. First, storage adapters accept
+bounded in-memory `bytes` (maximum configured size) rather than streaming; the
+adapter is not exposed through a product upload route, which remains Phase 9.
+Second, P3.4's HCL could not be formatted or validated because neither
+Terraform nor OpenTofu is installed. The YAML, shell script and offline Alembic
+SQL were checked, but they do not validate HCL or cloud behavior. No live
+Firebase, Neon, Cloud Run or GCS acceptance was possible without owner-supplied
+release inputs. P3.4 is therefore an offline artifact milestone; P3.5 and the
+Phase 4 gate remain open.
+
 ## Acceptance and completion review
 
 Existing Profile/daily behavior works locally and on a real authenticated staging deployment; owner isolation and state survive restart; storage private; migration/release repeatable; limits/secrets/logging reviewed. Ordinary local development still requires no cloud. No records/AI/planning/HealthKit/web added.
 
 Before Phase 4: Can every domain request resolve one verified owner? Do missing external services fail closed? Is the pool budget within real limits? Does rollback preserve data? Are live auth/storage checks actually performed and remaining vendor decisions visible?
 
-Luna Max must leave planned `docs/implementation/evidence/phase-3-release.md`: actual project/region identifiers (non-secret), deployed image/revision, IaC state procedure, migration head/run order, identity mapping and dev-mode restrictions, config/secret names, generated API procedure, local/cloud test results separately, IAM/storage/connection/budget evidence, rollback steps and unresolved gates. Link the cloud runbook without secret values; preserve costs as dated observations.
+Before Phase 4, the release evidence must include actual non-secret project and region identifiers, deployed image/revision, IaC state procedure, migration head/run order, identity mapping and development-mode restrictions, config/secret names, generated API procedure, local/cloud tests separately, IAM/storage/connection/budget evidence, rollback steps and unresolved gates. Link the runbook without secret values; preserve costs as dated observations. The current evidence deliberately records these live fields as unresolved and does not authorize Phase 4.
