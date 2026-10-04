@@ -71,15 +71,15 @@ resource "google_project_iam_member" "runtime_firebase_user_read" {
 resource "google_cloud_run_v2_service" "api" {
   count = var.deploy_api_service ? 1 : 0
 
-  project                 = var.gcp_project_id
-  name                    = local.api_name
-  location                = var.region
-  deletion_protection     = true
-  ingress                 = "INGRESS_TRAFFIC_ALL"
+  project             = var.gcp_project_id
+  name                = local.api_name
+  location            = var.region
+  deletion_protection = true
+  ingress             = "INGRESS_TRAFFIC_ALL"
   # Mobile sends Firebase ID tokens, not Cloud Run IAM identity tokens. The
   # application verifies bearer identity on every owner-scoped route.
-  invoker_iam_disabled    = true
-  launch_stage            = "GA"
+  invoker_iam_disabled = true
+  launch_stage         = "GA"
 
   template {
     service_account                  = google_service_account.runtime.email
