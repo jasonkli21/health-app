@@ -46,6 +46,7 @@ export default function DailyHistoryScreen() {
       setError(null);
       setEntries([]);
       setNextRevision(null);
+      setLoadingMore(false);
       void (async () => {
         try {
           const result =

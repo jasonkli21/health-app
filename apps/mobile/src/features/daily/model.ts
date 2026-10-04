@@ -213,6 +213,22 @@ function timePoint(draft: DailyDraft): components["schemas"]["DailyTimePoint"] {
   };
 }
 
+function intervalEnd(
+  draft: DailyDraft,
+  time: components["schemas"]["DailyTimePoint"],
+  label: string,
+): string | null {
+  if (!draft.endedAt.trim()) return null;
+  if (time.precision !== "instant") {
+    throw new Error(`${label} needs an exact start time.`);
+  }
+  const endedAt = instant(draft.endedAt, label);
+  if (instantMicroseconds(endedAt) <= instantMicroseconds(time.occurred_at)) {
+    throw new Error(`${label} must be after the start time.`);
+  }
+  return endedAt;
+}
+
 function buildEvent(domain: DailyDomain, draft: DailyDraft): EventRecord {
   const label = draft.label.trim() || (domain === "sleep" ? "Sleep" : "");
   if (!label) throw new Error("Enter a label for this entry.");
@@ -235,7 +251,7 @@ function buildEvent(domain: DailyDomain, draft: DailyDraft): EventRecord {
     return {
       domain,
       time,
-      ended_at: null,
+      ended_at: intervalEnd(draft, time, "End time"),
       payload: {
         kind: "meal",
         label,
@@ -253,19 +269,7 @@ function buildEvent(domain: DailyDomain, draft: DailyDraft): EventRecord {
     if (duration !== null && draft.endedAt.trim()) {
       throw new Error("Choose a reported duration or an end time, not both.");
     }
-    const endedAt = draft.endedAt.trim()
-      ? instant(draft.endedAt, "End time")
-      : null;
-    if (endedAt) {
-      if (time.precision !== "instant") {
-        throw new Error("An end time requires an exact start time.");
-      }
-      if (
-        instantMicroseconds(endedAt) <= instantMicroseconds(time.occurred_at)
-      ) {
-        throw new Error("End time must be after the start time.");
-      }
-    }
+    const endedAt = intervalEnd(draft, time, "End time");
     return {
       domain,
       time,
@@ -287,12 +291,7 @@ function buildEvent(domain: DailyDomain, draft: DailyDraft): EventRecord {
   }
 
   if (domain === "sleep") {
-    if (time.precision !== "instant")
-      throw new Error("Sleep needs exact start and end times.");
-    const endedAt = instant(draft.endedAt, "End time");
-    if (instantMicroseconds(endedAt) <= instantMicroseconds(time.occurred_at)) {
-      throw new Error("End time must be after the start time.");
-    }
+    const endedAt = intervalEnd(draft, time, "End time");
     const quality = finiteOptional(draft.quality, "Sleep quality", 1);
     if (quality !== null && (!Number.isInteger(quality) || quality > 5)) {
       throw new Error("Sleep quality must be a whole number from 1 to 5.");
@@ -310,7 +309,7 @@ function buildEvent(domain: DailyDomain, draft: DailyDraft): EventRecord {
     return {
       domain,
       time,
-      ended_at: null,
+      ended_at: intervalEnd(draft, time, "End time"),
       payload: { kind: "symptom", label },
       notes,
     };
@@ -324,8 +323,12 @@ function buildObservation(
   valueText: string,
   unit: DailyDraft["measurementUnit"] | "score",
   draft: DailyDraft,
+  includeIntervalEnd = true,
 ): ObservationRecord {
   const time = timePoint(draft);
+  const end = includeIntervalEnd
+    ? intervalEnd(draft, time, "Interval end")
+    : null;
   const value = finiteOptional(
     valueText,
     "Value",
@@ -345,7 +348,7 @@ function buildObservation(
     return {
       domain,
       time,
-      interval_end: null,
+      interval_end: end,
       payload: { value: { metric, value, unit: "score" } },
       notes: draft.notes.trim() || null,
     };
@@ -353,7 +356,7 @@ function buildObservation(
   return {
     domain,
     time,
-    interval_end: null,
+    interval_end: end,
     payload: {
       value: {
         metric: metric as Exclude<MeasurementMetric, "blood_pressure">,
@@ -415,6 +418,7 @@ export function buildDailyCreateRequest(
           draft.severity,
           "score",
           { ...draft, notes: "" },
+          false,
         );
         observations.push({ id: ids.observation, observation: severity });
         links.push({
@@ -529,6 +533,7 @@ export function draftFromDailyItem(item: DailyItem): DailyDraft {
     }
   } else {
     draftTime(draft, item.observation.time);
+    draft.endedAt = item.observation.interval_end ?? "";
     const value = item.observation.payload.value;
     if (value.metric === "symptom_severity") {
       draft.severity = String(value.value);

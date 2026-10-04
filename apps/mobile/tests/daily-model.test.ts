@@ -150,7 +150,7 @@ describe("daily entry builders", () => {
     });
   });
 
-  it("requires exact start/end time for sleep and validates optional quality", () => {
+  it("keeps sleep duration unknown until an exact end time is supplied", () => {
     const request = built(
       "sleep",
       draft({
@@ -164,10 +164,16 @@ describe("daily entry builders", () => {
       ended_at: "2026-05-02T06:00:00-07:00",
       payload: { kind: "sleep", label: "Sleep", quality: 4 },
     });
-    expect(
-      buildDailyCreateRequest("sleep", draft({ precision: "date_only" }), IDS)
-        .ok,
-    ).toBe(false);
+    const dateOnly = built(
+      "sleep",
+      draft({ precision: "date_only", localDate: "2026-05-01", endedAt: "" }),
+    );
+    expect(dateOnly.events?.[0]?.event).toMatchObject({
+      time: { precision: "date_only", local_date: "2026-05-01" },
+      ended_at: null,
+    });
+    const knownStart = built("sleep", draft({ endedAt: "" }));
+    expect(knownStart.events?.[0]?.event.ended_at).toBeNull();
   });
 
   it("saves symptom and optional severity as linked records in one bounded request", () => {
@@ -191,6 +197,40 @@ describe("daily entry builders", () => {
     expect(
       built("symptoms", draft({ label: "Headache" })).observations,
     ).toEqual([]);
+  });
+
+  it("keeps an optional symptom interval on the event without assigning it to its severity observation", () => {
+    const request = built(
+      "symptoms",
+      draft({
+        label: "Headache",
+        instant: "2026-05-01T09:00:00.123456-07:00",
+        endedAt: "2026-05-01T09:30:00.654321-07:00",
+        severity: "4",
+      }),
+    );
+    expect(request.events?.[0]?.event.ended_at).toBe(
+      "2026-05-01T09:30:00.654321-07:00",
+    );
+    expect(request.observations?.[0]?.observation.interval_end).toBeNull();
+  });
+
+  it("supports an optional measurement Observation interval end", () => {
+    const request = built(
+      "measurements",
+      draft({
+        measurementMetric: "weight",
+        measurementValue: "150",
+        measurementUnit: "lb",
+        instant: "2026-05-01T09:00:00.123456-07:00",
+        endedAt: "2026-05-01T09:05:00.654321-07:00",
+      }),
+    );
+    expect(request.observations?.[0]?.observation).toMatchObject({
+      time: { occurred_at: "2026-05-01T09:00:00.123456-07:00" },
+      interval_end: "2026-05-01T09:05:00.654321-07:00",
+      payload: { value: { value: 150, unit: "lb" } },
+    });
   });
 
   it("creates blood pressure as a systolic/diastolic pair with blank values rejected", () => {
@@ -352,6 +392,100 @@ describe("daily entry builders", () => {
         payload: {
           value: { metric: "symptom_severity", value: 0, unit: "score" },
         },
+      },
+    });
+  });
+
+  it("round trips event and Observation interval bounds, original units, and microseconds", () => {
+    const symptom: DailyEvent = {
+      id: IDS.event,
+      object_type: "event",
+      domain: "symptoms",
+      status: "active",
+      title: "Headache",
+      valid_from: null,
+      valid_to: null,
+      recorded_at: "2026-05-01T16:00:00Z",
+      created_at: "2026-05-01T16:00:00Z",
+      updated_at: "2026-05-01T16:00:00Z",
+      source: { id: IDS.observation, kind: "manual", name: "You" },
+      confirmation_status: "user_confirmed",
+      schema_version: 1,
+      revision: 1,
+      notes: null,
+      metadata: {},
+      permissions: { ai_use_allowed: false, cross_domain_use_allowed: false },
+      linked_observation_ids: [],
+      event: {
+        domain: "symptoms",
+        time: {
+          precision: "instant",
+          occurred_at: "2026-05-01T09:00:00.123456-07:00",
+          timezone: "America/Los_Angeles",
+        },
+        ended_at: "2026-05-01T09:30:00.654321-07:00",
+        notes: null,
+        payload: { kind: "symptom", label: "Headache" },
+      },
+    };
+    const eventDraft = draftFromDailyItem(symptom);
+    expect(eventDraft.instant).toBe("2026-05-01T09:00:00.123456-07:00");
+    expect(eventDraft.endedAt).toBe("2026-05-01T09:30:00.654321-07:00");
+    expect(
+      buildDailyUpdateRecord(symptom, { ...eventDraft, label: "Migraine" }),
+    ).toMatchObject({
+      ok: true,
+      value: {
+        time: { occurred_at: "2026-05-01T09:00:00.123456-07:00" },
+        ended_at: "2026-05-01T09:30:00.654321-07:00",
+        payload: { label: "Migraine" },
+      },
+    });
+
+    const intervalObservation: DailyObservation = {
+      id: IDS.observation,
+      object_type: "observation",
+      domain: "measurements",
+      status: "active",
+      title: "Weight",
+      valid_from: null,
+      valid_to: null,
+      recorded_at: "2026-05-01T16:00:00Z",
+      created_at: "2026-05-01T16:00:00Z",
+      updated_at: "2026-05-01T16:00:00Z",
+      source: { id: IDS.event, kind: "manual", name: "You" },
+      confirmation_status: "user_confirmed",
+      schema_version: 1,
+      revision: 1,
+      notes: null,
+      metadata: {},
+      permissions: { ai_use_allowed: false, cross_domain_use_allowed: false },
+      observation: {
+        domain: "measurements",
+        time: {
+          precision: "instant",
+          occurred_at: "2026-05-01T09:00:00.123456-07:00",
+          timezone: "America/Los_Angeles",
+        },
+        interval_end: "2026-05-01T09:05:00.654321-07:00",
+        notes: null,
+        payload: { value: { metric: "weight", value: 150, unit: "lb" } },
+      },
+    };
+    const observationDraft = draftFromDailyItem(intervalObservation);
+    expect(observationDraft.endedAt).toBe("2026-05-01T09:05:00.654321-07:00");
+    expect(observationDraft.measurementUnit).toBe("lb");
+    expect(
+      buildDailyUpdateRecord(intervalObservation, {
+        ...observationDraft,
+        measurementValue: "151",
+      }),
+    ).toMatchObject({
+      ok: true,
+      value: {
+        time: { occurred_at: "2026-05-01T09:00:00.123456-07:00" },
+        interval_end: "2026-05-01T09:05:00.654321-07:00",
+        payload: { value: { value: 151, unit: "lb" } },
       },
     });
   });

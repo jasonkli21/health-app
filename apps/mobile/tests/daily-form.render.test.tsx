@@ -55,7 +55,7 @@ describe("DailyEntryForm first render", () => {
   it.each([
     ["nutrition", "Meal label"],
     ["exercise", "Activity"],
-    ["sleep", "Sleep end time"],
+    ["sleep", "Sleep end time (optional)"],
     ["symptoms", "Severity (optional, 0 to 10)"],
     ["measurements", "Measurement value"],
   ] as const)("shows the %s form's labeled input", async (domain, label) => {

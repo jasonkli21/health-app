@@ -29,6 +29,7 @@ type Props = {
   domain: DailyDomain;
   initialItem?: DailyItem;
   initialDraft?: DailyDraft;
+  onDraftChange?: (draft: DailyDraft) => void;
   submitLabel: string;
   onCancel: () => void;
   onCreate?: (request: DailyCreateRequest, draft: DailyDraft) => Promise<void>;
@@ -102,6 +103,7 @@ export function DailyEntryForm({
   domain,
   initialItem,
   initialDraft,
+  onDraftChange,
   submitLabel,
   onCancel,
   onCreate,
@@ -109,10 +111,10 @@ export function DailyEntryForm({
   onRetryUncertain,
   onConflictReload,
 }: Props) {
-  const [draft, setDraft] = useState<DailyDraft>(() =>
-    initialItem
-      ? draftFromDailyItem(initialItem)
-      : (initialDraft ?? emptyDailyDraft()),
+  const [draft, setDraft] = useState<DailyDraft>(
+    () =>
+      initialDraft ??
+      (initialItem ? draftFromDailyItem(initialItem) : emptyDailyDraft()),
   );
   const ids = useRef({
     event: initialItem?.object_type === "event" ? initialItem.id : newDailyId(),
@@ -127,7 +129,9 @@ export function DailyEntryForm({
   const [saving, setSaving] = useState(false);
 
   function update(patch: Partial<DailyDraft>) {
-    setDraft((current) => ({ ...current, ...patch }));
+    const next = { ...draft, ...patch };
+    setDraft(next);
+    onDraftChange?.(next);
     setError(null);
     setConflict(false);
   }
@@ -224,7 +228,7 @@ export function DailyEntryForm({
         value you can enter.
       </Text>
 
-      {domain !== "sleep" && !severityOnly ? (
+      {!severityOnly ? (
         <View>
           <Text style={styles.fieldLabel}>Time detail</Text>
           <View accessibilityRole="radiogroup" style={styles.choices}>
@@ -236,7 +240,7 @@ export function DailyEntryForm({
             <Choice
               label="Date only"
               selected={draft.precision === "date_only"}
-              onPress={() => update({ precision: "date_only" })}
+              onPress={() => update({ precision: "date_only", endedAt: "" })}
             />
           </View>
         </View>
@@ -271,14 +275,24 @@ export function DailyEntryForm({
       />
 
       {severityOnly ? (
-        <Field
-          label="Severity score (0 to 10)"
-          hint="0 is a recorded value. Leave it blank only when you are creating a new symptom without a severity."
-          value={draft.severity}
-          onChange={(severity) => update({ severity })}
-          placeholder="Enter a score"
-          keyboardType="numbers-and-punctuation"
-        />
+        <>
+          <Field
+            label="Severity score (0 to 10)"
+            hint="0 is a recorded value. Leave it blank only when you are creating a new symptom without a severity."
+            value={draft.severity}
+            onChange={(severity) => update({ severity })}
+            placeholder="Enter a score"
+            keyboardType="numbers-and-punctuation"
+          />
+          {draft.precision === "instant" ? (
+            <Field
+              label="Interval end (optional)"
+              hint="Preserves or edits the Observation interval when one is recorded."
+              value={draft.endedAt}
+              onChange={(endedAt) => update({ endedAt })}
+            />
+          ) : null}
+        </>
       ) : null}
 
       {domain === "nutrition" && !initialItem ? (
@@ -380,20 +394,32 @@ export function DailyEntryForm({
 
       {domain === "sleep" && !initialItem ? (
         <>
-          <Field
-            label="Sleep start time"
-            hint="Include Z for UTC or an explicit offset."
-            value={draft.instant}
-            onChange={(instant) => update({ instant })}
-            placeholder="2026-05-01T22:00:00-07:00"
-          />
-          <Field
-            label="Sleep end time"
-            hint="Required. Overnight sleep is allocated across local days by elapsed time."
-            value={draft.endedAt}
-            onChange={(endedAt) => update({ endedAt })}
-            placeholder="2026-05-02T06:00:00-07:00"
-          />
+          {draft.precision === "date_only" ? (
+            <Field
+              label="Local calendar date"
+              hint="Enter the date you know. No start or duration is inferred."
+              value={draft.localDate}
+              onChange={(localDate) => update({ localDate })}
+              placeholder="YYYY-MM-DD"
+            />
+          ) : (
+            <>
+              <Field
+                label="Sleep start time"
+                hint="Include Z or an explicit offset. An end time is optional."
+                value={draft.instant}
+                onChange={(instant) => update({ instant })}
+                placeholder="2026-05-01T22:00:00-07:00"
+              />
+              <Field
+                label="Sleep end time (optional)"
+                hint="When known, the exact interval is allocated across local days."
+                value={draft.endedAt}
+                onChange={(endedAt) => update({ endedAt })}
+                placeholder="2026-05-02T06:00:00-07:00"
+              />
+            </>
+          )}
           <Field
             label="Sleep quality (optional, 1 to 5)"
             value={draft.quality}
@@ -420,6 +446,14 @@ export function DailyEntryForm({
             placeholder="Leave blank if unknown"
             keyboardType="numbers-and-punctuation"
           />
+          {draft.precision === "instant" ? (
+            <Field
+              label="Symptom end time (optional)"
+              hint="Leave blank when the end is unknown."
+              value={draft.endedAt}
+              onChange={(endedAt) => update({ endedAt })}
+            />
+          ) : null}
         </>
       ) : null}
 
@@ -512,6 +546,14 @@ export function DailyEntryForm({
               ) : null}
             </>
           )}
+          {draft.precision === "instant" ? (
+            <Field
+              label="Interval end (optional)"
+              hint="Leave blank when the measurement end is unknown."
+              value={draft.endedAt}
+              onChange={(endedAt) => update({ endedAt })}
+            />
+          ) : null}
         </>
       ) : null}
 
@@ -546,6 +588,14 @@ export function DailyEntryForm({
               onPress={() => update({ energyUnit: "kJ" })}
             />
           </View>
+          {draft.precision === "instant" ? (
+            <Field
+              label="End time (optional)"
+              hint="Preserves the recorded meal interval when one is present."
+              value={draft.endedAt}
+              onChange={(endedAt) => update({ endedAt })}
+            />
+          ) : null}
         </>
       ) : null}
 
@@ -607,11 +657,14 @@ export function DailyEntryForm({
             value={draft.label}
             onChange={(label) => update({ label })}
           />
-          <Field
-            label="Sleep end time"
-            value={draft.endedAt}
-            onChange={(endedAt) => update({ endedAt })}
-          />
+          {draft.precision === "instant" ? (
+            <Field
+              label="Sleep end time (optional)"
+              hint="Leave blank when the end is unknown."
+              value={draft.endedAt}
+              onChange={(endedAt) => update({ endedAt })}
+            />
+          ) : null}
           <Field
             label="Sleep quality (optional, 1 to 5)"
             value={draft.quality}
@@ -622,11 +675,21 @@ export function DailyEntryForm({
       ) : null}
 
       {initialItem?.object_type === "event" && eventKind === "symptom" ? (
-        <Field
-          label="Symptom"
-          value={draft.label}
-          onChange={(label) => update({ label })}
-        />
+        <>
+          <Field
+            label="Symptom"
+            value={draft.label}
+            onChange={(label) => update({ label })}
+          />
+          {draft.precision === "instant" ? (
+            <Field
+              label="Symptom end time (optional)"
+              hint="Leave blank when the end is unknown."
+              value={draft.endedAt}
+              onChange={(endedAt) => update({ endedAt })}
+            />
+          ) : null}
+        </>
       ) : null}
 
       {initialItem?.object_type === "observation" && !severityOnly ? (
@@ -671,6 +734,14 @@ export function DailyEntryForm({
           ) : null}
           {observationMetric === "pulse" ? (
             <Text style={styles.hint}>Unit: bpm</Text>
+          ) : null}
+          {draft.precision === "instant" ? (
+            <Field
+              label="Interval end (optional)"
+              hint="Preserves or edits the observation interval when one is recorded."
+              value={draft.endedAt}
+              onChange={(endedAt) => update({ endedAt })}
+            />
           ) : null}
         </>
       ) : null}

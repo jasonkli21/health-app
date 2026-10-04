@@ -29,6 +29,11 @@ import {
 } from "../../profile/components/Ui";
 import { RequestScope, requestNextPage } from "../../profile/requestScope";
 import type { components } from "@personal-health/api-client";
+import {
+  canLoadTodayPage,
+  pageMatchesTodaySnapshot,
+  type TodaySnapshotIdentity,
+} from "../todayPaging";
 
 const PAGE_SIZE = 50;
 type TodayResult = components["schemas"]["TodayResponse"];
@@ -62,7 +67,12 @@ export default function TodayScreen() {
   const [error, setError] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
   const [refresh, setRefresh] = useState(0);
+  const [visibleResultScopeKey, setVisibleResultScopeKey] = useState<
+    string | null
+  >(null);
   const requestScope = useRef(new RequestScope());
+  const [visibleSnapshot, setVisibleSnapshot] =
+    useState<TodaySnapshotIdentity | null>(null);
   const queryWithResult = useRef<string | null>(null);
   const queryKey = `${date}:${timezone}`;
   const scopeKey = `today:${queryKey}:${refresh}`;
@@ -74,6 +84,8 @@ export default function TodayScreen() {
         setData(null);
         setItems([]);
         setStale(false);
+        setVisibleSnapshot(null);
+        setVisibleResultScopeKey(null);
       }
       setLoading(true);
       setError(null);
@@ -88,6 +100,13 @@ export default function TodayScreen() {
           if (!requestScope.current.isCurrent(scope)) return;
           setData(result);
           setItems(result.items);
+          setVisibleSnapshot({
+            scopeKey,
+            date: result.date,
+            timezone: result.timezone,
+            asOfSequence: result.as_of_sequence,
+          });
+          setVisibleResultScopeKey(scopeKey);
           queryWithResult.current = queryKey;
           setStale(false);
         } catch (requestError) {
@@ -106,7 +125,20 @@ export default function TodayScreen() {
   );
 
   async function loadMore() {
-    if (!data?.next_cursor) return;
+    if (
+      !data?.next_cursor ||
+      !canLoadTodayPage({
+        hasCursor: Boolean(data.next_cursor),
+        loading,
+        visible: visibleSnapshot,
+        scopeKey,
+        date,
+        timezone,
+        asOfSequence: data.as_of_sequence,
+      })
+    ) {
+      return;
+    }
     const scope = requestScope.current.tokenFor(scopeKey);
     if (!scope) return;
     const cursor = data.next_cursor;
@@ -121,6 +153,13 @@ export default function TodayScreen() {
           setError(null);
         },
         onSuccess: (page) => {
+          if (!pageMatchesTodaySnapshot(page, visibleSnapshot, scopeKey)) {
+            setError(
+              "The timeline page belongs to a different Today snapshot. Refresh and retry.",
+            );
+            setStale(true);
+            return;
+          }
           setItems((current) => [...current, ...page.items]);
           setData((current) =>
             current
@@ -348,7 +387,19 @@ export default function TodayScreen() {
                   label="Load more timeline entries"
                   onPress={() => void loadMore()}
                   busy={loadingMore}
-                  disabled={loadingMore}
+                  disabled={
+                    loadingMore ||
+                    visibleResultScopeKey !== scopeKey ||
+                    !canLoadTodayPage({
+                      hasCursor: Boolean(data.next_cursor),
+                      loading,
+                      visible: visibleSnapshot,
+                      scopeKey,
+                      date,
+                      timezone,
+                      asOfSequence: data.as_of_sequence,
+                    })
+                  }
                   secondary
                 />
               ) : null}
