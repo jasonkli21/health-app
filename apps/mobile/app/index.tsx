@@ -1,8 +1,17 @@
 import { Link } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSyncExternalStore } from "react";
+
+import { signOutCurrentUser } from "../src/auth/firebaseSession";
+import { sessionStore } from "../src/auth/sessionStore";
 
 export default function HomeScreen() {
+  const session = useSyncExternalStore(
+    sessionStore.subscribe,
+    sessionStore.getSnapshot,
+    sessionStore.getSnapshot,
+  );
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.content}>
@@ -13,6 +22,22 @@ export default function HomeScreen() {
           A private place for health details you choose to remember. Review your
           daily log or the context you keep in your Profile.
         </Text>
+        {session.mode === "firebase" ? (
+          <View style={styles.account}>
+            <Text style={styles.accountText}>
+              Signed in as {session.email ?? "your account"}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void signOutCurrentUser()}
+            >
+              <Text style={styles.signOut}>Sign out</Text>
+            </Pressable>
+            {session.message ? (
+              <Text accessibilityRole="alert">{session.message}</Text>
+            ) : null}
+          </View>
+        ) : null}
         <Link accessibilityRole="button" style={styles.link} href="/today">
           Open Today
         </Link>
@@ -64,4 +89,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
   },
+  account: { gap: 8 },
+  accountText: { color: "#46534d", fontSize: 14 },
+  signOut: { color: "#245d3a", fontSize: 16, fontWeight: "700" },
 });

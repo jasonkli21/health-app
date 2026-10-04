@@ -1882,10 +1882,17 @@
         "title": "WorkoutEventV1",
         "type": "object"
       }
+    },
+    "securitySchemes": {
+      "FirebaseBearer": {
+        "description": "Cloud requests use a verified Firebase ID token.",
+        "scheme": "bearer",
+        "type": "http"
+      }
     }
   },
   "info": {
-    "description": "Owner-scoped Profile v1 and daily Event/Observation v1 APIs for private local development. The server principal is configured outside request data. Request bodies are limited to 65,536 bytes.",
+    "description": "Owner-scoped Profile v1 and daily Event/Observation v1 APIs. Identity is resolved from server configuration or verified Firebase bearer tokens. Request bodies are limited to 65,536 bytes.",
     "title": "Personal Health API",
     "version": "1.0.0"
   },
@@ -1933,7 +1940,7 @@
                 }
               }
             },
-            "description": "Local principal is unavailable."
+            "description": "Authentication is required or invalid."
           },
           "409": {
             "content": {
@@ -1976,6 +1983,11 @@
             "description": "Health storage is unavailable."
           }
         },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
         "summary": "Create Compound Daily Entry",
         "tags": ["daily"]
       }
@@ -2084,7 +2096,7 @@
                 }
               }
             },
-            "description": "Local principal is unavailable."
+            "description": "Authentication is required or invalid."
           },
           "413": {
             "content": {
@@ -2117,6 +2129,11 @@
             "description": "Health storage is unavailable."
           }
         },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
         "summary": "List Events",
         "tags": ["daily"]
       },
@@ -2161,7 +2178,7 @@
                 }
               }
             },
-            "description": "Local principal is unavailable."
+            "description": "Authentication is required or invalid."
           },
           "409": {
             "content": {
@@ -2204,6 +2221,11 @@
             "description": "Health storage is unavailable."
           }
         },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
         "summary": "Create Event",
         "tags": ["daily"]
       }
@@ -2252,7 +2274,7 @@
                 }
               }
             },
-            "description": "Local principal is unavailable."
+            "description": "Authentication is required or invalid."
           },
           "404": {
             "content": {
@@ -2305,6 +2327,11 @@
             "description": "Health storage is unavailable."
           }
         },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
         "summary": "Delete Event",
         "tags": ["daily"]
       },
@@ -2341,7 +2368,7 @@
                 }
               }
             },
-            "description": "Local principal is unavailable."
+            "description": "Authentication is required or invalid."
           },
           "404": {
             "content": {
@@ -2384,6 +2411,11 @@
             "description": "Health storage is unavailable."
           }
         },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
         "summary": "Get Event",
         "tags": ["daily"]
       },
@@ -2430,7 +2462,7 @@
                 }
               }
             },
-            "description": "Local principal is unavailable."
+            "description": "Authentication is required or invalid."
           },
           "404": {
             "content": {
@@ -2483,6 +2515,11 @@
             "description": "Health storage is unavailable."
           }
         },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
         "summary": "Patch Event",
         "tags": ["daily"]
       }
@@ -2544,7 +2581,7 @@
                 }
               }
             },
-            "description": "Local principal is unavailable."
+            "description": "Authentication is required or invalid."
           },
           "404": {
             "content": {
@@ -2587,6 +2624,11 @@
             "description": "Health storage is unavailable."
           }
         },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
         "summary": "Get Event History",
         "tags": ["daily"]
       }
@@ -2719,7 +2761,7 @@
                 }
               }
             },
-            "description": "Local principal is unavailable."
+            "description": "Authentication is required or invalid."
           },
           "413": {
             "content": {
@@ -2752,6 +2794,11 @@
             "description": "Health storage is unavailable."
           }
         },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
         "summary": "List Observations",
         "tags": ["daily"]
       },
@@ -2796,7 +2843,7 @@
                 }
               }
             },
-            "description": "Local principal is unavailable."
+            "description": "Authentication is required or invalid."
           },
           "409": {
             "content": {
@@ -2839,6 +2886,11 @@
             "description": "Health storage is unavailable."
           }
         },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
         "summary": "Create Observation",
         "tags": ["daily"]
       }
@@ -2887,7 +2939,7 @@
                 }
               }
             },
-            "description": "Local principal is unavailable."
+            "description": "Authentication is required or invalid."
           },
           "404": {
             "content": {
@@ -2940,6 +2992,11 @@
             "description": "Health storage is unavailable."
           }
         },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
         "summary": "Delete Observation",
         "tags": ["daily"]
       },
@@ -2976,7 +3033,7 @@
                 }
               }
             },
-            "description": "Local principal is unavailable."
+            "description": "Authentication is required or invalid."
           },
           "404": {
             "content": {
@@ -3019,6 +3076,11 @@
             "description": "Health storage is unavailable."
           }
         },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
         "summary": "Get Observation",
         "tags": ["daily"]
       },
@@ -3065,7 +3127,7 @@
                 }
               }
             },
-            "description": "Local principal is unavailable."
+            "description": "Authentication is required or invalid."
           },
           "404": {
             "content": {
@@ -3118,6 +3180,11 @@
             "description": "Health storage is unavailable."
           }
         },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
         "summary": "Patch Observation",
         "tags": ["daily"]
       }
@@ -3179,7 +3246,7 @@
                 }
               }
             },
-            "description": "Local principal is unavailable."
+            "description": "Authentication is required or invalid."
           },
           "404": {
             "content": {
@@ -3222,6 +3289,11 @@
             "description": "Health storage is unavailable."
           }
         },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
         "summary": "Get Observation History",
         "tags": ["daily"]
       }
@@ -3312,7 +3384,7 @@
                 }
               }
             },
-            "description": "Local principal is unavailable."
+            "description": "Authentication is required or invalid."
           },
           "413": {
             "content": {
@@ -3345,6 +3417,11 @@
             "description": "Profile storage is unavailable."
           }
         },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
         "summary": "List Profiles",
         "tags": ["profile"]
       },
@@ -3389,7 +3466,7 @@
                 }
               }
             },
-            "description": "Local principal is unavailable."
+            "description": "Authentication is required or invalid."
           },
           "409": {
             "content": {
@@ -3432,6 +3509,11 @@
             "description": "Profile storage is unavailable."
           }
         },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
         "summary": "Create Profile",
         "tags": ["profile"]
       }
@@ -3480,7 +3562,7 @@
                 }
               }
             },
-            "description": "Local principal is unavailable."
+            "description": "Authentication is required or invalid."
           },
           "404": {
             "content": {
@@ -3533,6 +3615,11 @@
             "description": "Profile storage is unavailable."
           }
         },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
         "summary": "Delete Profile",
         "tags": ["profile"]
       },
@@ -3569,7 +3656,7 @@
                 }
               }
             },
-            "description": "Local principal is unavailable."
+            "description": "Authentication is required or invalid."
           },
           "404": {
             "content": {
@@ -3612,6 +3699,11 @@
             "description": "Profile storage is unavailable."
           }
         },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
         "summary": "Get Profile",
         "tags": ["profile"]
       },
@@ -3658,7 +3750,7 @@
                 }
               }
             },
-            "description": "Local principal is unavailable."
+            "description": "Authentication is required or invalid."
           },
           "404": {
             "content": {
@@ -3711,6 +3803,11 @@
             "description": "Profile storage is unavailable."
           }
         },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
         "summary": "Patch Profile",
         "tags": ["profile"]
       }
@@ -3772,7 +3869,7 @@
                 }
               }
             },
-            "description": "Local principal is unavailable."
+            "description": "Authentication is required or invalid."
           },
           "404": {
             "content": {
@@ -3815,6 +3912,11 @@
             "description": "Profile storage is unavailable."
           }
         },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
         "summary": "Get Profile History",
         "tags": ["profile"]
       }
@@ -3907,7 +4009,7 @@
                 }
               }
             },
-            "description": "Local principal is unavailable."
+            "description": "Authentication is required or invalid."
           },
           "413": {
             "content": {
@@ -3940,6 +4042,11 @@
             "description": "Health storage is unavailable."
           }
         },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
         "summary": "Get Today",
         "tags": ["daily"]
       }

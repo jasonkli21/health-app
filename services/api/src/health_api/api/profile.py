@@ -5,12 +5,12 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-from collections.abc import Iterator
 from datetime import UTC, datetime
-from typing import Annotated, Any, cast
+from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, Query, Response
+from health_api.api.dependencies import get_current_owner, get_session
 from health_api.api.errors import APIError
 from health_api.api.schemas import (
     ErrorResponse,
@@ -21,7 +21,6 @@ from health_api.api.schemas import (
     ProfileListResponse,
     ProfilePatchRequest,
 )
-from health_api.application.local_principal import ensure_local_principal
 from health_api.application.profile_service import (
     CreateProfile,
     ProfileAggregate,
@@ -32,7 +31,6 @@ from health_api.application.profile_service import (
     list_profile_items,
     update_profile_item,
 )
-from health_api.config.settings import Settings
 from health_api.domain.schemas import ProfileCategory, ProfileMetadata, ProfileValidity
 from health_api.persistence.models import HealthObjectRevision
 from pydantic import AwareDatetime, ValidationError
@@ -40,7 +38,7 @@ from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/profile", tags=["profile"])
 COMMON_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
-    401: {"model": ErrorResponse, "description": "Local principal is unavailable."},
+    401: {"model": ErrorResponse, "description": "Authentication is required or invalid."},
     413: {
         "model": ErrorResponse,
         "description": "Request body exceeds the 65,536 byte limit.",
@@ -54,26 +52,6 @@ NOT_FOUND_RESPONSE: dict[int | str, dict[str, Any]] = {
 CONFLICT_RESPONSE: dict[int | str, dict[str, Any]] = {
     409: {"model": ErrorResponse, "description": "Revision or ID conflict."}
 }
-
-
-def get_session(request: Request) -> Iterator[Session]:
-    session_factory = request.app.state.session_factory
-    with session_factory() as session:
-        yield session
-
-
-def get_settings(request: Request) -> Settings:
-    return cast(Settings, request.app.state.settings)
-
-
-def get_local_owner(
-    session: Annotated[Session, Depends(get_session)],
-    settings: Annotated[Settings, Depends(get_settings)],
-) -> UUID:
-    owner_id = ensure_local_principal(session, settings)
-    if owner_id is None:
-        raise APIError(401, "principal_unavailable", "Local principal is unavailable.")
-    return owner_id
 
 
 def item_response(aggregate: ProfileAggregate) -> ProfileItemResponse:
@@ -169,7 +147,7 @@ def _decode_cursor(
     responses=COMMON_ERROR_RESPONSES,
 )
 def list_profiles(
-    owner_id: Annotated[UUID, Depends(get_local_owner)],
+    owner_id: Annotated[UUID, Depends(get_current_owner)],
     session: Annotated[Session, Depends(get_session)],
     as_of: Annotated[AwareDatetime | None, Query()] = None,
     category: Annotated[ProfileCategory | None, Query()] = None,
@@ -218,7 +196,7 @@ def list_profiles(
 def create_profile(
     body: ProfileCreateRequest,
     response: Response,
-    owner_id: Annotated[UUID, Depends(get_local_owner)],
+    owner_id: Annotated[UUID, Depends(get_current_owner)],
     session: Annotated[Session, Depends(get_session)],
 ) -> ProfileItemResponse:
     result = create_profile_item(
@@ -246,7 +224,7 @@ def create_profile(
 )
 def get_profile(
     item_id: UUID,
-    owner_id: Annotated[UUID, Depends(get_local_owner)],
+    owner_id: Annotated[UUID, Depends(get_current_owner)],
     session: Annotated[Session, Depends(get_session)],
 ) -> ProfileItemResponse:
     return item_response(get_profile_item(session, owner_id, item_id))
@@ -260,7 +238,7 @@ def get_profile(
 )
 def get_profile_history(
     item_id: UUID,
-    owner_id: Annotated[UUID, Depends(get_local_owner)],
+    owner_id: Annotated[UUID, Depends(get_current_owner)],
     session: Annotated[Session, Depends(get_session)],
     after_revision: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
@@ -306,7 +284,7 @@ def _history_response(revision: HealthObjectRevision) -> ProfileHistoryEntry:
 def patch_profile(
     item_id: UUID,
     body: ProfilePatchRequest,
-    owner_id: Annotated[UUID, Depends(get_local_owner)],
+    owner_id: Annotated[UUID, Depends(get_current_owner)],
     session: Annotated[Session, Depends(get_session)],
 ) -> ProfileItemResponse:
     changes = body.changes()
@@ -325,7 +303,7 @@ def patch_profile(
 def delete_profile(
     item_id: UUID,
     response: Response,
-    owner_id: Annotated[UUID, Depends(get_local_owner)],
+    owner_id: Annotated[UUID, Depends(get_current_owner)],
     session: Annotated[Session, Depends(get_session)],
     expected_revision: Annotated[int, Query(ge=1)],
 ) -> ProfileItemResponse:

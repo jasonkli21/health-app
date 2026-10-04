@@ -1,4 +1,5 @@
 import { ApiError, HealthApiClient } from "@personal-health/api-client";
+import { mobileFetch } from "../../auth/mobileFetch";
 
 import type { DailyCreateRequest, DailyDomain, DailyDraft } from "./model";
 
@@ -6,6 +7,7 @@ const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
 
 export const dailyApi = new HealthApiClient(
   configuredApiUrl || "http://127.0.0.1:8000",
+  mobileFetch,
 );
 
 export class DailyUserError extends Error {

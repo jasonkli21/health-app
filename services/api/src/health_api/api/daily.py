@@ -11,8 +11,8 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query, Response
+from health_api.api.dependencies import get_current_owner, get_session
 from health_api.api.errors import APIError
-from health_api.api.profile import get_local_owner, get_session
 from health_api.api.schemas import (
     DailyEntryCreateRequest,
     DailyEntryCreateResponse,
@@ -71,7 +71,7 @@ from sqlalchemy.orm import Session
 router = APIRouter(tags=["daily"])
 
 COMMON_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
-    401: {"model": ErrorResponse, "description": "Local principal is unavailable."},
+    401: {"model": ErrorResponse, "description": "Authentication is required or invalid."},
     413: {
         "model": ErrorResponse,
         "description": "Request body exceeds the 65,536 byte limit.",
@@ -422,7 +422,7 @@ def _list_daily_resource(
     responses=COMMON_ERROR_RESPONSES,
 )
 def list_events(
-    owner_id: Annotated[UUID, Depends(get_local_owner)],
+    owner_id: Annotated[UUID, Depends(get_current_owner)],
     session: Annotated[Session, Depends(get_session)],
     from_date: Annotated[date | None, Query()] = None,
     to_date: Annotated[date | None, Query()] = None,
@@ -462,7 +462,7 @@ def list_events(
 def create_event(
     body: DailyEventCreateRequest,
     response: Response,
-    owner_id: Annotated[UUID, Depends(get_local_owner)],
+    owner_id: Annotated[UUID, Depends(get_current_owner)],
     session: Annotated[Session, Depends(get_session)],
 ) -> DailyEventResponse:
     result = create_daily_entry(
@@ -482,7 +482,7 @@ def create_event(
 )
 def get_event(
     event_id: UUID,
-    owner_id: Annotated[UUID, Depends(get_local_owner)],
+    owner_id: Annotated[UUID, Depends(get_current_owner)],
     session: Annotated[Session, Depends(get_session)],
 ) -> DailyEventResponse:
     aggregate = get_daily_item(session, owner_id, event_id)
@@ -499,7 +499,7 @@ def get_event(
 )
 def get_event_history(
     event_id: UUID,
-    owner_id: Annotated[UUID, Depends(get_local_owner)],
+    owner_id: Annotated[UUID, Depends(get_current_owner)],
     session: Annotated[Session, Depends(get_session)],
     after_revision: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
@@ -519,7 +519,7 @@ def get_event_history(
 def patch_event(
     event_id: UUID,
     body: DailyEventUpdateRequest,
-    owner_id: Annotated[UUID, Depends(get_local_owner)],
+    owner_id: Annotated[UUID, Depends(get_current_owner)],
     session: Annotated[Session, Depends(get_session)],
 ) -> DailyEventResponse:
     aggregate = update_daily_item(session, owner_id, event_id, body.expected_revision, body.event)
@@ -536,7 +536,7 @@ def patch_event(
 )
 def delete_event(
     event_id: UUID,
-    owner_id: Annotated[UUID, Depends(get_local_owner)],
+    owner_id: Annotated[UUID, Depends(get_current_owner)],
     session: Annotated[Session, Depends(get_session)],
     expected_revision: Annotated[int, Query(ge=1)],
 ) -> DailyEventResponse:
@@ -555,7 +555,7 @@ def delete_event(
     responses=COMMON_ERROR_RESPONSES,
 )
 def list_observations(
-    owner_id: Annotated[UUID, Depends(get_local_owner)],
+    owner_id: Annotated[UUID, Depends(get_current_owner)],
     session: Annotated[Session, Depends(get_session)],
     from_date: Annotated[date | None, Query()] = None,
     to_date: Annotated[date | None, Query()] = None,
@@ -595,7 +595,7 @@ def list_observations(
 def create_observation(
     body: DailyObservationCreateRequest,
     response: Response,
-    owner_id: Annotated[UUID, Depends(get_local_owner)],
+    owner_id: Annotated[UUID, Depends(get_current_owner)],
     session: Annotated[Session, Depends(get_session)],
 ) -> DailyObservationResponse:
     result = create_daily_entry(
@@ -615,7 +615,7 @@ def create_observation(
 )
 def get_observation(
     observation_id: UUID,
-    owner_id: Annotated[UUID, Depends(get_local_owner)],
+    owner_id: Annotated[UUID, Depends(get_current_owner)],
     session: Annotated[Session, Depends(get_session)],
 ) -> DailyObservationResponse:
     aggregate = get_daily_item(session, owner_id, observation_id)
@@ -632,7 +632,7 @@ def get_observation(
 )
 def get_observation_history(
     observation_id: UUID,
-    owner_id: Annotated[UUID, Depends(get_local_owner)],
+    owner_id: Annotated[UUID, Depends(get_current_owner)],
     session: Annotated[Session, Depends(get_session)],
     after_revision: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
@@ -652,7 +652,7 @@ def get_observation_history(
 def patch_observation(
     observation_id: UUID,
     body: DailyObservationUpdateRequest,
-    owner_id: Annotated[UUID, Depends(get_local_owner)],
+    owner_id: Annotated[UUID, Depends(get_current_owner)],
     session: Annotated[Session, Depends(get_session)],
 ) -> DailyObservationResponse:
     aggregate = update_daily_item(
@@ -671,7 +671,7 @@ def patch_observation(
 )
 def delete_observation(
     observation_id: UUID,
-    owner_id: Annotated[UUID, Depends(get_local_owner)],
+    owner_id: Annotated[UUID, Depends(get_current_owner)],
     session: Annotated[Session, Depends(get_session)],
     expected_revision: Annotated[int, Query(ge=1)],
 ) -> DailyObservationResponse:
@@ -715,7 +715,7 @@ def _history_response(
 def create_compound_daily_entry(
     body: DailyEntryCreateRequest,
     response: Response,
-    owner_id: Annotated[UUID, Depends(get_local_owner)],
+    owner_id: Annotated[UUID, Depends(get_current_owner)],
     session: Annotated[Session, Depends(get_session)],
 ) -> DailyEntryCreateResponse:
     result = create_daily_entry(session, owner_id, _create_command(body))
@@ -818,7 +818,7 @@ def _decode_today_cursor(
     ),
 )
 def get_today(
-    owner_id: Annotated[UUID, Depends(get_local_owner)],
+    owner_id: Annotated[UUID, Depends(get_current_owner)],
     session: Annotated[Session, Depends(get_session)],
     requested_date: Annotated[date | None, Query(alias="date")] = None,
     timezone: Annotated[str | None, Query(max_length=64)] = None,
