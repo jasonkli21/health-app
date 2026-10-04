@@ -72,6 +72,22 @@ def test_unit_conversions_use_the_named_versioned_factors(
     assert convert_value(metric, expected, target, source) == pytest.approx(value)
 
 
+@pytest.mark.parametrize("value", [1.1e300, "1.1e300", "1e308"])
+def test_daily_quantity_bound_applies_after_numeric_coercion(value: float | str) -> None:
+    with pytest.raises(ValueError, match="safe aggregation"):
+        EventSchemaV1.model_validate(
+            {
+                "domain": "nutrition",
+                "time": {"precision": "date_only", "local_date": "2026-01-01", "timezone": "UTC"},
+                "payload": {
+                    "kind": "meal",
+                    "label": "Meal",
+                    "energy": {"value": value, "unit": "kcal"},
+                },
+            }
+        )
+
+
 def test_unit_conversion_rejects_unrelated_units_and_nonfinite_values() -> None:
     with pytest.raises(ValueError, match="not supported"):
         convert_value(MetricKey.WEIGHT, 1, MeasurementUnit.MI, MeasurementUnit.KG)

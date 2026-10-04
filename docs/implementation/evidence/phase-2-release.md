@@ -4,7 +4,8 @@ Updated 2026-10-04 (PDT). Phase 2 implementation and P2.5 evidence are
 committed through `61d09ac`. Independent-review fixes are committed as
 `a24c48a` (backend integrity, semantics and queries) and `435f396` (mobile
 draft and pagination behavior); this evidence/review checkpoint is the third
-logical fix commit. Root's independent re-review remains open. The backend fix
+logical fix commit. Root's independent code re-review is complete; database
+acceptance remains open. The backend fix
 adds an additive cursor-boundary migration. PostgreSQL-backed API verification,
 migration lifecycle/drift, and query-cost checks remain open because fresh
 PostgreSQL 16 initialization still fails at shared-memory allocation.
@@ -164,6 +165,19 @@ writes.
 | Formatting                                    | Whole-repository Prettier check passed after OpenAPI/client regeneration and documentation edits.                                                                                                                     |
 | iOS bundle                                    | Expo SDK 57 export succeeded with Node 24.19: 1,136 modules and one 2.5 MB Hermes bundle at `/private/tmp/health-phase2-review-ios-bundle`. This is Metro bundle evidence, not device-interaction evidence.           |
 | Migration head                                | `alembic heads`: `b9f5e1a72c4d (head)`. Offline graph/SQL generation passed; database migration lifecycle and model drift checks remain open.                                                                         |
+
+## Main-session final re-review
+
+The eight review findings are addressed and root's code re-review is complete.
+A residual numeric-string bypass of the aggregation bound was reproduced and
+fixed with a post-coercion magnitude validator; three regressions were added.
+The final available Python suite reports **42 passed, 40 PostgreSQL tests
+skipped**; mobile reports **54 passed**. Configured CI Python static/scaffold
+checks, mobile TypeScript/ESLint and client TypeScript pass. OpenAPI/client
+regeneration leaves no tracked diff. These results supersede the earlier
+39-pass count above. Phase 2 acceptance remains blocked on the database checks
+below; Phase 3 has not started. See `phase-2-review.md` and
+`../coordinator-state.md` for the exact resume scope.
 
 ## Unverified gates and prerequisites
 

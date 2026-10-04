@@ -29,15 +29,11 @@ from pydantic import (
 MAX_DAILY_QUANTITY = 1e300
 
 
-def reject_unaggregatable_daily_number(value: object) -> object:
+def reject_unaggregatable_daily_number(value: float) -> float:
     """Keep a single supported-unit value safely summable within bounded Today reads."""
-    value = reject_boolean_number(value)
-    if isinstance(value, (int, float)) and abs(value) > MAX_DAILY_QUANTITY:
+    if abs(value) > MAX_DAILY_QUANTITY:
         raise ValueError("daily quantity exceeds the safe aggregation range")
     return value
-
-
-type FiniteDailyNumber = Annotated[FiniteFloat, BeforeValidator(reject_unaggregatable_daily_number)]
 
 
 class StrictModel(BaseModel):
@@ -97,6 +93,11 @@ def reject_boolean_number(value: object) -> object:
 
 
 type FiniteProfileNumber = Annotated[FiniteFloat, BeforeValidator(reject_boolean_number)]
+type FiniteDailyNumber = Annotated[
+    FiniteFloat,
+    BeforeValidator(reject_boolean_number),
+    AfterValidator(reject_unaggregatable_daily_number),
+]
 
 
 class TextValue(StrictModel):

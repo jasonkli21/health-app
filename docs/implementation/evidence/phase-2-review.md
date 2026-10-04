@@ -4,7 +4,8 @@ Main-session review of Phase 2 through `61d09ac`, 2026-10-04 PDT.
 Reviewed the phase plan/reconciliation, prior foundation, migrations/models,
 daily schemas/unit/time/rollup rules, transactional services, snapshot queries,
 daily routes/serializers/cursors, generated client, mobile form/builders/screens,
-and tests/evidence. Review is open; Phase 3 must wait for fixes and verification.
+and tests/evidence. Code re-review is complete; Phase 3 must wait for the
+PostgreSQL verification gate described below.
 
 ## Required fixes
 
@@ -96,8 +97,30 @@ fixes and regressions are committed in `a24c48a` (backend) and `435f396`
    only sequence zero and each owner's legacy current state as old cursor
    boundaries. Rollback and boundary assertions were added.
 
-Root's independent re-review, real PostgreSQL tests, migration lifecycle/drift,
-and EXPLAIN/ANALYZE remain open; this disposition does not close the review.
+## Main-session re-review disposition
+
+Root independently re-reviewed the backend transaction/type guards, compound
+sequences and marker migration, snapshot query/timeout, rollup semantics,
+mobile edit-state wiring, interval roundtrips and paging guards. The eight code
+findings are addressed. Database-dependent acceptance remains open, particularly
+the actual latest-revision query plan and performance under long histories.
+
+One residual numeric-validation bypass was reproduced: Pydantic accepted the
+string `"1e308"` because the software bound ran before float coercion. The bound
+now runs after coercion, while the separate boolean rejection remains before
+coercion. Three numeric/string regression cases pass. Contract regeneration has
+no tracked diff. Root reran the full available suite: **42 Python tests passed,
+40 PostgreSQL tests skipped; 54 mobile tests passed across 11 files**. Configured
+CI Ruff check/format (36 files), mypy (21 sources), scaffold verification,
+mobile TypeScript/ESLint and generated-client TypeScript passed.
+
+Phase 2 is implemented and code-reviewed, but is not verified complete. Resume
+with an authorized disposable PostgreSQL database: run all 82 Python tests,
+fresh and existing-data migrations and drift checks, and record representative
+EXPLAIN/ANALYZE and latency for sparse and high-revision owners. Investigate and
+delegate any substantive failures before closing the phase. Do not start Phase
+3 while these checks remain blocked. No unrelated cluster or IPC cleanup is
+authorized by this checkpoint.
 
 ## Verification and handoff
 
