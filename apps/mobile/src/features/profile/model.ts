@@ -86,7 +86,7 @@ function parseInstant(value: string, label: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
   const parts =
-    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|([+-])(\d{2}):(\d{2}))$/i.exec(
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(Z|([+-])(\d{2}):(\d{2}))$/i.exec(
       trimmed,
     );
   if (!parts) {
@@ -118,6 +118,7 @@ function parseInstant(value: string, label: string): string | null {
     31,
   ];
   if (
+    year < 1 ||
     month < 1 ||
     month > 12 ||
     day < 1 ||
@@ -133,7 +134,16 @@ function parseInstant(value: string, label: string): string | null {
   const instant = new Date(trimmed);
   if (Number.isNaN(instant.getTime()))
     throw new Error(`${label} is not a valid date and time.`);
-  return instant.toISOString();
+  // Server timestamps carry microseconds; preserve them through an unchanged edit.
+  const fraction = parts[7]?.padEnd(6, "0");
+  return fraction
+    ? instant.toISOString().replace(/\.\d{3}Z$/, `.${fraction}Z`)
+    : instant.toISOString();
+}
+
+function instantMicroseconds(value: string): bigint {
+  const remainder = /\.(\d{6})Z$/.exec(value)?.[1]?.slice(3) ?? "0";
+  return BigInt(new Date(value).getTime()) * 1000n + BigInt(remainder);
 }
 
 function parseNumber(value: string, label: string): number {
@@ -200,7 +210,11 @@ export function buildProfileFields(draft: ProfileDraft): BuildDraftResult {
     const value = buildValue(draft.value);
     const valid_from = parseInstant(draft.valid_from, "Effective start");
     const valid_to = parseInstant(draft.valid_to, "Effective end");
-    if (valid_from && valid_to && new Date(valid_from) >= new Date(valid_to)) {
+    if (
+      valid_from &&
+      valid_to &&
+      instantMicroseconds(valid_from) >= instantMicroseconds(valid_to)
+    ) {
       throw new Error("Effective start must be earlier than effective end.");
     }
     const profile: ProfilePayload = {

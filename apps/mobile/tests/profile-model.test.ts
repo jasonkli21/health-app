@@ -20,6 +20,29 @@ function draft(overrides: Partial<ProfileDraft> = {}): ProfileDraft {
 }
 
 describe("Profile mobile model", () => {
+  it("preserves server microseconds and compares submillisecond validity windows", () => {
+    const result = buildProfileFields(
+      draft({
+        valid_from: "2026-10-03T12:00:00.123456-07:00",
+        valid_to: "2026-10-03T19:00:00.123457Z",
+      }),
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      fields: {
+        valid_from: "2026-10-03T19:00:00.123456Z",
+        valid_to: "2026-10-03T19:00:00.123457Z",
+      },
+    });
+    expect(
+      buildProfileFields(
+        draft({
+          valid_from: "2026-10-03T19:00:00.123457Z",
+          valid_to: "2026-10-03T19:00:00.123456Z",
+        }),
+      ),
+    ).toMatchObject({ ok: false });
+  });
   it("preserves unknown, false, zero, empty text, and empty list distinctly", () => {
     const unknownValue = buildProfileFields(draft());
     const falseValue = buildProfileFields(

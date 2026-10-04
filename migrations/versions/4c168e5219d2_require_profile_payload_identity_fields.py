@@ -19,9 +19,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.drop_constraint(
-        "ck_profile_items_payload_consistency", "profile_items", type_="check"
-    )
+    op.drop_constraint("ck_profile_items_payload_consistency", "profile_items", type_="check")
     op.create_check_constraint(
         "ck_profile_items_payload_consistency",
         "profile_items",
@@ -35,9 +33,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint(
-        "ck_profile_items_payload_consistency", "profile_items", type_="check"
-    )
+    op.drop_constraint("ck_profile_items_payload_consistency", "profile_items", type_="check")
     op.create_check_constraint(
         "ck_profile_items_payload_consistency",
         "profile_items",

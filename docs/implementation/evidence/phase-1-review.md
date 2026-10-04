@@ -5,7 +5,20 @@ Reviewed Phase 1 plan, roadmap, product/UX/security/data/architecture/ADRs,
 domain/config/application/persistence/migrations, HTTP contract/middleware/errors,
 client generator, mobile screens/form/model, tests and CI. All six findings below
 were confirmed in the reviewed code and are addressed in the follow-up changes.
-Independent re-review by `/root` remains pending.
+Independent re-review by `/root` is complete for local Phase 2 development.
+The external release gates listed below remain open.
+
+Re-review checked the changed screen wiring, shared request guard, dirty-draft
+state, original-create recovery, SQL constraint migration, regression tests,
+and compatibility with the existing Profile contract. A small residual fix
+preserves server microsecond timestamps and compares submillisecond validity
+windows, and disables conflict reload while saving. The main session reran
+24 mobile tests, strict TypeScript and ESLint successfully; 20 backend tests
+passed with 22 database cases explicitly skipped (no running test database).
+The fix agent's fresh 42-test PostgreSQL run remains the database evidence.
+Ruff import/format discrepancies found in re-review were corrected; Ruff,
+mypy (15 source files), and scaffold checks pass. No unresolved code finding
+blocks the next local implementation phase.
 
 ## Required fixes and implementation disposition
 

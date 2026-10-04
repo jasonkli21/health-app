@@ -1,6 +1,10 @@
 # Phased implementation plan
 
-The scaffold is currently **Phase 0 only**. Each phase should begin with a repository-wide reconciliation against this plan. If the code reveals a better design, update the plan/ADR first rather than forcing implementation to match stale prose.
+Phase 1 has been implemented and independently reviewed for local development;
+external release gates are recorded in its release evidence. Phases 2–9 remain.
+Each phase should begin with a repository-wide reconciliation against this plan.
+If the code reveals a better design, update the plan/ADR first rather than
+forcing implementation to match stale prose.
 
 Detailed documentation-only execution plans: [phase index](phases/README.md). Reconcile each plan immediately before implementation.
 

@@ -391,6 +391,8 @@ export function ProfileForm({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Reload latest Profile version"
+          disabled={saving}
+          accessibilityState={{ disabled: saving }}
           onPress={onConflictReload}
           style={styles.secondaryButton}
         >
