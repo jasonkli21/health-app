@@ -6,7 +6,12 @@ from datetime import UTC, date, datetime, time, timedelta
 from math import isfinite
 from zoneinfo import ZoneInfo
 
-from health_api.domain.schemas import MeasurementUnit, MetricKey, validate_iana_timezone
+from health_api.domain.schemas import (
+    MAX_DAILY_QUANTITY,
+    MeasurementUnit,
+    MetricKey,
+    validate_iana_timezone,
+)
 
 UNIT_CONVERSION_VERSION = "unit-v1"
 TODAY_METHOD_VERSION = "today-v1"
@@ -65,6 +70,8 @@ def convert_value(
     target = to_unit or canonical_unit(metric)
     if not isfinite(value):
         raise ValueError("quantity must be finite")
+    if abs(value) > MAX_DAILY_QUANTITY:
+        raise ValueError("quantity is outside the safe numeric range")
     supported = {
         MetricKey.ENERGY: {MeasurementUnit.KCAL, MeasurementUnit.KJ},
         MetricKey.DURATION: {MeasurementUnit.MIN, MeasurementUnit.HOUR},
@@ -87,7 +94,7 @@ def convert_value(
             value = (value - 32.0) * (5.0 / 9.0)
         if target == MeasurementUnit.FAHRENHEIT:
             value = value * (9.0 / 5.0) + 32.0
-        if not isfinite(value):
+        if not isfinite(value) or abs(value) > MAX_DAILY_QUANTITY:
             raise ValueError("converted quantity is outside the supported numeric range")
         return value
 
@@ -107,6 +114,6 @@ def convert_value(
     }
     base_value = value * to_base_factor.get((metric, from_unit), 1.0)
     converted = base_value * from_base_factor.get((metric, target), 1.0)
-    if not isfinite(converted):
+    if not isfinite(converted) or abs(converted) > MAX_DAILY_QUANTITY:
         raise ValueError("converted quantity is outside the supported numeric range")
     return converted

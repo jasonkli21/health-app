@@ -5,7 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from health_api.application.errors import DailyNotFound
-from health_api.persistence.models import Source, User
+from health_api.persistence.models import DailySnapshotMarker, Source, User
 from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
@@ -41,4 +41,5 @@ def next_daily_sequence(session: Session, owner_id: UUID) -> int:
     )
     if value is None:
         raise DailyNotFound("owner does not exist")
+    session.add(DailySnapshotMarker(owner_id=owner_id, daily_sequence=value))
     return value

@@ -48,6 +48,22 @@ class User(Base):
     )
 
 
+class DailySnapshotMarker(Base):
+    """Sequences that may safely anchor a complete committed Today snapshot."""
+
+    __tablename__ = "daily_snapshot_markers"
+
+    owner_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    daily_sequence: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["owner_id"], ["users.id"], ondelete="CASCADE", name="fk_daily_snapshot_markers_owner"
+        ),
+        CheckConstraint("daily_sequence >= 0", name="ck_daily_snapshot_markers_sequence"),
+    )
+
+
 class Source(Base):
     __tablename__ = "sources"
 
@@ -254,9 +270,6 @@ class HealthObjectRevision(Base):
             "daily_local_date IS NULL) OR (daily_time_precision = 'date_only' AND "
             "daily_occurred_at IS NULL AND daily_local_date IS NOT NULL AND daily_ended_at IS NULL)))",
             name="ck_health_object_revisions_daily_snapshot_shape",
-        ),
-        UniqueConstraint(
-            "owner_id", "daily_sequence", name="uq_health_object_revision_daily_sequence"
         ),
         Index(
             "ix_health_revisions_owner_daily_instant",

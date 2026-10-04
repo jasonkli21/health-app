@@ -219,7 +219,7 @@
       "known_count": 2,
       "total_count": 2,
       "partial": false,
-      "method_version": "today-v1/latest-observation-v1/unit-v1"
+      "method_version": "today-v1/latest-linked-episode-v2/unit-v1"
     },
     "measurements/weight": {
       "known_value": 68.0388555,

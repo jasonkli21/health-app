@@ -17,3 +17,14 @@ IANA zone. They are assigned to that calendar date for Today and are never
 converted to a fabricated midnight sample. Exact intervals use half-open UTC
 day bounds and elapsed overlap; a workout's distance is attributed to its start
 day because no route samples exist to distribute it across days.
+
+Daily numeric inputs have a software bound of `1e300` for both the entered
+quantity and its canonical conversion. Unit-aware validation rejects a duration
+or distance that would cross that bound before persistence; this is a numeric
+safety rule, not a clinical limit. Today caps a snapshot at 10,000 candidate
+objects; the canonical bound and candidate cap keep valid subtotals below the
+IEEE-754 maximum, while checked `fsum` rejects non-finite results. Sleep may be
+logged with only a date or an exact start;
+without an end, duration remains unknown and coverage stays partial. Symptom
+severity coverage uses active, same-day symptom episodes and their active linked
+Observations only; unrated episodes stay in the denominator.

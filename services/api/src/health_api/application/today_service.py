@@ -8,13 +8,28 @@ from uuid import UUID
 
 from health_api.application.errors import DailyNotFound, DailySnapshotLimitExceeded
 from health_api.domain.daily import local_day_bounds
-from health_api.persistence.models import HealthObject, HealthObjectRevision, ProfileItem, User
-from sqlalchemy import and_, func, or_, select
-from sqlalchemy.orm import Session
+from health_api.domain.daily_rollups import MetricSummaryV1, summarize_today
+from health_api.domain.schemas import (
+    DailyDomain,
+    EventKind,
+    EventSchemaV1,
+    MetricKey,
+    ObservationSchemaV1,
+)
+from health_api.persistence.models import (
+    DailySnapshotMarker,
+    HealthObject,
+    HealthObjectRevision,
+    ProfileItem,
+    User,
+)
+from sqlalchemy import and_, or_, select, text
+from sqlalchemy.orm import Session, aliased
 from sqlalchemy.sql.elements import ColumnElement
 
 MAX_TODAY_OBJECTS = 10_000
 MAX_PROFILE_CONTEXT_REFERENCES = 100
+TODAY_QUERY_TIMEOUT_MS = 2_000
 
 
 @dataclass(frozen=True)
@@ -36,6 +51,18 @@ def owner_today_settings(session: Session, owner_id: UUID) -> tuple[int, str]:
     if row is None:
         raise DailyNotFound("owner does not exist")
     return row[0], row[1]
+
+
+def is_today_snapshot_boundary(session: Session, owner_id: UUID, sequence: int) -> bool:
+    return (
+        session.scalar(
+            select(DailySnapshotMarker.daily_sequence).where(
+                DailySnapshotMarker.owner_id == owner_id,
+                DailySnapshotMarker.daily_sequence == sequence,
+            )
+        )
+        is not None
+    )
 
 
 def _day_condition(local_date: date, start_at: datetime, end_at: datetime) -> ColumnElement[bool]:
@@ -77,6 +104,8 @@ def load_today_snapshot(
     start_at, end_at = local_day_bounds(local_date, timezone)
     revision = HealthObjectRevision
     day_condition = _day_condition(local_date, start_at, end_at)
+    if session.get_bind().dialect.name == "postgresql":
+        session.execute(text(f"SET LOCAL statement_timeout = '{TODAY_QUERY_TIMEOUT_MS}ms'"))
 
     # Include every object ever observed in the day by this sequence. We then resolve its
     # latest revision at or below the sequence and re-check the latest time/status fields.
@@ -96,32 +125,27 @@ def load_today_snapshot(
     )
     if len(candidate_ids) > MAX_TODAY_OBJECTS:
         raise DailySnapshotLimitExceeded
-    latest = (
-        select(
-            revision.object_id.label("object_id"),
-            func.max(revision.daily_sequence).label("daily_sequence"),
-        )
+    revision_lookup = aliased(HealthObjectRevision)
+    latest_sequence = (
+        select(revision_lookup.daily_sequence)
         .where(
-            revision.owner_id == owner_id,
-            revision.daily_sequence.is_not(None),
-            revision.daily_sequence <= as_of_sequence,
-            revision.object_id.in_(candidate_ids),
+            revision_lookup.owner_id == revision.owner_id,
+            revision_lookup.object_id == revision.object_id,
+            revision_lookup.daily_sequence.is_not(None),
+            revision_lookup.daily_sequence <= as_of_sequence,
         )
-        .group_by(revision.object_id)
-        .subquery()
+        .order_by(revision_lookup.daily_sequence.desc())
+        .limit(1)
+        .correlate(revision)
+        .scalar_subquery()
     )
     rows = tuple(
         session.scalars(
             select(revision)
-            .join(
-                latest,
-                and_(
-                    latest.c.object_id == revision.object_id,
-                    latest.c.daily_sequence == revision.daily_sequence,
-                ),
-            )
             .where(
                 revision.owner_id == owner_id,
+                revision.object_id.in_(candidate_ids),
+                revision.daily_sequence == latest_sequence,
                 revision.daily_status == "active",
                 day_condition,
             )
@@ -165,3 +189,51 @@ def load_today_snapshot(
         profile_context=context_rows,
         profile_context_truncated=context_truncated,
     )
+
+
+def summarize_today_snapshot(
+    revisions: tuple[HealthObjectRevision, ...],
+    local_date: date,
+    timezone: str,
+) -> list[MetricSummaryV1]:
+    """Build the domain read model from the same resolved revisions as the timeline."""
+    events: list[tuple[UUID, EventSchemaV1]] = []
+    observations: list[tuple[UUID, ObservationSchemaV1]] = []
+    linked_severity_ids: set[UUID] = set()
+    for revision in revisions:
+        snapshot = revision.snapshot
+        if snapshot["object_type"] != "event":
+            continue
+        event = EventSchemaV1.model_validate(
+            {
+                "domain": snapshot["domain"],
+                "time": snapshot["time"],
+                "ended_at": snapshot.get("ended_at"),
+                "payload": snapshot["payload"],
+                "notes": snapshot.get("notes"),
+            }
+        )
+        events.append((revision.object_id, event))
+        if event.domain == DailyDomain.SYMPTOMS and event.payload.kind == EventKind.SYMPTOM:
+            linked_severity_ids.update(
+                UUID(value) for value in snapshot.get("linked_observation_ids", [])
+            )
+
+    for revision in revisions:
+        snapshot = revision.snapshot
+        if snapshot["object_type"] != "observation":
+            continue
+        observation = ObservationSchemaV1.model_validate(
+            {
+                "domain": snapshot["domain"],
+                "time": snapshot["time"],
+                "interval_end": snapshot.get("interval_end"),
+                "payload": snapshot["payload"],
+                "notes": snapshot.get("notes"),
+            }
+        )
+        metric = observation.payload.value.metric
+        if metric != MetricKey.SYMPTOM_SEVERITY or revision.object_id in linked_severity_ids:
+            observations.append((revision.object_id, observation))
+
+    return summarize_today(events, observations, local_date, timezone)

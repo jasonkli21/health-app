@@ -12,7 +12,7 @@ from health_api.domain.daily import (
     interval_overlap_seconds,
     local_day_bounds,
 )
-from health_api.domain.daily_rollups import summarize_today
+from health_api.domain.daily_rollups import _summary, summarize_today
 from health_api.domain.schemas import (
     DailyDomain,
     EventPayloadSchemaV1,
@@ -77,6 +77,54 @@ def test_unit_conversion_rejects_unrelated_units_and_nonfinite_values() -> None:
         convert_value(MetricKey.WEIGHT, 1, MeasurementUnit.MI, MeasurementUnit.KG)
     with pytest.raises(ValueError, match="finite"):
         convert_value(MetricKey.ENERGY, float("inf"), MeasurementUnit.KCAL)
+    with pytest.raises(ValueError, match="numeric range"):
+        convert_value(MetricKey.DISTANCE, 1e300, MeasurementUnit.MI)
+    with pytest.raises(ValueError, match="safe aggregation"):
+        EventSchemaV1.model_validate(
+            {
+                "domain": "nutrition",
+                "time": {"precision": "date_only", "local_date": "2026-01-01", "timezone": "UTC"},
+                "payload": {
+                    "kind": "meal",
+                    "label": "Meal",
+                    "energy": {"value": 1.1e300, "unit": "kcal"},
+                },
+            }
+        )
+    with pytest.raises(ValueError, match="after unit conversion"):
+        EventSchemaV1.model_validate(
+            {
+                "domain": "exercise",
+                "time": {
+                    "precision": "date_only",
+                    "local_date": "2026-01-01",
+                    "timezone": "UTC",
+                },
+                "payload": {
+                    "kind": "workout",
+                    "label": "Walk",
+                    "duration": {"value": 1e300, "unit": "h"},
+                },
+            }
+        )
+    with pytest.raises(ValueError, match="after unit conversion"):
+        EventSchemaV1.model_validate(
+            {
+                "domain": "exercise",
+                "time": {
+                    "precision": "date_only",
+                    "local_date": "2026-01-01",
+                    "timezone": "UTC",
+                },
+                "payload": {
+                    "kind": "workout",
+                    "label": "Walk",
+                    "distance": {"value": 1e300, "unit": "mi"},
+                },
+            }
+        )
+    with pytest.raises(ValueError, match="safe numeric range"):
+        _summary(DailyDomain.NUTRITION, MetricKey.ENERGY, [1e308, 1e308], 2, "sum-known-v1")
 
 
 @pytest.mark.parametrize(
@@ -264,3 +312,82 @@ def test_date_only_is_assigned_by_local_date_without_a_fake_instant() -> None:
     )
     assert event.time.model_dump(mode="json") == point
     assert not hasattr(event.time, "occurred_at")
+
+
+def test_sleep_can_be_logged_without_inventing_an_end_or_duration() -> None:
+    date_only = EventSchemaV1.model_validate(
+        {
+            "domain": "sleep",
+            "time": {"precision": "date_only", "local_date": "2026-01-01", "timezone": "UTC"},
+            "payload": {"kind": "sleep", "quality": 3},
+        }
+    )
+    known_start = EventSchemaV1.model_validate(
+        {
+            "domain": "sleep",
+            "time": {
+                "precision": "instant",
+                "occurred_at": "2026-01-01T22:00:00Z",
+                "timezone": "UTC",
+            },
+            "payload": {"kind": "sleep"},
+        }
+    )
+    summaries = summarize_today(
+        [(UUID(int=1), date_only), (UUID(int=2), known_start)],
+        [],
+        date(2026, 1, 1),
+        "UTC",
+    )
+    duration = next(
+        row
+        for row in summaries
+        if row.metric == MetricKey.DURATION and row.domain == DailyDomain.SLEEP
+    )
+    assert duration.known_value is None
+    assert duration.logged_count == 2
+    assert duration.coverage.known_count == 0
+    assert duration.coverage.total_count == 2
+    assert duration.partial
+
+
+def test_symptom_severity_coverage_uses_all_logged_episodes() -> None:
+    events = []
+    for identity, label in ((20, "Headache"), (21, "Nausea")):
+        events.append(
+            (
+                UUID(int=identity),
+                EventSchemaV1.model_validate(
+                    {
+                        "domain": "symptoms",
+                        "time": {
+                            "precision": "instant",
+                            "occurred_at": "2026-01-01T12:00:00Z",
+                            "timezone": "UTC",
+                        },
+                        "payload": {"kind": "symptom", "label": label},
+                    }
+                ),
+            )
+        )
+    severity = ObservationSchemaV1.model_validate(
+        {
+            "domain": "symptoms",
+            "time": {
+                "precision": "instant",
+                "occurred_at": "2026-01-01T12:00:00Z",
+                "timezone": "UTC",
+            },
+            "payload": {"value": {"metric": "symptom_severity", "value": 4}},
+        }
+    )
+    summary = next(
+        row
+        for row in summarize_today(events, [(UUID(int=22), severity)], date(2026, 1, 1), "UTC")
+        if row.metric == MetricKey.SYMPTOM_SEVERITY
+    )
+    assert summary.known_value == 4
+    assert summary.logged_count == 2
+    assert summary.coverage.known_count == 1
+    assert summary.coverage.total_count == 2
+    assert summary.partial

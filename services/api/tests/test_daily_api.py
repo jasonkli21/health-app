@@ -167,6 +167,12 @@ async def test_compound_symptom_entry_and_blood_pressure_are_atomic_and_roll_up_
     assert compound.status_code == 201
     assert compound.json()["events"][0]["linked_observation_ids"] == [str(severity_id)]
     assert compound.json()["observations"][0]["revision"] == 1
+    today_after_compound = await api_client.get("/today", params={"date": "2026-05-01"})
+    assert today_after_compound.json()["as_of_sequence"] == 1
+    assert {item["id"] for item in today_after_compound.json()["items"]} == {
+        str(symptom_id),
+        str(severity_id),
+    }
 
     unlinked = await api_client.post(
         "/observations",
@@ -201,6 +207,231 @@ async def test_compound_symptom_entry_and_blood_pressure_are_atomic_and_roll_up_
     assert summaries[("symptoms", "symptom_severity")]["logged_count"] == 1
     assert summaries[("measurements", "systolic_pressure")]["known_value"] == 120
     assert summaries[("measurements", "diastolic_pressure")]["known_value"] == 80
+
+
+@pytest.mark.asyncio
+async def test_wrong_resource_delete_returns_404_without_archiving_or_allocating_sequence(
+    api_client: AsyncClient,
+) -> None:
+    event = await api_client.post("/events", json=event_request(meal_event("2026-05-01T17:00:00Z")))
+    observation_id = uuid4()
+    observation_result = await api_client.post(
+        "/observations",
+        json={
+            "id": str(observation_id),
+            "observation": observation("weight", 70, "kg"),
+        },
+    )
+    assert event.status_code == observation_result.status_code == 201
+    event_id = UUID(event.json()["id"])
+    before = await api_client.get("/today", params={"date": "2026-05-01"})
+
+    wrong_event_delete = await api_client.delete(
+        f"/events/{observation_id}", params={"expected_revision": 1}
+    )
+    wrong_observation_delete = await api_client.delete(
+        f"/observations/{event_id}", params={"expected_revision": 1}
+    )
+    assert wrong_event_delete.status_code == wrong_observation_delete.status_code == 404
+
+    event_after = await api_client.get(f"/events/{event_id}")
+    observation_after = await api_client.get(f"/observations/{observation_id}")
+    event_history = await api_client.get(f"/events/{event_id}/history")
+    observation_history = await api_client.get(f"/observations/{observation_id}/history")
+    after = await api_client.get("/today", params={"date": "2026-05-01"})
+    assert event_after.json()["status"] == observation_after.json()["status"] == "active"
+    assert event_after.json()["revision"] == observation_after.json()["revision"] == 1
+    assert len(event_history.json()["items"]) == len(observation_history.json()["items"]) == 1
+    assert after.json()["as_of_sequence"] == before.json()["as_of_sequence"]
+
+
+@pytest.mark.asyncio
+async def test_sleep_with_only_a_known_date_or_start_has_partial_unknown_duration(
+    api_client: AsyncClient,
+) -> None:
+    sleep_ids = [uuid4(), uuid4()]
+    date_only_sleep = {
+        "domain": "sleep",
+        "time": {
+            "precision": "date_only",
+            "local_date": "2026-05-01",
+            "timezone": "America/Los_Angeles",
+        },
+        "ended_at": None,
+        "payload": {"kind": "sleep", "quality": None},
+        "notes": None,
+    }
+    started_sleep = {
+        **date_only_sleep,
+        "time": {
+            "precision": "instant",
+            "occurred_at": "2026-05-01T23:00:00-07:00",
+            "timezone": "America/Los_Angeles",
+        },
+    }
+    for object_id, entry in zip(sleep_ids, (date_only_sleep, started_sleep), strict=True):
+        response = await api_client.post("/events", json={"id": str(object_id), "event": entry})
+        assert response.status_code == 201
+
+    today = await api_client.get("/today", params={"date": "2026-05-01"})
+    duration = next(
+        summary
+        for summary in today.json()["summaries"]
+        if summary["domain"] == "sleep" and summary["metric"] == "duration"
+    )
+    assert duration["known_value"] is None
+    assert duration["logged_count"] == 2
+    assert duration["coverage"] == {"known_count": 0, "total_count": 2}
+    assert duration["partial"] is True
+
+
+@pytest.mark.asyncio
+async def test_conversion_bound_is_a_sanitized_input_error_before_persistence(
+    api_client: AsyncClient,
+) -> None:
+    before = await api_client.get("/today", params={"date": "2026-05-01"})
+    rejected = await api_client.post(
+        "/events",
+        json={
+            "id": str(uuid4()),
+            "event": {
+                "domain": "exercise",
+                "time": {
+                    "precision": "date_only",
+                    "local_date": "2026-05-01",
+                    "timezone": "America/Los_Angeles",
+                },
+                "ended_at": None,
+                "payload": {
+                    "kind": "workout",
+                    "label": "Walk",
+                    "distance": {"value": 1e300, "unit": "mi"},
+                },
+                "notes": None,
+            },
+        },
+    )
+    after = await api_client.get("/today", params={"date": "2026-05-01"})
+    assert rejected.status_code == 422
+    assert rejected.json()["code"] == "validation_error"
+    assert any(field["field"].endswith("value") for field in rejected.json()["field_errors"])
+    assert "1e+300" not in rejected.text
+    assert after.json()["as_of_sequence"] == before.json()["as_of_sequence"]
+
+
+@pytest.mark.asyncio
+async def test_symptom_severity_coverage_includes_unrated_episodes_and_excludes_archived_links(
+    api_client: AsyncClient,
+) -> None:
+    rated_id, unrated_id, severity_id = uuid4(), uuid4(), uuid4()
+    symptom = {
+        "domain": "symptoms",
+        "time": {
+            "precision": "instant",
+            "occurred_at": "2026-05-01T16:00:00Z",
+            "timezone": "America/Los_Angeles",
+        },
+        "ended_at": None,
+        "payload": {"kind": "symptom", "label": "Headache"},
+        "notes": None,
+    }
+    severity = observation(
+        "symptom_severity", 5, "score", domain="symptoms", occurred_at="2026-05-01T16:00:00Z"
+    )
+    created = await api_client.post(
+        "/daily-entries",
+        json={
+            "events": [
+                {"id": str(rated_id), "event": symptom},
+                {
+                    "id": str(unrated_id),
+                    "event": {**symptom, "payload": {"kind": "symptom", "label": "Nausea"}},
+                },
+            ],
+            "observations": [{"id": str(severity_id), "observation": severity}],
+            "links": [{"event_id": str(rated_id), "observation_id": str(severity_id)}],
+        },
+    )
+    assert created.status_code == 201
+
+    def severity_summary(response: object) -> dict[str, object]:
+        payload = response.json()  # type: ignore[attr-defined]
+        return next(
+            row
+            for row in payload["summaries"]
+            if row["domain"] == "symptoms" and row["metric"] == "symptom_severity"
+        )
+
+    today = await api_client.get("/today", params={"date": "2026-05-01"})
+    initial = severity_summary(today)
+    assert initial["known_value"] == 5
+    assert initial["logged_count"] == 2
+    assert initial["coverage"] == {"known_count": 1, "total_count": 2}
+    assert initial["partial"] is True
+
+    archived_observation = await api_client.delete(
+        f"/observations/{severity_id}", params={"expected_revision": 1}
+    )
+    assert archived_observation.status_code == 200
+    after_observation_archive = severity_summary(
+        await api_client.get("/today", params={"date": "2026-05-01"})
+    )
+    assert after_observation_archive["known_value"] is None
+    assert after_observation_archive["coverage"] == {"known_count": 0, "total_count": 2}
+    assert after_observation_archive["partial"] is True
+
+    archived_event = await api_client.delete(f"/events/{rated_id}", params={"expected_revision": 1})
+    assert archived_event.status_code == 200
+    after_event_archive = severity_summary(
+        await api_client.get("/today", params={"date": "2026-05-01"})
+    )
+    assert after_event_archive["logged_count"] == 1
+    assert after_event_archive["coverage"] == {"known_count": 0, "total_count": 1}
+
+
+@pytest.mark.asyncio
+async def test_active_severity_linked_to_archived_episode_is_not_counted_as_unlinked(
+    api_client: AsyncClient,
+) -> None:
+    event_id, severity_id = uuid4(), uuid4()
+    symptom = {
+        "domain": "symptoms",
+        "time": {
+            "precision": "instant",
+            "occurred_at": "2026-05-01T16:00:00Z",
+            "timezone": "America/Los_Angeles",
+        },
+        "ended_at": None,
+        "payload": {"kind": "symptom", "label": "Headache"},
+        "notes": None,
+    }
+    severity = observation(
+        "symptom_severity", 4, "score", domain="symptoms", occurred_at="2026-05-01T16:00:00Z"
+    )
+    created = await api_client.post(
+        "/daily-entries",
+        json={
+            "events": [{"id": str(event_id), "event": symptom}],
+            "observations": [{"id": str(severity_id), "observation": severity}],
+            "links": [{"event_id": str(event_id), "observation_id": str(severity_id)}],
+        },
+    )
+    assert created.status_code == 201
+    archived = await api_client.delete(f"/events/{event_id}", params={"expected_revision": 1})
+    assert archived.status_code == 200
+    active_severity = await api_client.get(f"/observations/{severity_id}")
+    assert active_severity.status_code == 200
+    assert active_severity.json()["status"] == "active"
+
+    today = await api_client.get("/today", params={"date": "2026-05-01"})
+    severity_summary = next(
+        row
+        for row in today.json()["summaries"]
+        if row["domain"] == "symptoms" and row["metric"] == "symptom_severity"
+    )
+    assert severity_summary["known_value"] is None
+    assert severity_summary["logged_count"] == 0
+    assert severity_summary["coverage"] == {"known_count": 0, "total_count": 0}
 
 
 @pytest.mark.asyncio

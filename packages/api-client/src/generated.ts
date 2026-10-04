@@ -122,15 +122,15 @@ export interface components {
     };
     DistanceQuantity: {
       unit: "m" | "km" | "mi";
-      value: components["schemas"]["FiniteProfileNumber"];
+      value: components["schemas"]["FiniteDailyNumber"];
     };
     DurationQuantity: {
       unit: "min" | "h";
-      value: components["schemas"]["FiniteProfileNumber"];
+      value: components["schemas"]["FiniteDailyNumber"];
     };
     EnergyQuantity: {
       unit: "kcal" | "kJ";
-      value: components["schemas"]["FiniteProfileNumber"];
+      value: components["schemas"]["FiniteDailyNumber"];
     };
     ErrorResponse: {
       code: string;
@@ -154,6 +154,7 @@ export interface components {
       field: string;
       message: string;
     };
+    FiniteDailyNumber: number;
     FiniteProfileNumber: number;
     InstantTimePoint: {
       occurred_at: components["schemas"]["UTCInstant"];
@@ -190,7 +191,7 @@ export interface components {
         | "diastolic_pressure"
         | "pulse";
       unit: components["schemas"]["MeasurementUnit"];
-      value: components["schemas"]["FiniteProfileNumber"];
+      value: components["schemas"]["FiniteDailyNumber"];
     };
     MetadataKey: string;
     MetadataScalar: string | number | number | boolean | null;

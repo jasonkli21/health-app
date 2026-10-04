@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import UTC, date, datetime
+from math import fsum, isfinite
 from typing import Annotated
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -95,18 +96,37 @@ def _summary(
     method: str,
     *,
     latest: bool = False,
+    coverage_counts: tuple[int, int] | None = None,
 ) -> MetricSummaryV1:
-    known_count = logged_count if latest and values else len(values)
-    known_value = (values[-1] if latest else sum(values)) if values else None
+    known_count = (
+        coverage_counts[0]
+        if coverage_counts is not None
+        else logged_count
+        if latest and values
+        else len(values)
+    )
+    total_count = coverage_counts[1] if coverage_counts is not None else logged_count
+    if values:
+        if latest:
+            known_value = values[-1]
+        else:
+            try:
+                known_value = fsum(values)
+            except (OverflowError, ValueError) as exc:
+                raise ValueError("daily summary exceeds the safe numeric range") from exc
+            if not isfinite(known_value):
+                raise ValueError("daily summary exceeds the safe numeric range")
+    else:
+        known_value = None
     return MetricSummaryV1(
         domain=domain,
         metric=metric,
         known_value=known_value,
         unit=canonical_unit(metric).value,
         logged_count=logged_count,
-        coverage=CoverageV1(known_count=known_count, total_count=logged_count),
+        coverage=CoverageV1(known_count=known_count, total_count=total_count),
         method_version=f"{TODAY_METHOD_VERSION}/{method}/{UNIT_CONVERSION_VERSION}",
-        partial=logged_count > 0 and known_count < logged_count,
+        partial=total_count > 0 and known_count < total_count,
     )
 
 
@@ -247,9 +267,10 @@ def summarize_today(
             DailyDomain.SYMPTOMS,
             MetricKey.SYMPTOM_SEVERITY,
             [row[2] for row in symptom_rows[-1:]],
-            len(symptom_rows),
-            "latest-observation-v1",
+            len(symptom_events),
+            "latest-linked-episode-v2",
             latest=True,
+            coverage_counts=(len(symptom_rows), len(symptom_events)),
         )
     )
 

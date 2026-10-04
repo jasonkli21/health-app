@@ -634,7 +634,7 @@
             "type": "string"
           },
           "value": {
-            "$ref": "#/components/schemas/FiniteProfileNumber"
+            "$ref": "#/components/schemas/FiniteDailyNumber"
           }
         },
         "required": ["value", "unit"],
@@ -650,7 +650,7 @@
             "type": "string"
           },
           "value": {
-            "$ref": "#/components/schemas/FiniteProfileNumber"
+            "$ref": "#/components/schemas/FiniteDailyNumber"
           }
         },
         "required": ["value", "unit"],
@@ -666,7 +666,7 @@
             "type": "string"
           },
           "value": {
-            "$ref": "#/components/schemas/FiniteProfileNumber"
+            "$ref": "#/components/schemas/FiniteDailyNumber"
           }
         },
         "required": ["value", "unit"],
@@ -787,6 +787,9 @@
         "title": "FieldError",
         "type": "object"
       },
+      "FiniteDailyNumber": {
+        "type": "number"
+      },
       "FiniteProfileNumber": {
         "type": "number"
       },
@@ -890,7 +893,7 @@
             "$ref": "#/components/schemas/MeasurementUnit"
           },
           "value": {
-            "$ref": "#/components/schemas/FiniteProfileNumber"
+            "$ref": "#/components/schemas/FiniteDailyNumber"
           }
         },
         "required": ["metric", "value", "unit"],

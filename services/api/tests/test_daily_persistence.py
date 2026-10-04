@@ -23,6 +23,7 @@ from health_api.application.local_principal import ensure_local_principal
 from health_api.config.settings import Settings
 from health_api.domain.schemas import EventSchemaV1, ObservationSchemaV1
 from health_api.persistence.models import (
+    DailySnapshotMarker,
     EventItem,
     EventObservationLink,
     HealthObject,
@@ -126,7 +127,7 @@ def test_compound_symptom_save_is_idempotent_and_records_manual_history(
     retry = create_daily_entry(db_session, owner, command)
     assert retry.created is False
     assert retry.events[0][0].revision == retry.observations[0][0].revision == 1
-    assert db_session.scalar(select(User.daily_sequence).where(User.id == owner)) == 2
+    assert db_session.scalar(select(User.daily_sequence).where(User.id == owner)) == 1
     revisions = list(
         db_session.scalars(
             select(HealthObjectRevision)
@@ -134,7 +135,10 @@ def test_compound_symptom_save_is_idempotent_and_records_manual_history(
             .order_by(HealthObjectRevision.daily_sequence)
         )
     )
-    assert [item.daily_sequence for item in revisions] == [1, 2]
+    assert [item.daily_sequence for item in revisions] == [1, 1]
+    assert db_session.scalars(
+        select(DailySnapshotMarker.daily_sequence).where(DailySnapshotMarker.owner_id == owner)
+    ).all() == [1]
     assert revisions[0].snapshot["linked_observation_ids"] == [str(observation_id)]
     assert revisions[1].daily_object_type == "observation"
     db_session.commit()
@@ -168,7 +172,7 @@ def test_measurement_pair_is_one_compound_save_and_date_only_stays_date_only(
         "systolic_pressure",
         "diastolic_pressure",
     ]
-    assert db_session.scalar(select(User.daily_sequence).where(User.id == owner)) == 2
+    assert db_session.scalar(select(User.daily_sequence).where(User.id == owner)) == 1
     db_session.commit()
 
     date_only = ObservationSchemaV1.model_validate(
@@ -224,6 +228,7 @@ def test_failed_compound_history_write_rolls_back_every_row_and_sequence(
     assert db_session.scalar(select(func.count()).select_from(EventObservationLink)) == 0
     assert db_session.scalar(select(func.count()).select_from(HealthObjectRevision)) == 0
     assert db_session.scalar(select(User.daily_sequence).where(User.id == owner)) == 0
+    assert db_session.scalar(select(func.count()).select_from(DailySnapshotMarker)) == 0
     assert db_session.scalar(select(func.count()).select_from(Source)) == 0
 
 
@@ -257,7 +262,7 @@ def test_update_archive_append_revisions_reject_stale_writes_and_retries_keep_cu
     assert archived[0].revision == 2
     history = list_daily_history(db_session, owner, event_id, 0, 10)
     assert [item.revision for item in history] == [1, 2]
-    assert [item.daily_sequence for item in history] == [1, 4]
+    assert [item.daily_sequence for item in history] == [1, 3]
     assert [item.snapshot["status"] for item in history] == ["active", "archived"]
 
 
@@ -327,3 +332,8 @@ def test_concurrent_daily_edits_allow_only_one_revision(db_session: Session) -> 
         1,
         2,
     ]
+    assert db_session.scalars(
+        select(DailySnapshotMarker.daily_sequence)
+        .where(DailySnapshotMarker.owner_id == owner)
+        .order_by(DailySnapshotMarker.daily_sequence)
+    ).all() == [1, 2]

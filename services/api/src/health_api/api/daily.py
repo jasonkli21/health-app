@@ -46,15 +46,14 @@ from health_api.application.daily_service import (
 )
 from health_api.application.errors import DailyNotFound
 from health_api.application.today_service import (
+    is_today_snapshot_boundary,
     load_today_snapshot,
     owner_today_settings,
+    summarize_today_snapshot,
 )
-from health_api.domain.daily_rollups import MetricSummaryV1, summarize_today
 from health_api.domain.schemas import (
-    EventKind,
     EventSchemaV1,
     InstantTimePoint,
-    MetricKey,
     ObservationSchemaV1,
     ProfileMetadata,
     validate_iana_timezone,
@@ -541,7 +540,9 @@ def delete_event(
     session: Annotated[Session, Depends(get_session)],
     expected_revision: Annotated[int, Query(ge=1)],
 ) -> DailyEventResponse:
-    aggregate = archive_daily_item(session, owner_id, event_id, expected_revision)
+    aggregate = archive_daily_item(
+        session, owner_id, event_id, expected_revision, expected_object_type="event"
+    )
     if not isinstance(aggregate[1], EventItem):
         raise DailyNotFound
     return _event_response(aggregate)
@@ -674,7 +675,9 @@ def delete_observation(
     session: Annotated[Session, Depends(get_session)],
     expected_revision: Annotated[int, Query(ge=1)],
 ) -> DailyObservationResponse:
-    aggregate = archive_daily_item(session, owner_id, observation_id, expected_revision)
+    aggregate = archive_daily_item(
+        session, owner_id, observation_id, expected_revision, expected_object_type="observation"
+    )
     if not isinstance(aggregate[1], ObservationItem):
         raise DailyNotFound
     return _observation_response(aggregate)
@@ -834,6 +837,8 @@ def get_today(
         as_of_sequence, after = _decode_today_cursor(
             cursor, owner_id, effective_date, effective_timezone, current_sequence
         )
+        if not is_today_snapshot_boundary(session, owner_id, as_of_sequence):
+            raise _invalid_cursor()
     else:
         as_of_sequence, after = current_sequence, None
 
@@ -862,29 +867,7 @@ def get_today(
             _today_key(page[-1], effective_timezone),
         )
 
-    active_symptom_link_ids = {
-        observation_id
-        for item in snapshot_items
-        if isinstance(item, DailyEventResponse)
-        and item.event.domain.value == "symptoms"
-        and item.event.payload.kind == EventKind.SYMPTOM
-        for observation_id in item.linked_observation_ids
-    }
-    event_rows: list[tuple[UUID, EventSchemaV1]] = []
-    observation_rows: list[tuple[UUID, ObservationSchemaV1]] = []
-    for item in snapshot_items:
-        if isinstance(item, DailyEventResponse):
-            event_rows.append((item.id, item.event))
-        else:
-            metric = item.observation.payload.value.metric
-            if metric != MetricKey.SYMPTOM_SEVERITY or item.id in active_symptom_link_ids:
-                observation_rows.append((item.id, item.observation))
-    summaries: list[MetricSummaryV1] = summarize_today(
-        event_rows,
-        observation_rows,
-        effective_date,
-        effective_timezone,
-    )
+    summaries = summarize_today_snapshot(snapshot.revisions, effective_date, effective_timezone)
     return TodayResponse(
         date=effective_date,
         timezone=effective_timezone,

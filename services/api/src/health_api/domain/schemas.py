@@ -26,6 +26,19 @@ from pydantic import (
     model_validator,
 )
 
+MAX_DAILY_QUANTITY = 1e300
+
+
+def reject_unaggregatable_daily_number(value: object) -> object:
+    """Keep a single supported-unit value safely summable within bounded Today reads."""
+    value = reject_boolean_number(value)
+    if isinstance(value, (int, float)) and abs(value) > MAX_DAILY_QUANTITY:
+        raise ValueError("daily quantity exceeds the safe aggregation range")
+    return value
+
+
+type FiniteDailyNumber = Annotated[FiniteFloat, BeforeValidator(reject_unaggregatable_daily_number)]
+
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -288,7 +301,7 @@ type DailyTimePoint = Annotated[
 
 
 class EnergyQuantity(StrictModel):
-    value: FiniteProfileNumber
+    value: FiniteDailyNumber
     unit: Literal[MeasurementUnit.KCAL, MeasurementUnit.KJ]
 
     @model_validator(mode="after")
@@ -299,24 +312,32 @@ class EnergyQuantity(StrictModel):
 
 
 class DurationQuantity(StrictModel):
-    value: FiniteProfileNumber
+    value: FiniteDailyNumber
     unit: Literal[MeasurementUnit.MIN, MeasurementUnit.HOUR]
 
     @model_validator(mode="after")
     def duration_is_nonnegative(self) -> DurationQuantity:
         if self.value < 0:
             raise ValueError("duration must be nonnegative")
+        if self.unit == MeasurementUnit.HOUR and self.value > MAX_DAILY_QUANTITY / 60:
+            raise ValueError("duration exceeds the safe numeric range after unit conversion")
         return self
 
 
 class DistanceQuantity(StrictModel):
-    value: FiniteProfileNumber
+    value: FiniteDailyNumber
     unit: Literal[MeasurementUnit.M, MeasurementUnit.KM, MeasurementUnit.MI]
 
     @model_validator(mode="after")
     def distance_is_nonnegative(self) -> DistanceQuantity:
         if self.value < 0:
             raise ValueError("distance must be nonnegative")
+        conversion_factor = {
+            MeasurementUnit.KM: 1000.0,
+            MeasurementUnit.MI: 1609.344,
+        }.get(self.unit, 1.0)
+        if self.value > MAX_DAILY_QUANTITY / conversion_factor:
+            raise ValueError("distance exceeds the safe numeric range after unit conversion")
         return self
 
 
@@ -365,7 +386,7 @@ class MeasurementValueV1(StrictModel):
         MetricKey.DIASTOLIC_PRESSURE,
         MetricKey.PULSE,
     ]
-    value: FiniteProfileNumber
+    value: FiniteDailyNumber
     unit: MeasurementUnit
 
     @model_validator(mode="after")
@@ -431,8 +452,6 @@ class EventSchemaV1(StrictModel):
                 raise ValueError("an interval requires an exact start instant")
             if self.ended_at <= self.time.occurred_at:
                 raise ValueError("ended_at must be after occurred_at")
-        if self.payload.kind == EventKind.SLEEP and self.ended_at is None:
-            raise ValueError("sleep requires a start and end instant")
         if (
             self.payload.kind == EventKind.WORKOUT
             and self.ended_at is not None

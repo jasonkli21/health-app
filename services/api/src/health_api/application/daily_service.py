@@ -595,6 +595,8 @@ def create_daily_entry(
                 )
 
             source = manual_source(session, owner_id)
+            # All objects in this command become visible at one commit boundary.
+            sequence = next_daily_sequence(session, owner_id)
             event_objects: dict[UUID, tuple[HealthObject, EventItem, int]] = {}
             observation_objects: dict[UUID, tuple[HealthObject, ObservationItem, int]] = {}
             for event_entry in command.events:
@@ -623,7 +625,6 @@ def create_daily_entry(
                     object_id=event_entry.id,
                     **{**_event_fields(event_schema), "payload": payload},
                 )
-                sequence = next_daily_sequence(session, owner_id)
                 session.add_all([obj, event_subtype])
                 event_objects[event_entry.id] = (obj, event_subtype, sequence)
 
@@ -653,7 +654,6 @@ def create_daily_entry(
                     object_id=observation_entry.id,
                     **_observation_fields(observation_schema),
                 )
-                sequence = next_daily_sequence(session, owner_id)
                 session.add_all([obj, observation_subtype])
                 observation_objects[observation_entry.id] = (obj, observation_subtype, sequence)
 
@@ -828,6 +828,8 @@ def archive_daily_item(
     owner_id: UUID,
     object_id: UUID,
     expected_revision: int,
+    *,
+    expected_object_type: str | None = None,
 ) -> DailyAggregate:
     with session.begin():
         owner = session.scalar(select(User).where(User.id == owner_id).with_for_update())
@@ -838,7 +840,11 @@ def archive_daily_item(
             .where(HealthObject.owner_id == owner_id, HealthObject.id == object_id)
             .with_for_update()
         )
-        if obj is None or obj.object_type not in {"event", "observation"}:
+        if (
+            obj is None
+            or obj.object_type not in {"event", "observation"}
+            or (expected_object_type is not None and obj.object_type != expected_object_type)
+        ):
             raise DailyNotFound
         if obj.status != "active":
             raise DailyConflict("daily entry is already archived")
