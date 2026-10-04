@@ -15,4 +15,10 @@ build/
 coverage/
 *.log
 .data/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+infra/gcp/*.tfvars
+infra/gcp/*.tfvars.json
 contracts/openapi/generated/

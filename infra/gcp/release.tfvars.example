@@ -1,0 +1,18 @@
+# Copy to ignored infra/gcp/release.tfvars and fill only with owner-approved
+# non-secret IDs, endpoint secret IDs/versions, and immutable image digests.
+gcp_project_id                   = "OWNER_SUPPLIED_PROJECT_ID"
+firebase_project_id              = "OWNER_SUPPLIED_FIREBASE_PROJECT_ID"
+region                            = "OWNER_SUPPLIED_REGION"
+gcs_bucket_name                   = "OWNER_SUPPLIED_PRIVATE_BUCKET_NAME"
+api_image_uri                     = "REGION-docker.pkg.dev/PROJECT/REPOSITORY/health-api@sha256:REPLACE_WITH_64_HEX_DIGEST"
+migration_image_uri               = "REGION-docker.pkg.dev/PROJECT/REPOSITORY/health-api@sha256:REPLACE_WITH_64_HEX_DIGEST"
+runtime_database_secret_id        = "OWNER_SUPPLIED_POOLED_DATABASE_URL_SECRET_ID"
+migration_database_secret_id      = "OWNER_SUPPLIED_DIRECT_MIGRATION_URL_SECRET_ID"
+runtime_database_secret_version   = "OWNER_SUPPLIED_NUMERIC_VERSION"
+migration_database_secret_version = "OWNER_SUPPLIED_NUMERIC_VERSION"
+# Replace both zero placeholders with the explicit owner-approved runtime budget.
+cloud_max_instances               = 0
+database_connection_budget        = 0
+database_pool_size                = 5
+database_max_overflow             = 0
+deploy_api_service                = false
