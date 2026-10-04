@@ -9,11 +9,6 @@ from datetime import date, datetime, timedelta
 from typing import Any, TypeGuard
 from uuid import UUID
 
-from pydantic import ValidationError
-from sqlalchemy import and_, or_, select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
-
 from health_api.application.envelope_service import manual_source, next_daily_sequence
 from health_api.application.errors import DailyConflict, DailyNotFound, DailyValidationError
 from health_api.domain.daily import local_day_bounds
@@ -37,6 +32,10 @@ from health_api.persistence.models import (
     Source,
     User,
 )
+from pydantic import ValidationError
+from sqlalchemy import and_, or_, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 type EventAggregate = tuple[HealthObject, EventItem, Source, tuple[UUID, ...]]
 type ObservationAggregate = tuple[HealthObject, ObservationItem, Source]

@@ -2,7 +2,7 @@
 
 ## Implementation-time reconciliation gate
 
-**Status: implementation in progress. Dependencies: Phase 1 local implementation and independent review are complete; Phase 1 external release gates remain open.** The actual Phase 1 release evidence, model/service/routes, migrations, generated client and mobile flows were inspected before implementation. The repository has `health_objects`/`health_object_revisions`, owner-scoped sources, Profile subtype storage, a local principal, server-generated OpenAPI/client, and six profile-era tables; migration head is `4c168e5219d2`.
+**Status: implementation packages P2.1–P2.5 are complete and committed; acceptance sign-off remains open for PostgreSQL-backed P2.3 route/snapshot tests, fresh migration drift/lifecycle and measured query cost, plus manual device/accessibility gates.** Phase 1 local implementation and independent review are complete; its external release gates remain open. The actual Phase 1 release evidence, model/service/routes, migrations, generated client and mobile flows were inspected before implementation. The repository has `health_objects`/`health_object_revisions`, owner-scoped sources, Profile subtype storage, a local principal, server-generated OpenAPI/client, and six profile-era tables; migration head is `4c168e5219d2`.
 
 ### Reconciliation decisions (2026-10-03)
 
@@ -122,4 +122,4 @@ A local user can log/edit/archive each supported daily type, navigate Profile/To
 
 Before Phase 3: Are Event/Observation responsibilities and rollup methods unambiguous? Do late edits and unknowns render correctly? Are compound writes/retries safe? Are query bounds/indexes explicit? Is device behavior verified or gated?
 
-Luna Max must create planned `docs/implementation/evidence/phase-2-release.md`: actual migration head, metric/schema catalog and examples, routes/error/ID/revision contracts, Today DTO/method versions/day semantics, generated procedure, mobile/API test commands/results, representative query costs, unresolved external checks and Phase 3 deployment prerequisites. Include synthetic DST/sparse fixtures for later analytics evaluation.
+`docs/implementation/evidence/phase-2-release.md` records the actual migration head, metric/schema catalog and examples, route/error/ID/revision contracts, Today method/day/snapshot semantics, generation procedure, mobile/API test commands/results, static query bounds, unresolved database/device gates and Phase 3 prerequisites. It includes the synthetic DST/sparse fixture expectations for later analytics evaluation. Actual PostgreSQL execution plans and timing remain unverified and are required before Phase 3 deployment.

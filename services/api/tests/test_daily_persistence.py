@@ -6,10 +6,6 @@ from threading import Barrier
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, sessionmaker
-
 from health_api.application import daily_service
 from health_api.application.daily_service import (
     CreateDailyEntry,
@@ -35,6 +31,9 @@ from health_api.persistence.models import (
     Source,
     User,
 )
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, sessionmaker
 
 
 def new_principal(session: Session, principal_id: UUID | None = None) -> UUID:

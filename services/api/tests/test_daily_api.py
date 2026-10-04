@@ -6,12 +6,11 @@ from uuid import UUID, uuid4
 import pytest
 import pytest_asyncio
 from fastapi import FastAPI
+from health_api.config.settings import Settings
+from health_api.main import create_app
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
-
-from health_api.config.settings import Settings
-from health_api.main import create_app
 
 OWNER_ID = UUID("00000000-0000-0000-0000-000000000111")
 OTHER_OWNER_ID = UUID("00000000-0000-0000-0000-000000000222")

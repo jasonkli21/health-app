@@ -4,12 +4,11 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from health_api.application.errors import DailyNotFound
+from health_api.persistence.models import Source, User
 from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
-
-from health_api.application.errors import DailyNotFound
-from health_api.persistence.models import Source, User
 
 
 def manual_source(session: Session, owner_id: UUID) -> Source:
