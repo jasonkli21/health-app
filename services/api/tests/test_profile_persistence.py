@@ -6,6 +6,10 @@ from threading import Barrier
 from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, sessionmaker
+
 from health_api.application import profile_service
 from health_api.application.errors import ProfileConflict, ProfileNotFound, ProfileValidationError
 from health_api.application.local_principal import ensure_local_principal
@@ -30,9 +34,6 @@ from health_api.persistence.models import (
     Source,
     User,
 )
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, sessionmaker
 
 
 def payload(label: str = "Diet preference", value: object = None) -> ProfilePayloadV1:
@@ -137,6 +138,36 @@ def test_create_persists_restrictive_permissions_and_bounded_metadata(db_session
                 metadata={"not_finite": float("nan")},
             ),
         )
+
+
+@pytest.mark.parametrize("missing_field", ["kind", "category", "key"])
+def test_database_rejects_profile_payload_missing_identity_fields(
+    db_session: Session, missing_field: str
+) -> None:
+    owner = new_principal(db_session)
+    aggregate = create_profile_item(db_session, owner, create_command()).aggregate
+    health_object = aggregate[0]
+    profile_item = aggregate[1]
+    malformed_payload = dict(profile_item.payload)
+    malformed_payload.pop(missing_field)
+    db_session.execute(
+        delete(ProfileItem).where(
+            ProfileItem.owner_id == owner, ProfileItem.object_id == health_object.id
+        )
+    )
+
+    with pytest.raises(IntegrityError), db_session.begin_nested():
+        db_session.add(
+            ProfileItem(
+                owner_id=owner,
+                object_id=health_object.id,
+                kind=profile_item.kind,
+                category=profile_item.category,
+                key=profile_item.key,
+                payload=malformed_payload,
+            )
+        )
+        db_session.flush()
 
 
 def test_owner_scoping_applies_to_detail_and_history(db_session: Session) -> None:

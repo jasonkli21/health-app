@@ -173,8 +173,11 @@ class ProfileItem(Base):
         CheckConstraint("key ~ '^[a-z][a-z0-9_]{0,63}$'", name="ck_profile_items_key"),
         CheckConstraint(
             "jsonb_typeof(payload) = 'object' AND "
-            "payload->>'kind' = kind AND payload->>'category' = category AND "
-            "payload->>'key' = key",
+            "payload ? 'kind' AND jsonb_typeof(payload->'kind') = 'string' AND "
+            "payload->>'kind' = kind AND payload ? 'category' AND "
+            "jsonb_typeof(payload->'category') = 'string' AND "
+            "payload->>'category' = category AND payload ? 'key' AND "
+            "jsonb_typeof(payload->'key') = 'string' AND payload->>'key' = key",
             name="ck_profile_items_payload_consistency",
         ),
         Index("ix_profile_items_owner_category_key", "owner_id", "category", "key"),
