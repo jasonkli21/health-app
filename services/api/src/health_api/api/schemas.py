@@ -2,19 +2,25 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
+from pydantic import AwareDatetime, ConfigDict, Field, StrictBool, StrictInt, model_validator
+
+from health_api.domain.daily_rollups import MetricSummaryV1
 from health_api.domain.schemas import (
     ConfirmationStatus,
+    DailyDomain,
+    DailyNotes,
+    EventSchemaV1,
+    ObservationSchemaV1,
     ProfileMetadata,
     ProfileNotes,
     ProfilePayloadV1,
     ProfileValidity,
     StrictModel,
 )
-from pydantic import AwareDatetime, ConfigDict, Field, StrictBool, StrictInt, model_validator
 
 
 def _non_null_openapi_schema(schema: dict[str, Any]) -> None:
@@ -138,6 +144,136 @@ class ProfileHistoryEntry(StrictModel):
 class ProfileHistoryResponse(StrictModel):
     items: list[ProfileHistoryEntry]
     next_after_revision: int | None
+
+
+class DailyEventCreateRequest(StrictModel):
+    id: UUID
+    event: EventSchemaV1
+
+
+class DailyObservationCreateRequest(StrictModel):
+    id: UUID
+    observation: ObservationSchemaV1
+
+
+class DailyLinkRequest(StrictModel):
+    event_id: UUID
+    observation_id: UUID
+    role: Literal["symptom_severity"] = "symptom_severity"
+
+
+class DailyEntryCreateRequest(StrictModel):
+    events: list[DailyEventCreateRequest] = Field(default_factory=list, max_length=20)
+    observations: list[DailyObservationCreateRequest] = Field(default_factory=list, max_length=20)
+    links: list[DailyLinkRequest] = Field(default_factory=list, max_length=20)
+
+    @model_validator(mode="after")
+    def validate_atomic_entry_bounds(self) -> DailyEntryCreateRequest:
+        objects = [item.id for item in self.events] + [item.id for item in self.observations]
+        if not objects or len(objects) > 20:
+            raise ValueError("daily entry must contain between one and twenty objects")
+        if len(set(objects)) != len(objects):
+            raise ValueError("daily entry object IDs must be unique")
+        event_ids = {item.id for item in self.events}
+        observation_ids = {item.id for item in self.observations}
+        if any(
+            link.event_id not in event_ids or link.observation_id not in observation_ids
+            for link in self.links
+        ):
+            raise ValueError("linked objects must be included in the same atomic save")
+        return self
+
+
+class DailyEventUpdateRequest(StrictModel):
+    expected_revision: Annotated[StrictInt, Field(ge=1)]
+    event: EventSchemaV1
+
+
+class DailyObservationUpdateRequest(StrictModel):
+    expected_revision: Annotated[StrictInt, Field(ge=1)]
+    observation: ObservationSchemaV1
+
+
+class DailyEnvelopeResponse(StrictModel):
+    id: UUID
+    domain: DailyDomain
+    status: Literal["active", "archived"]
+    title: Annotated[str, Field(min_length=1, max_length=120)]
+    valid_from: datetime | None
+    valid_to: datetime | None
+    recorded_at: datetime
+    created_at: datetime
+    updated_at: datetime
+    source: ProfileSource
+    confirmation_status: ConfirmationStatus
+    schema_version: Literal[1]
+    revision: Annotated[int, Field(ge=1)]
+    notes: DailyNotes | None
+    metadata: ProfileMetadata
+    permissions: ProfilePermissions
+
+
+class DailyEventResponse(DailyEnvelopeResponse):
+    object_type: Literal["event"]
+    event: EventSchemaV1
+    linked_observation_ids: list[UUID]
+
+
+class DailyObservationResponse(DailyEnvelopeResponse):
+    object_type: Literal["observation"]
+    observation: ObservationSchemaV1
+
+
+DailyItemResponse = Annotated[
+    DailyEventResponse | DailyObservationResponse,
+    Field(discriminator="object_type"),
+]
+
+
+class DailyEntryCreateResponse(StrictModel):
+    events: list[DailyEventResponse]
+    observations: list[DailyObservationResponse]
+    created: bool
+
+
+class DailyEventListResponse(StrictModel):
+    items: list[DailyEventResponse]
+    next_cursor: str | None
+
+
+class DailyObservationListResponse(StrictModel):
+    items: list[DailyObservationResponse]
+    next_cursor: str | None
+
+
+class DailyHistoryEntry(StrictModel):
+    revision: Annotated[int, Field(ge=1)]
+    recorded_at: datetime
+    actor_kind: Literal["user"]
+    reason: Literal["create", "update", "archive"]
+    snapshot: DailyItemResponse
+
+
+class DailyHistoryResponse(StrictModel):
+    items: list[DailyHistoryEntry]
+    next_after_revision: int | None
+
+
+class ProfileContextReference(StrictModel):
+    id: UUID
+    title: Annotated[str, Field(min_length=1, max_length=120)]
+
+
+class TodayResponse(StrictModel):
+    date: date
+    timezone: Annotated[str, Field(min_length=1, max_length=64)]
+    as_of_sequence: Annotated[int, Field(ge=0)]
+    items: list[DailyItemResponse]
+    summaries: list[MetricSummaryV1]
+    profile_context_refs: list[ProfileContextReference]
+    profile_context_truncated: bool
+    includes_profile_context: bool
+    next_cursor: str | None
 
 
 class FieldError(StrictModel):

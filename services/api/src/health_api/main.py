@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from health_api.api.daily import router as daily_router
 from health_api.api.errors import install_error_handlers
 from health_api.api.middleware import RequestBoundaryMiddleware
 from health_api.api.profile import router as profile_router
@@ -32,7 +33,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
         title="Personal Health API",
         version="1.0.0",
         description=(
-            "Owner-scoped Profile v1 API for private local development. "
+            "Owner-scoped Profile v1 and daily Event/Observation v1 APIs for private local development. "
             "The server principal is configured outside request data. "
             "Request bodies are limited to 65,536 bytes."
         ),
@@ -44,6 +45,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     app.add_middleware(RequestBoundaryMiddleware, max_body_bytes=65_536)
     install_error_handlers(app)
     app.include_router(profile_router)
+    app.include_router(daily_router)
 
     @app.get("/healthz", tags=["system"], operation_id="healthcheck")
     def healthcheck() -> dict[str, str]:

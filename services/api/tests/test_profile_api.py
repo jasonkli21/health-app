@@ -6,11 +6,12 @@ from uuid import UUID, uuid4
 import pytest
 import pytest_asyncio
 from fastapi import FastAPI
-from health_api.config.settings import Settings
-from health_api.main import create_app
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
+
+from health_api.config.settings import Settings
+from health_api.main import create_app
 
 OWNER_ID = UUID("00000000-0000-0000-0000-000000000101")
 OTHER_OWNER_ID = UUID("00000000-0000-0000-0000-000000000202")
@@ -314,6 +315,20 @@ async def test_openapi_has_stable_transport_paths_and_no_server_secrets(
         "updateProfileItem",
         "archiveProfileItem",
         "healthcheck",
+        "listEvents",
+        "createEvent",
+        "getEvent",
+        "listEventHistory",
+        "updateEvent",
+        "archiveEvent",
+        "listObservations",
+        "createObservation",
+        "getObservation",
+        "listObservationHistory",
+        "updateObservation",
+        "archiveObservation",
+        "createDailyEntry",
+        "getToday",
     } <= operations
     serialized = str(document)
     assert "database_url" not in serialized
@@ -327,3 +342,22 @@ async def test_openapi_has_stable_transport_paths_and_no_server_secrets(
         assert all(variant.get("type") != "null" for variant in variants)
     assert "explicit null is invalid" in patch_schema["profile"]["description"]
     assert "65,536 bytes" in document["info"]["description"]
+    event_post = document["paths"]["/events"]["post"]
+    assert event_post["operationId"] == "createEvent"
+    assert event_post["responses"]["200"]["content"]["application/json"]["schema"]["$ref"] == (
+        "#/components/schemas/DailyEventResponse"
+    )
+    assert event_post["responses"]["201"]["content"]["application/json"]["schema"]["$ref"] == (
+        "#/components/schemas/DailyEventResponse"
+    )
+    today_get = document["paths"]["/today"]["get"]
+    assert today_get["operationId"] == "getToday"
+    assert {parameter["name"] for parameter in today_get["parameters"]} == {
+        "date",
+        "timezone",
+        "limit",
+        "cursor",
+    }
+    assert "DailyEventResponse" in str(
+        document["components"]["schemas"]["TodayResponse"]["properties"]["items"]
+    )

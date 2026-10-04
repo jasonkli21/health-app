@@ -23,3 +23,7 @@ class DailyConflict(Exception):
 
 class DailyValidationError(Exception):
     pass
+
+
+class DailySnapshotLimitExceeded(Exception):
+    pass

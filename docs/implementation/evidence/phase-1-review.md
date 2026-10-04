@@ -85,10 +85,12 @@ blocks the next local implementation phase.
 The requested regression tests, fresh disposable PostgreSQL integration run,
 migration lifecycle, static checks, generated-contract check, and iOS bundle
 export were completed. Exact results and the remaining external/device gates are
-recorded in [Phase 1 release evidence](phase-1-release.md). This implementation
-follow-up does not close independent review or any native-device release gate.
+recorded in [Phase 1 release evidence](phase-1-release.md). The main-session
+independent review and re-review are complete, with no local finding blocking
+Phase 2 implementation. This does not close any external or native-device gate.
 
 Known external gates remain PG17/Docker, exact pnpm9/full CI, actual device and
 VoiceOver/keyboard walkthrough, online compatibility, and Phase 0 advisories.
-No cloud/AI/native/web capabilities belong in this fix scope. Main session will
-re-review fixes before advancing Phase 2. Future agents use Luna Extra High.
+No cloud/AI/native/web capabilities belong in this fix scope. The final review
+disposition is recorded in the Phase 2 checkpoint. Future implementation agents
+use Luna Extra High.

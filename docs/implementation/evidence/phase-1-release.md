@@ -77,4 +77,4 @@ unresponsive cluster was left untouched.
 
 ## Handoff
 
-Implementation commits through P1.4 are `b491df0` (P1.1), `433bc0d` (P1.2), `4d1e365` (P1.3), and `6f0b85b` (P1.4). The coordinator checkpoint is [coordinator-state.md](../coordinator-state.md). Phase 1 is ready for independent review; the listed environment and manual gates still need explicit completion before a release claim.
+Phase 1 implementation and the main-session independent review are complete. The implementation commits are `b491df0` (P1.1), `433bc0d` (P1.2), `4d1e365` (P1.3), and `6f0b85b` (P1.4), followed by review fixes `f75135d`, `d388814`, and `360d95a`. The coordinator checkpoint is [coordinator-state.md](../coordinator-state.md). The listed environment, source-use and manual gates remain open; this local completion does not claim an external release.

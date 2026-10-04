@@ -14,6 +14,7 @@ from health_api.api.schemas import ErrorResponse, FieldError
 from health_api.application.errors import (
     DailyConflict,
     DailyNotFound,
+    DailySnapshotLimitExceeded,
     DailyValidationError,
     ProfileConflict,
     ProfileNotFound,
@@ -139,6 +140,17 @@ def install_error_handlers(app: FastAPI) -> None:
         request: Request, _exc: DailyValidationError
     ) -> JSONResponse:
         return _error_response(request, 422, "validation_error", "Daily entry is invalid.")
+
+    @app.exception_handler(DailySnapshotLimitExceeded)
+    async def daily_snapshot_limit_handler(
+        request: Request, _exc: DailySnapshotLimitExceeded
+    ) -> JSONResponse:
+        return _error_response(
+            request,
+            422,
+            "today_window_too_large",
+            "The selected day has too many entries for a safe Today snapshot.",
+        )
 
     @app.exception_handler(RequestValidationError)
     async def request_validation_handler(

@@ -5,16 +5,18 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from datetime import date, datetime, timedelta
 from typing import Any, TypeGuard
 from uuid import UUID
 
 from pydantic import ValidationError
-from sqlalchemy import and_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from health_api.application.envelope_service import manual_source, next_daily_sequence
 from health_api.application.errors import DailyConflict, DailyNotFound, DailyValidationError
+from health_api.domain.daily import local_day_bounds
 from health_api.domain.schemas import (
     DailyDomain,
     EventKind,
@@ -389,6 +391,138 @@ def _daily_aggregate(session: Session, owner_id: UUID, object_id: UUID) -> Daily
 
 def get_daily_item(session: Session, owner_id: UUID, object_id: UUID) -> DailyAggregate:
     return _daily_aggregate(session, owner_id, object_id)
+
+
+def list_daily_items(
+    session: Session,
+    owner_id: UUID,
+    object_type: str,
+    limit: int,
+    after: tuple[datetime, UUID] | None = None,
+    from_date: date | None = None,
+    to_date: date | None = None,
+    timezone: str | None = None,
+) -> list[DailyAggregate]:
+    if (from_date is None) != (to_date is None):
+        raise ValueError("both date range bounds are required")
+    conditions = [
+        HealthObject.owner_id == owner_id,
+        HealthObject.object_type == object_type,
+        HealthObject.status == "active",
+    ]
+    if after is not None:
+        conditions.append(
+            or_(
+                HealthObject.created_at < after[0],
+                and_(HealthObject.created_at == after[0], HealthObject.id < after[1]),
+            )
+        )
+    if from_date is not None and to_date is not None:
+        if timezone is None or to_date < from_date or to_date == date.max:
+            raise ValueError("daily list date range is invalid")
+        start_at = local_day_bounds(from_date, timezone)[0]
+        end_at = local_day_bounds(to_date + timedelta(days=1), timezone)[0]
+        if object_type == "event":
+            time_filter = or_(
+                and_(
+                    EventItem.time_precision == "instant",
+                    EventItem.occurred_at < end_at,
+                    or_(
+                        and_(EventItem.ended_at.is_(None), EventItem.occurred_at >= start_at),
+                        EventItem.ended_at > start_at,
+                    ),
+                ),
+                and_(
+                    EventItem.time_precision == "date_only",
+                    EventItem.local_date >= from_date,
+                    EventItem.local_date <= to_date,
+                ),
+            )
+        elif object_type == "observation":
+            time_filter = or_(
+                and_(
+                    ObservationItem.time_precision == "instant",
+                    ObservationItem.observed_at < end_at,
+                    or_(
+                        and_(
+                            ObservationItem.interval_end.is_(None),
+                            ObservationItem.observed_at >= start_at,
+                        ),
+                        ObservationItem.interval_end > start_at,
+                    ),
+                ),
+                and_(
+                    ObservationItem.time_precision == "date_only",
+                    ObservationItem.local_date >= from_date,
+                    ObservationItem.local_date <= to_date,
+                ),
+            )
+        else:
+            raise ValueError("unsupported daily object type")
+        conditions.append(time_filter)
+
+    order_by = (HealthObject.created_at.desc(), HealthObject.id.desc())
+    if object_type == "event":
+        event_rows = session.execute(
+            select(HealthObject, EventItem, Source)
+            .join(
+                EventItem,
+                and_(
+                    EventItem.owner_id == HealthObject.owner_id,
+                    EventItem.object_id == HealthObject.id,
+                ),
+            )
+            .join(
+                Source,
+                and_(Source.owner_id == HealthObject.owner_id, Source.id == HealthObject.source_id),
+            )
+            .where(*conditions)
+            .order_by(*order_by)
+            .limit(limit)
+        ).all()
+        event_ids = {row[0].id for row in event_rows}
+        link_rows = (
+            session.execute(
+                select(
+                    EventObservationLink.event_object_id,
+                    EventObservationLink.observation_object_id,
+                )
+                .where(
+                    EventObservationLink.owner_id == owner_id,
+                    EventObservationLink.event_object_id.in_(event_ids),
+                )
+                .order_by(EventObservationLink.observation_object_id)
+            ).all()
+            if event_ids
+            else []
+        )
+        links_by_event: dict[UUID, list[UUID]] = {}
+        for event_id, observation_id in link_rows:
+            links_by_event.setdefault(event_id, []).append(observation_id)
+        return [
+            (obj, event, source, tuple(links_by_event.get(obj.id, [])))
+            for obj, event, source in event_rows
+        ]
+    if object_type == "observation":
+        observation_rows = session.execute(
+            select(HealthObject, ObservationItem, Source)
+            .join(
+                ObservationItem,
+                and_(
+                    ObservationItem.owner_id == HealthObject.owner_id,
+                    ObservationItem.object_id == HealthObject.id,
+                ),
+            )
+            .join(
+                Source,
+                and_(Source.owner_id == HealthObject.owner_id, Source.id == HealthObject.source_id),
+            )
+            .where(*conditions)
+            .order_by(*order_by)
+            .limit(limit)
+        ).all()
+        return [(obj, observation, source) for obj, observation, source in observation_rows]
+    raise ValueError("unsupported daily object type")
 
 
 def _requested_ids(command: CreateDailyEntry) -> set[UUID]:

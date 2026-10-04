@@ -34,6 +34,104 @@ describe("generated Profile API client", () => {
     );
   });
 
+  it("serializes generated daily create and Today query contracts", async () => {
+    const requests: { url: string; body?: string }[] = [];
+    const fetcher: FetchLike = async (url, init) => {
+      requests.push({ url, body: init?.body });
+      return response({});
+    };
+    const client = new ProfileApiClient("https://localhost:8000", fetcher);
+    const request: components["schemas"]["DailyEventCreateRequest"] = {
+      id: "00000000-0000-0000-0000-000000000777",
+      event: {
+        domain: "nutrition",
+        time: {
+          precision: "instant",
+          occurred_at: "2026-05-01T16:00:00Z",
+          timezone: "America/Los_Angeles",
+        },
+        ended_at: null,
+        payload: {
+          kind: "meal",
+          label: "Lunch",
+          energy: { value: 0, unit: "kcal" },
+        },
+        notes: null,
+      },
+    };
+    await client.createEvent(request);
+    await client.getToday({
+      date: "2026-05-01",
+      timezone: "America/Los_Angeles",
+      limit: 20,
+    });
+    const bloodPressurePair: components["schemas"]["DailyEntryCreateRequest"] =
+      {
+        events: [],
+        observations: [
+          {
+            id: "00000000-0000-0000-0000-000000000778",
+            observation: {
+              domain: "measurements",
+              time: {
+                precision: "instant",
+                occurred_at: "2026-05-01T16:00:00Z",
+                timezone: "America/Los_Angeles",
+              },
+              interval_end: null,
+              payload: {
+                value: {
+                  metric: "systolic_pressure",
+                  value: 120,
+                  unit: "mmHg",
+                },
+              },
+              notes: null,
+            },
+          },
+          {
+            id: "00000000-0000-0000-0000-000000000779",
+            observation: {
+              domain: "measurements",
+              time: {
+                precision: "instant",
+                occurred_at: "2026-05-01T16:00:00Z",
+                timezone: "America/Los_Angeles",
+              },
+              interval_end: null,
+              payload: {
+                value: {
+                  metric: "diastolic_pressure",
+                  value: 80,
+                  unit: "mmHg",
+                },
+              },
+              notes: null,
+            },
+          },
+        ],
+        links: [],
+      };
+    await client.createDailyEntry(bloodPressurePair);
+    await client.listEvents({
+      from_date: "2026-05-01",
+      to_date: "2026-05-31",
+      timezone: "America/Los_Angeles",
+      cursor: "stable-cursor",
+    });
+
+    expect(requests[0].url).toBe("https://localhost:8000/events");
+    expect(JSON.parse(requests[0].body ?? "{}")).toEqual(request);
+    expect(requests[1].url).toBe(
+      "https://localhost:8000/today?date=2026-05-01&timezone=America%2FLos_Angeles&limit=20",
+    );
+    expect(requests[2].url).toBe("https://localhost:8000/daily-entries");
+    expect(JSON.parse(requests[2].body ?? "{}")).toEqual(bloodPressurePair);
+    expect(requests[3].url).toBe(
+      "https://localhost:8000/events?from_date=2026-05-01&to_date=2026-05-31&timezone=America%2FLos_Angeles&cursor=stable-cursor",
+    );
+  });
+
   it("serializes the typed create request and raises a structured API error", async () => {
     const request: components["schemas"]["ProfileCreateRequest"] = {
       id: "00000000-0000-0000-0000-000000000001",
