@@ -1,7 +1,7 @@
 from uuid import UUID
 
 import pytest
-from health_api.config.settings import Settings
+from health_api.config.settings import Settings, migration_database_url
 from pydantic import ValidationError
 
 POOL_URL = "postgresql+psycopg://api:secret@ep-health-pooler.us-east-2.aws.neon.tech/health?sslmode=verify-full"
@@ -49,6 +49,22 @@ def test_local_settings_hide_database_credentials_from_repr() -> None:
     assert "private-pass" not in repr(settings)
 
 
+def test_cloud_migration_uses_only_the_explicit_direct_url() -> None:
+    assert migration_database_url("cloud", DIRECT_URL, None) == DIRECT_URL
+    with pytest.raises(ValueError, match="MIGRATION_DATABASE_URL is required"):
+        migration_database_url("cloud", None, None)
+    with pytest.raises(ValueError, match="direct, non-pooled"):
+        migration_database_url("cloud", POOL_URL, None)
+
+
+def test_migration_environment_rejects_unknown_mode_and_uses_local_database() -> None:
+    assert migration_database_url("local", None, "postgresql://localhost/health") == (
+        "postgresql://localhost/health"
+    )
+    with pytest.raises(ValueError, match="APP_ENV"):
+        migration_database_url("production", DIRECT_URL, None)
+
+
 def test_cloud_requires_verified_firebase_and_gcs_configuration() -> None:
     with pytest.raises(ValidationError, match="FIREBASE_PROJECT_ID"):
         Settings(_env_file=None, app_env="cloud", auth_mode="firebase")
@@ -62,10 +78,10 @@ def test_cloud_rejects_dev_auth_and_local_principal() -> None:
 
 
 def test_cloud_pool_is_bounded_by_explicit_connection_budget() -> None:
-    settings = _cloud_settings(database_connection_budget=10)
-    assert settings.database_pool_size * settings.cloud_max_instances == 10
+    settings = _cloud_settings(database_connection_budget=20)
+    assert 2 * settings.database_pool_size * settings.cloud_max_instances == 20
     with pytest.raises(ValidationError, match="DATABASE_CONNECTION_BUDGET"):
-        _cloud_settings(database_connection_budget=9)
+        _cloud_settings(database_connection_budget=19)
 
 
 def test_cloud_requires_pooled_runtime_url_and_verified_tls() -> None:
@@ -96,7 +112,7 @@ def _cloud_settings(**overrides: object) -> Settings:
         "gcs_bucket": "health-prod-private-objects",
         "database_url": POOL_URL,
         "cloud_max_instances": 2,
-        "database_connection_budget": 10,
+        "database_connection_budget": 20,
     }
     values.update(overrides)
     return Settings(**values)

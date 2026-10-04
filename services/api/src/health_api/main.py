@@ -15,6 +15,7 @@ from health_api.api.middleware import RequestBoundaryMiddleware
 from health_api.api.profile import router as profile_router
 from health_api.config.settings import Settings, get_settings
 from health_api.integrations.firebase_auth import FirebaseTokenVerifier, IdentityVerifier
+from health_api.integrations.object_storage import create_object_storage
 from health_api.persistence.database import create_database_engine, create_session_factory
 
 
@@ -56,6 +57,7 @@ def create_app(
     app.state.settings = configured_settings
     app.state.engine = database_engine
     app.state.session_factory = sessions
+    app.state.object_storage = create_object_storage(configured_settings)
     if identity_verifier is not None:
         app.state.identity_verifier = identity_verifier
     elif configured_settings.auth_mode == "firebase":

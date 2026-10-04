@@ -39,6 +39,25 @@ def validate_cloud_database_url(value: str | SecretStr, *, direct: bool) -> None
         raise ValueError("runtime database URLs must use Neon's pooled endpoint")
 
 
+def migration_database_url(
+    app_env: str, direct_url: str | None, local_database_url: str | None
+) -> str:
+    """Resolve the direct migration endpoint without loading runtime secrets in cloud."""
+    normalized_env = app_env.lower()
+    if normalized_env not in {"local", "test", "cloud"}:
+        raise ValueError("APP_ENV must be local, test, or cloud")
+    if normalized_env == "cloud":
+        if not direct_url:
+            raise ValueError("MIGRATION_DATABASE_URL is required for cloud releases")
+        validate_cloud_database_url(direct_url, direct=True)
+        return direct_url
+    if direct_url:
+        return direct_url
+    if not local_database_url:
+        raise ValueError("a database URL is required for migrations")
+    return local_database_url
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -59,6 +78,7 @@ class Settings(BaseSettings):
     local_principal_timezone: str = "America/Los_Angeles"
     local_object_storage_root: Path = Path(".data/objects")
     max_object_size_bytes: int = Field(default=10_485_760, ge=1, le=52_428_800)
+    object_storage_timeout_seconds: int = Field(default=10, ge=1, le=30)
     firebase_project_id: str | None = None
     gcp_project_id: str | None = None
     gcs_bucket: str | None = None
@@ -119,8 +139,11 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "CLOUD_MAX_INSTANCES and DATABASE_CONNECTION_BUDGET are required in cloud environments"
                 )
-            configured_connections = self.cloud_max_instances * (
-                self.database_pool_size + self.database_max_overflow
+            # Cloud Run can scale the new revision alongside the previous one.
+            configured_connections = (
+                2
+                * self.cloud_max_instances
+                * (self.database_pool_size + self.database_max_overflow)
             )
             if configured_connections > self.database_connection_budget:
                 raise ValueError("per-instance database pools exceed DATABASE_CONNECTION_BUDGET")
