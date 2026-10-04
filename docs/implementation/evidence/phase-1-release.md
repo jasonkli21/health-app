@@ -50,6 +50,22 @@ The controls include accessible labels/hints and usable touch targets. Vitest co
 | Expo package compatibility      | `expo install --check` reported dependencies up to date using the local SDK map; its online well-known-version lookup was unavailable offline, so remote compatibility was not verified.                                                                                                                                                                                                                                                                                                                                                       |
 | CI                              | Workflow config provisions PostgreSQL 17, installs frozen pnpm dependencies, checks generated drift, runs lint/typecheck/tests, and performs the iOS Expo export. The complete GitHub Actions workflow was not run locally.                                                                                                                                                                                                                                                                                                                    |
 
+## Review-fix follow-up validation
+
+The independent review findings and their implementation dispositions are in
+[phase-1-review.md](phase-1-review.md). Validation of the follow-up changes used
+a new disposable PostgreSQL 16.15 cluster under `/private/tmp`; the previous
+unresponsive cluster was left untouched.
+
+| Area                              | Result                                                                                                                                                                                                      |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PostgreSQL integration            | API suite: **42 passed** against the new disposable PostgreSQL 16.15 database. Three new database insert cases verify that a missing payload `kind`, `category`, or `key` violates the JSON identity CHECK. |
+| Migration agreement and lifecycle | `alembic check`: **No new upgrade operations detected.** On a fresh database, Alembic upgrade to head `4c168e5219d2`, downgrade to base, and re-upgrade to `4c168e5219d2` all completed.                    |
+| Mobile behavior and static checks | Vitest: **23 passed** across six files; strict mobile TypeScript and ESLint passed. Prettier and Python formatting/lint checks also passed after the follow-up edits.                                       |
+| Python static checks              | Ruff check and format check passed for the changed persistence model, integration tests, and migration. Mypy passed for the API source package (13 files).                                                  |
+| API contract reproducibility      | Re-exported OpenAPI and regenerated the typed API client, then applied the repository Prettier version. Both tracked artifacts had no diff.                                                                 |
+| Native bundle export              | Expo SDK 57 iOS export completed with Node 24.19: **1,121 modules**, one **2.4 MB** Hermes bundle. This verifies bundle generation only; no native simulator/device interaction was performed.              |
+
 ## Unresolved release gates and deviations
 
 - The host has Node 24.19 via the Codex-bundled runtime but only pnpm 11.19; the repository pins pnpm 9.15.0. The pinned `pnpm install --frozen-lockfile`, exact root scripts, and full CI workflow therefore remain unverified locally. Tests used the existing workspace install and direct bundled Node tools.
