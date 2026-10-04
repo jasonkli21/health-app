@@ -2,7 +2,7 @@
 
 Updated 2026-10-04 (PDT). Resume from this file, the phase plans, release evidence, and Git history; do not rely on conversation memory.
 
-- Current stage: Phase 3 local implementation is complete through commit `c288982`; P3.4 is offline IaC/runbook only, and P3.5 live acceptance is blocked on owner-supplied release inputs and staging. The user explicitly authorized skipping Phase 2's blocked database checks and continuing to Phase 3 on October 4. Phase 1 local review and Phase 2 code review are complete. Phase 2 database acceptance remains unverified (40 PostgreSQL tests, migration lifecycle/drift and query measurements); carry it forward before live release, without claiming it passed.
+- Current stage: Phase 3 local implementation and seven review fixes are committed through `e802439`, awaiting root re-review; P3.4 is offline IaC/runbook only, and P3.5 live acceptance is blocked on owner-supplied release inputs and staging. The user explicitly authorized skipping Phase 2's blocked database checks and continuing to Phase 3 on October 4. Phase 1 local review and Phase 2 code review are complete. Phase 2 database acceptance remains unverified (40 PostgreSQL tests, migration lifecycle/drift and query measurements); carry it forward before live release, without claiming it passed.
 - Baseline: Phase 0 scaffold committed as `b06b93d` on `main`. This directory originally had no Git repository; Git was initialized to support the requested logical commits.
 - Governing instructions: `CODEX.md`, `docs/handoff/codex-handoff.md`, `docs/implementation/phases/README.md`, and the current phase plan. The user's explicit request authorizes implementing Phases 1–9 sequentially, overriding the earlier Phase 0-only handoff boundary.
 - Completed Phase 1 commits: `b491df0` (P1.1 schema/local principal), `433bc0d` (P1.2 PostgreSQL persistence/services), `4d1e365` (P1.3 Profile API/OpenAPI/generated client), `6f0b85b` (P1.4 mobile Profile flow/tests/docs), and `368ed43` (P1.5 release evidence and checks). Independent-review fixes are committed as `f75135d` (database payload identity checks) and `d388814` (mobile recovery, race, date, consent, and regression tests); the local-review checkpoint correction is `360d95a`.
@@ -68,3 +68,38 @@ PG17 is still unavailable.
 - IaC/build boundaries: Terraform/OpenTofu, gcloud, Docker and Podman are unavailable; HCL formatting, validation and provider-lock generation are unverified. Cloud Build YAML parsing, builder-script syntax/argument guard and offline SQL generation passed. No live Firebase users/project, Neon endpoints/secrets, GCP project/region, private bucket/retention policy, approved spend budget, instance/connection budget or state bucket was supplied. No cloud operation or spend occurred. See the evidence file for official vendor sources checked 2026-10-04 and exact commands.
 - Resume sequence: first obtain an authorized disposable PostgreSQL instance, set `TEST_DATABASE_URL`, run all currently skipped tests and the Phase 2 migration lifecycle/drift/query checks, and close that deferred gate. Independently obtain owner-approved non-secret release identifiers and approved secret names/versions/budget, install Terraform/OpenTofu and gcloud under normal tooling policy, generate/commit provider lock, validate and review a plan, then request any required external apply approval only after a concrete plan. Deploy migration Job before API service and run the real two-user, owner isolation, GCS privacy, connection, shutdown, rollback and cost/log-redaction acceptance. Do not begin Phase 4 until root re-review and release acceptance are complete.
 - Agent timing: every new phase/fix agent spawned before October 4, 2026 3:05 PM PDT / 22:05 UTC remains `gpt-6-luna` Extra High. Only agents spawned after that scheduled restart use `gpt-6-sol` Medium. The one-time restart automation is `resume-health-implementation-october-4-at-3-05pm-pdt`; do not duplicate it. The main session owns independent review; after restart, use fresh Sol Medium agents for review fixes, then root light-verifies.
+
+## Phase 3 review-fix checkpoint — October 4, after 15:05 PDT
+
+- Review baseline `8b6c093`; earlier uncommitted edits were preserved/finished
+  by the fresh Sol Medium fix agent. Logical commits: `4d2dd7a` mobile key
+  mapping/session races/token invalidity/JSON/config; `f6dcf59` privacy logging,
+  PostgreSQL advisory release lock, actual signed Firebase SDK fixtures and
+  gated two-subject owner routes; `19fe52e` formatted/validated Terraform and
+  signed Google 8.2.0 lock for macOS ARM64/Linux AMD64. All seven dispositions
+  are in `evidence/phase-3-review.md`; root independent re-review remains next.
+- Latest API **90 passed, 43 skipped**: 40 deferred Phase 2 cases plus first-
+  login identity race, signed two-subject route isolation and real advisory-
+  lock contention/cleanup. Mobile **79 passed/16 files**, strict app/client
+  TypeScript, zero-warning ESLint, Prettier, Ruff/format (**48 files**), mypy
+  (**26 sources**), compileall/scaffold/pip checks and reproducible generation
+  pass. Expo iOS export: **1,158 modules**, **2.9 MB**. Offline SQL head remains
+  `c3721f5a9a01`; no live migrations/database claim.
+- Terraform 1.13.3 was safely acquired and checksum-verified in `/private/tmp`.
+  Backend-disabled init and signed Google 8.2.0 platform lock, HCL format and
+  schema validation pass. Default sandbox DNS and local plugin-handshake
+  limitations were resolved through authorized elevated local tooling, not
+  treated as permanent blocks. No backend/cloud/apply/plan/spend occurred.
+- Resume: root light-reviews fixes and checks clean committed evidence; obtain
+  usable authorized disposable PostgreSQL and run all 133 Python cases plus
+  deferred Phase 2 migration lifecycle/drift/query measurements and lock/owner
+  checks. Owner release identifiers/secrets names/versions/budget remain
+  pending; no guessed project or identity. Then review a concrete Terraform
+  plan and authorized staging migration-first release, live two-user auth,
+  GCS privacy, redacted logs, connections/shutdown/rollback/cost gates. Do not
+  claim Phase 3 live completion or advance Phase 4.
+
+Follow-up `e802439` invalidates the owner epoch before SDK sign-in can install
+a different user, suppresses signed-out callbacks that could resurrect a
+rejected account, and keeps failed sign-in retryable. Two more asynchronous
+regressions pass; the final mobile count is 79.

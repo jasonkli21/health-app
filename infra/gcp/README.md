@@ -135,3 +135,25 @@ validated or applied; no live Cloud Run job/service, Firebase identity, GCS IAM,
 Neon migration, billing, rollback or connection measurement is claimed. See
 [`phase-3-release.md`](../../docs/implementation/evidence/phase-3-release.md)
 for the explicit evidence boundary.
+
+## Local validation and release guards
+
+The checked-in provider lock pins Google 8.2.0 with signed archive checksums
+and platform content hashes for macOS ARM64 and Linux AMD64. Terraform 1.13.3
+format, backend-disabled initialization and schema validation passed locally
+on October 4, 2026; no cloud plan/apply or remote state access has occurred.
+Use `terraform init -backend=false` and `terraform validate` for schema checks
+without a configured backend; a deployable plan still requires owner inputs.
+
+Online Alembic acquires a database-scoped session advisory lock before schema
+changes and waits at most 30 seconds for competing executions. A busy release
+fails with a sanitized message; inspect the existing Job and retry after it
+finishes. Do not bypass the lock or downgrade live data. Lock-query implicit
+transactions end before Alembic starts; unlock/connection cleanup runs on
+success and error. Real PostgreSQL concurrency acceptance is still pending.
+
+The container disables Uvicorn access logs. Operational request logs contain
+only generated request ID, route template (or unmatched marker), status and
+duration; the exception boundary suppresses raw error/SQL details. Cloud Run's
+own platform request logs are outside this application boundary: review their
+retention/access and verify the live log-redaction policy before acceptance.

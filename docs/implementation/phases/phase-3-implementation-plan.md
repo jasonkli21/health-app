@@ -28,7 +28,7 @@ inputs; a question is pending in the main session. Do not guess identifiers,
 spend money or claim mock/static results certify live cloud behavior. Complete
 all independent implementation and checks before reporting external blockers.
 
-**Status: local implementation complete for P3.1–P3.3; P3.4 deployment artifacts are reviewable but not statically validated or applied; P3.5 live acceptance is blocked on release inputs and staging.** Dependencies: accepted Phases 1–2, with Phase 2 PostgreSQL acceptance still deferred. Read [Phase 3 roadmap](../implementation-plan.md#phase-3--cloud-baseline), ADR 0002, security/deployment docs, actual principal/auth settings, migrations, daily/Profile routes and generated mobile client. Inspect local bootstrapping and locks before selecting images/config. Record drift and update plan/ADR before a material change. Dated outcomes and checks are in [Phase 3 release evidence](../evidence/phase-3-release.md).
+**Status: local implementation complete for P3.1–P3.3; P3.4 deployment artifacts are formatted, provider-locked and statically validated, but not planned/applied; P3.5 live acceptance is blocked on release inputs and staging.** Dependencies: accepted Phases 1–2, with Phase 2 PostgreSQL acceptance still deferred. Read [Phase 3 roadmap](../implementation-plan.md#phase-3--cloud-baseline), ADR 0002, security/deployment docs, actual principal/auth settings, migrations, daily/Profile routes and generated mobile client. Inspect local bootstrapping and locks before selecting images/config. Record drift and update plan/ADR before a material change. Dated outcomes and checks are in [Phase 3 release evidence](../evidence/phase-3-release.md).
 
 Execution began at `7e00bb1`; Phase 2 code/review was committed through `7cc0a7d`, while 40 PostgreSQL tests, migration lifecycle/drift and query measurements were still unverified. The user explicitly authorized proceeding without closing that database gate. Phase 3 adds an issuer/subject identity map, Firebase server and mobile session integration, local/GCS object adapters, the production container, and offline IaC/runbook artifacts. It does not add product upload routes. The final local implementation commits are recorded in release evidence; no live project or budget was selected.
 
@@ -154,3 +154,25 @@ Existing Profile/daily behavior works locally and on a real authenticated stagin
 Before Phase 4: Can every domain request resolve one verified owner? Do missing external services fail closed? Is the pool budget within real limits? Does rollback preserve data? Are live auth/storage checks actually performed and remaining vendor decisions visible?
 
 Before Phase 4, the release evidence must include actual non-secret project and region identifiers, deployed image/revision, IaC state procedure, migration head/run order, identity mapping and development-mode restrictions, config/secret names, generated API procedure, local/cloud tests separately, IAM/storage/connection/budget evidence, rollback steps and unresolved gates. Link the runbook without secret values; preserve costs as dated observations. The current evidence deliberately records these live fields as unresolved and does not authorize Phase 4.
+
+### Review-fix reconciliation — October 4, after 15:05 PDT
+
+The review at `8b6c093` confirmed seven gaps: invalid native persistence keys,
+asynchronous owner/session races, refresh invalidity handling, body parsing
+ownership, unsafe mobile configuration defaults, raw operational logging and
+cross-execution migration serialization. All are addressed in `4d2dd7a` and
+`f6dcf59`; source boundaries and behavior regressions are recorded in the
+review dispositions. The actual pinned Firebase Admin SDK now verifies local
+cryptographically signed fixtures. Signed two-subject route isolation and
+actual PostgreSQL lock contention/cleanup tests are added but remain gated.
+
+`19fe52e` supersedes the earlier missing-Terraform limitation: a checksum-
+verified temporary Terraform 1.13.3 validates the configuration with its
+backend disabled; signed Google 8.2.0 provider lock covers macOS ARM64/Linux
+AMD64. This changes offline verification only. Root re-review, database
+acceptance, owner release inputs and every P3.5 live gate remain open.
+
+Follow-up `e802439` invalidates the owner epoch before SDK sign-in can install
+a different user, suppresses signed-out callbacks that could resurrect a
+rejected account, and keeps failed sign-in retryable. Two more asynchronous
+regressions pass; the final mobile count is 79.

@@ -6,16 +6,20 @@ provisioned, and no cloud spend occurred.
 
 ## Completion status
 
-P3.1–P3.3 are implemented and committed for local review. P3.4 has a Terraform
-configuration, Cloud Build recipe, explicit image-build script and release
-runbook, but its HCL was not formatted or validated and it was not applied.
+P3.1–P3.3 and the seven independent review fixes are implemented for root
+re-review. P3.4 has a Terraform configuration, Cloud Build recipe, explicit
+image-build script and release runbook. HCL formatting, backend-disabled
+initialization, provider locking and schema validation now pass; no plan or
+apply has run. The dated original verification below is superseded by the
+review-fix checkpoint at the end of this file.
 P3.5 live identity, storage, database, rollout, rollback and cost acceptance
 remains open. The implementation does not authorize Phase 4.
 
 The Phase 2 PostgreSQL gate remains deferred under the user's explicit
-instruction to proceed. The final local API run reports **77 passed and 41
-skipped**. Forty skips are the carried Phase 2 PostgreSQL tests; the new
-provider-identity first-login race test is the 41st PostgreSQL-dependent skip.
+instruction to proceed. The latest local API run reports **90 passed and 43
+skipped**. Forty skips are the carried Phase 2 PostgreSQL tests; the other
+three are provider-identity first-login race, signed two-subject route isolation
+and migration advisory-lock contention/cleanup.
 Alembic offline SQL generation is supplemental evidence only; it does not
 replace PostgreSQL route/persistence tests, migration lifecycle or drift
 checks, or query-plan measurements.
@@ -222,3 +226,70 @@ P3.4 as deployed, P3.5 as complete, or Phase 4 as authorized.
 - The pinned Google provider's [Cloud Run v2 service resource](https://registry.terraform.io/providers/hashicorp/google/8.2.0/docs/resources/cloud_run_v2_service)
   is the resource reference for the reviewable Terraform source. Its provider
   configuration and schema have not been initialized or validated locally.
+
+## Review-fix verification checkpoint — October 4, 2026, after 15:05 PDT
+
+Commits: `4d2dd7a` mobile persistence/session/configuration and generated-client
+body guard; `f6dcf59` redacted logging, serialized migrations and real SDK token
+fixtures; `19fe52e` formatted Terraform and signed pinned-provider lock.
+[Review dispositions](phase-3-review.md) enumerate all seven fixes.
+
+Local verification after these fixes:
+
+- `.venv/bin/pytest -q -rs`: **90 passed, 43 skipped**, one existing Starlette
+  TestClient/httpx deprecation warning. The 40 carried Phase 2 skips retain the
+  inventory above; the three Phase 3 skips are
+  `test_provider_identity_persistence.py` (1), `test_firebase_crypto.py` (1),
+  `test_migration_release_lock.py` (1). Every skip requires `TEST_DATABASE_URL`.
+  No initdb retry, arbitrary IPC cleanup or SQLite acceptance was attempted.
+- Configured CI Ruff check and format check pass (**48 files**); mypy passes
+  (**26 sources**); compileall of source/migrations, scaffold verification and
+  `pip check` pass. Alembic `upgrade head --sql` renders head `c3721f5a9a01`.
+  This remains supplemental offline evidence, not live migration verification.
+- Bundled Node 24.19 runs installed Vitest directly:
+  `node apps/mobile/node_modules/vitest/vitest.mjs run --root apps/mobile`:
+  **79 passed across 16 files**. Strict mobile/client TypeScript and mobile
+  ESLint with `--max-warnings 0` pass. Whole-repository Prettier passes.
+- `.venv/bin/python services/api/scripts/export_openapi.py`,
+  `node packages/api-client/scripts/generate-client.mjs` and Prettier on both
+  outputs reproduce the contract/client; only the intended non-syntax JSON
+  error propagation changes the generated client. OpenAPI is unchanged.
+- `EXPO_NO_TELEMETRY=1 node node_modules/expo/bin/cli export --platform ios
+--output-dir /private/tmp/health-phase3-review-ios-final` from `apps/mobile` passes:
+  **1,158 modules**, **2.9 MB** Hermes bundle. Device persistence, keyboard,
+  VoiceOver and actual account-switch interaction remain manual gates.
+
+The actual Firebase Admin SDK is exercised with locally generated signed RSA
+JWT/X.509 fixtures and controlled certificate/revocation-account responses.
+Signature tampering, expiry, foreign issuer/audience, revocation, disabled-user
+and certificate outage are enforced without mocking token verification. This
+is deterministic SDK evidence, not real Firebase service acceptance. The new
+signed two-subject route test remains skipped until PostgreSQL is available.
+
+Terraform 1.13.3 was downloaded from HashiCorp into
+`/private/tmp/health-terraform-bin`, verified against its official SHA256
+manifest (`8362e7284b38a1194884963deed83481696d468b42dab88052775f4280383584`),
+and executed locally. Default sandbox curl failed DNS resolution for
+`releases.hashicorp.com`; elevated authorized download succeeded. Default
+backend-disabled init similarly failed registry DNS; elevated init succeeded
+and verified the signed `hashicorp/google` **8.2.0** package. Default validation
+could not complete the local provider handshake; elevated validation succeeded.
+No remote backend, cloud credentials, plan, apply or resource operation was used.
+
+```bash
+/private/tmp/health-terraform-bin/terraform -chdir=infra/gcp fmt -check
+/private/tmp/health-terraform-bin/terraform -chdir=infra/gcp init -backend=false -input=false
+/private/tmp/health-terraform-bin/terraform -chdir=infra/gcp providers lock -platform=darwin_arm64 -platform=linux_amd64
+/private/tmp/health-terraform-bin/terraform -chdir=infra/gcp validate -no-color
+```
+
+All four succeed under the tooling permissions described above. The reviewed
+lock includes only Google 8.2.0, its two platform content hashes and signed
+archive checksums. A concrete owner-input plan, staging deployment, Phase 2
+PostgreSQL lifecycle/drift/query acceptance and live Phase 3 auth/storage/
+logging/rollback/connection/budget evidence are still required before Phase 4.
+
+Follow-up `e802439` invalidates the owner epoch before SDK sign-in can install
+a different user, suppresses signed-out callbacks that could resurrect a
+rejected account, and keeps failed sign-in retryable. Two more asynchronous
+regressions pass; the final mobile count is 79.

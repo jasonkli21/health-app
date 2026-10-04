@@ -87,3 +87,43 @@ cloud provisioning, builds with spend, arbitrary identities or secret output.
 Root will lightly re-review and verify. Live release inputs and the carried
 database acceptance remain explicit human/environment gates before closing
 Phase 3 or starting Phase 4.
+
+## Fix disposition — October 4, 2026, after 15:05 PDT
+
+The review baseline is `8b6c093`. All seven code premises were confirmed.
+Earlier uncommitted edits were preserved and completed. Root's independent
+re-review is the next step; these dispositions record implementation and local
+verification, not live acceptance.
+
+| Finding | Implemented disposition and regression evidence                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1       | `4d2dd7a`: injective fixed-width UTF-16 key encoding produces legal SecureStore keys. The installed `@firebase/auth` 1.13.6 RN persistence class probes, writes, restores and removes through a fake constraint-enforcing native store, with distinct Firebase-shaped/collision-candidate keys.                                                                                                                                           |
+| 2       | `4d2dd7a`: rejected cleanup binds epoch and UID at execution; SDK mutations serialize with sign-in/sign-out. Listener generations, current SDK user identity, expired state and operation intents suppress stale callbacks/completions. Tests cover delayed cleanup after new sign-in, cleanup in progress, duplicate rejection, stale listener and stale sign-in.                                                                        |
+| 3       | `4d2dd7a`: definitive disabled/deleted/expired/invalid-user/invalid-refresh errors expire only the current owner. Network refresh failure preserves the session and a later request recovers. Delayed old-owner failure and concurrent 401s cannot expire the new owner or run expiration twice.                                                                                                                                          |
+| 4       | `4d2dd7a`: response JSON checks owner epoch before and after consumption. The generator preserves non-syntax JSON errors. Actual generated-client requests reject a switch during deferred successful and error JSON parsing.                                                                                                                                                                                                             |
+| 5       | `4d2dd7a`: invalid modes throw; Firebase mode requires explicit well-formed HTTPS configuration without credentials/query/fragment. Both feature clients use that URL. The transport refuses unconfigured origins/paths before token acquisition or network transmission. Explicit local dev remains usable.                                                                                                                              |
+| 6       | `f6dcf59`: Uvicorn access logging is disabled. The boundary logs only generated request ID, source route template/unmatched marker, status and duration. Unexpected exceptions become sanitized 500s before Uvicorn can log their representation. Sentinel tests cover path/query/header/body, unmatched/auth rejection, oversized bodies, SQL errors and generic exceptions.                                                             |
+| 7       | `f6dcf59`: Alembic online executions acquire the same session advisory lock with a 30-second acquisition budget. Lock-query implicit transactions are rolled back before Alembic starts; caller-owned transactions are preserved. Error cleanup rolls back before unlock; broken unlock invalidates the connection. Four deterministic regressions pass; real PostgreSQL contention/aborted-transaction cleanup remains explicitly gated. |
+
+The pinned Firebase Admin SDK now cryptographically verifies locally generated
+RSA/X.509 fixtures through its actual ID-token verifier. Controlled certificate
+and account-record responses cover valid identity, altered signature, expiry,
+issuer/audience, revocation, disabled account and certificate outage; verification
+itself is not mocked. The new signed two-subject integration test exercises
+real owner resolution, separate same-email mappings, Profile/Event/Observation
+CRUD/history/list isolation and Today. It is PostgreSQL-gated and has not run.
+
+Latest checks: Python **90 passed, 43 PostgreSQL skips** (40 carried Phase 2,
+identity race, signed two-subject route matrix, advisory-lock integration);
+mobile **79 passed across 16 files**; Ruff, format, mypy, TypeScript, ESLint,
+Prettier, scaffold, pip, compileall and reproducible OpenAPI/client generation
+pass. Expo iOS export passes. `19fe52e` adds formatted HCL and the signed Google
+8.2.0 lock for macOS ARM64/Linux AMD64; Terraform 1.13.3 backend-disabled init,
+provider lock and schema validation pass. Exact commands/tool limitations are
+in [release evidence](phase-3-release.md). No PostgreSQL, cloud apply/deployment
+or spend occurred; Phase 3 live acceptance and Phase 4 remain gated.
+
+Follow-up `e802439` invalidates the owner epoch before SDK sign-in can install
+a different user, suppresses signed-out callbacks that could resurrect a
+rejected account, and keeps failed sign-in retryable. Two more asynchronous
+regressions pass; the final mobile count is 79.
