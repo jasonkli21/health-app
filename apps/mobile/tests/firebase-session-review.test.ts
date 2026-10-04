@@ -127,3 +127,37 @@ it("ignores a stale sign-in completion after a newer sign-out intent", async () 
   expect(store.getSnapshot().status).toBe("signed_out");
   expect(sdk.auth.currentUser).toBeNull();
 });
+
+it("blocks old owner requests before sign-in installs another SDK user", async () => {
+  const { firebase, store } = await setup();
+  const epoch = store.getSnapshot().epoch;
+  let finish!: () => void;
+  sdk.signIn.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const signIn = firebase.signIn("new@example.test", "password");
+  await Promise.resolve();
+  expect(store.getSnapshot()).toMatchObject({
+    status: "initializing",
+    epoch: epoch + 1,
+    userId: null,
+  });
+  finish();
+  await signIn;
+});
+
+it("failed sign-in can retry without resurrecting the rejected SDK account", async () => {
+  const { firebase, store } = await setup();
+  store.markExpired(store.getSnapshot().epoch, "old");
+  sdk.signIn.mockRejectedValueOnce(new Error("wrong password"));
+  await expect(
+    firebase.signIn("new@example.test", "password"),
+  ).rejects.toThrow();
+  sdk.callbacks[0]!(sdk.auth.currentUser);
+  expect(store.getSnapshot().status).toBe("signed_out");
+  await firebase.signIn("new@example.test", "password");
+  expect(store.getSnapshot().userId).toBe("new");
+});

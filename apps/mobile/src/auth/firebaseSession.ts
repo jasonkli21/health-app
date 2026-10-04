@@ -102,7 +102,11 @@ export function startFirebaseSession(): void {
       (user) => {
         if (generation !== listenerGeneration || mutating) return;
         if (user && auth?.currentUser !== user) return;
-        if (user && sessionStore.getSnapshot().status === "expired") return;
+        if (
+          user &&
+          ["expired", "signed_out"].includes(sessionStore.getSnapshot().status)
+        )
+          return;
         if (user) sessionStore.setSignedIn(user.uid, user.email);
         else if (
           auth?.currentUser === null &&
@@ -135,11 +139,18 @@ export async function signIn(email: string, password: string): Promise<void> {
   const intent = ++operation;
   await mutate(async () => {
     if (intent !== operation) return;
-    await firebaseAuth.signInWithEmailAndPassword(
-      requestedAuth,
-      email.trim(),
-      password,
-    );
+    // Invalidate owner requests before the SDK can install a different user.
+    sessionStore.setInitializing();
+    try {
+      await firebaseAuth.signInWithEmailAndPassword(
+        requestedAuth,
+        email.trim(),
+        password,
+      );
+    } catch (error) {
+      if (intent === operation) sessionStore.setSignedOut();
+      throw error;
+    }
     if (intent !== operation) return;
     const user = requestedAuth.currentUser;
     if (user) sessionStore.setSignedIn(user.uid, user.email);
