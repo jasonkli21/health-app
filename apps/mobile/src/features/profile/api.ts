@@ -1,12 +1,8 @@
 import { ApiError, ProfileApiClient } from "@personal-health/api-client";
 import { mobileFetch } from "../../auth/mobileFetch";
+import { apiBaseUrl } from "../../auth/apiConfig";
 
-const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
-
-export const profileApi = new ProfileApiClient(
-  configuredApiUrl || "http://127.0.0.1:8000",
-  mobileFetch,
-);
+export const profileApi = new ProfileApiClient(apiBaseUrl, mobileFetch);
 
 export class ProfileUserError extends Error {
   constructor(message: string) {

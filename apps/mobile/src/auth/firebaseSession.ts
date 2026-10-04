@@ -5,11 +5,27 @@ import * as SecureStore from "expo-secure-store";
 
 import { sessionStore } from "./sessionStore";
 
-const securePersistence = {
-  getItem: (key: string) => SecureStore.getItemAsync(key),
-  setItem: (key: string, value: string) => SecureStore.setItemAsync(key, value),
-  removeItem: (key: string) => SecureStore.deleteItemAsync(key),
-};
+export function secureStorageKey(key: string): string {
+  // Fixed-width UTF-16 code units give an injective mapping for all JS strings.
+  return `firebase_${Array.from({ length: key.length }, (_, index) =>
+    key.charCodeAt(index).toString(16).padStart(4, "0"),
+  ).join("")}`;
+}
+
+export function createSecurePersistence(
+  store: Pick<
+    typeof SecureStore,
+    "getItemAsync" | "setItemAsync" | "deleteItemAsync"
+  >,
+): ReactNativeAsyncStorage {
+  return {
+    getItem: (key) => store.getItemAsync(secureStorageKey(key)),
+    setItem: (key, value) => store.setItemAsync(secureStorageKey(key), value),
+    removeItem: (key) => store.deleteItemAsync(secureStorageKey(key)),
+  };
+}
+
+const securePersistence = createSecurePersistence(SecureStore);
 
 // Firebase's React Native package entry exports this API, while its top-level
 // declaration file omits it. Metro selects the package's documented
@@ -40,6 +56,23 @@ function configured(): boolean {
 
 let auth: firebaseAuth.Auth | null = null;
 let stopListening: (() => void) | null = null;
+let mutations: Promise<void> = Promise.resolve();
+let operation = 0;
+let mutating = false;
+let listenerGeneration = 0;
+
+function mutate(action: () => Promise<void>): Promise<void> {
+  const next = mutations.then(async () => {
+    mutating = true;
+    try {
+      await action();
+    } finally {
+      mutating = false;
+    }
+  });
+  mutations = next.catch(() => undefined);
+  return next;
+}
 
 export function startFirebaseSession(): void {
   if (!configured()) {
@@ -63,13 +96,27 @@ export function startFirebaseSession(): void {
       auth = firebaseAuth.getAuth(app);
     }
     stopListening?.();
+    const generation = ++listenerGeneration;
     stopListening = firebaseAuth.onAuthStateChanged(
       auth,
       (user) => {
+        if (generation !== listenerGeneration || mutating) return;
+        if (user && auth?.currentUser !== user) return;
+        if (user && sessionStore.getSnapshot().status === "expired") return;
         if (user) sessionStore.setSignedIn(user.uid, user.email);
-        else sessionStore.setSignedOut();
+        else if (
+          auth?.currentUser === null &&
+          sessionStore.getSnapshot().status !== "expired"
+        )
+          sessionStore.setSignedOut();
       },
       () => {
+        if (
+          generation !== listenerGeneration ||
+          mutating ||
+          sessionStore.getSnapshot().status === "expired"
+        )
+          return;
         sessionStore.setUnavailable(
           "The saved sign-in session could not be restored. Check this device and try again.",
         );
@@ -84,34 +131,56 @@ export function startFirebaseSession(): void {
 
 export async function signIn(email: string, password: string): Promise<void> {
   if (!auth) throw new Error("Firebase sign-in is unavailable.");
-  await firebaseAuth.signInWithEmailAndPassword(auth, email.trim(), password);
+  const requestedAuth = auth;
+  const intent = ++operation;
+  await mutate(async () => {
+    if (intent !== operation) return;
+    await firebaseAuth.signInWithEmailAndPassword(
+      requestedAuth,
+      email.trim(),
+      password,
+    );
+    if (intent !== operation) return;
+    const user = requestedAuth.currentUser;
+    if (user) sessionStore.setSignedIn(user.uid, user.email);
+  });
 }
 
 export async function signOutCurrentUser(): Promise<void> {
-  if (!auth) {
-    sessionStore.setSignedOut();
-    return;
-  }
-  const currentUser = auth.currentUser;
+  const intent = ++operation;
+  const requestedAuth = auth;
+  const currentUser = requestedAuth?.currentUser;
   sessionStore.setInitializing();
-  try {
-    await firebaseAuth.signOut(auth);
-    sessionStore.setSignedOut();
-  } catch {
-    if (currentUser) {
-      sessionStore.setSignedIn(
-        currentUser.uid,
-        currentUser.email,
-        "Sign-out failed. Try again.",
-      );
-    } else {
-      sessionStore.setUnavailable("Sign-out failed. Try again.");
+  await mutate(async () => {
+    if (intent !== operation) return;
+    try {
+      if (requestedAuth) await firebaseAuth.signOut(requestedAuth);
+      if (intent === operation) sessionStore.setSignedOut();
+    } catch {
+      if (intent !== operation) return;
+      if (currentUser)
+        sessionStore.setSignedIn(
+          currentUser.uid,
+          currentUser.email,
+          "Sign-out failed. Try again.",
+        );
+      else sessionStore.setUnavailable("Sign-out failed. Try again.");
     }
-  }
+  });
 }
 
-export async function clearRejectedFirebaseSession(): Promise<void> {
-  if (auth?.currentUser) await firebaseAuth.signOut(auth);
+export async function clearRejectedFirebaseSession(
+  epoch: number,
+  userId: string,
+): Promise<void> {
+  const rejectedAuth = auth;
+  await mutate(async () => {
+    if (
+      sessionStore.isRejectedSession(epoch) &&
+      rejectedAuth?.currentUser?.uid === userId
+    )
+      await firebaseAuth.signOut(rejectedAuth);
+  });
 }
 
 export async function getCurrentIdToken(

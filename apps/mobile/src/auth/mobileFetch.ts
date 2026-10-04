@@ -10,10 +10,10 @@ export const mobileFetch: FetchLike = createAuthenticatedFetch(
     return firebase.getCurrentIdToken(forceRefresh);
   },
   globalThis.fetch as FetchLike,
-  (epoch) => {
-    sessionStore.markExpired(epoch);
+  ({ epoch, userId }) => {
+    if (!sessionStore.markExpired(epoch, userId)) return;
     void import("./firebaseSession")
-      .then((firebase) => firebase.clearRejectedFirebaseSession())
+      .then((firebase) => firebase.clearRejectedFirebaseSession(epoch, userId))
       .catch(() => undefined);
   },
 );

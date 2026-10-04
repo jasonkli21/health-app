@@ -1,4 +1,9 @@
 export type MobileAuthMode = "dev" | "firebase";
+export function resolveAuthMode(value: string | undefined): MobileAuthMode {
+  if (value === undefined || value === "dev") return "dev";
+  if (value === "firebase") return "firebase";
+  throw new Error("Invalid mobile authentication mode.");
+}
 export type SessionStatus =
   | "ready"
   | "initializing"
@@ -73,12 +78,13 @@ export class SessionStore {
     );
   }
 
-  markExpired(expectedEpoch: number): void {
+  markExpired(expectedEpoch: number, expectedUserId?: string): boolean {
     if (
       this.snapshot.epoch !== expectedEpoch ||
-      this.snapshot.status !== "signed_in"
+      this.snapshot.status !== "signed_in" ||
+      (expectedUserId !== undefined && this.snapshot.userId !== expectedUserId)
     )
-      return;
+      return false;
     this.update(
       {
         status: "expired",
@@ -87,6 +93,14 @@ export class SessionStore {
         message: "Your session expired. Sign in again to continue.",
       },
       true,
+    );
+    return true;
+  }
+
+  isRejectedSession(expectedExpiredEpoch: number): boolean {
+    return (
+      this.snapshot.status === "expired" &&
+      this.snapshot.epoch === expectedExpiredEpoch + 1
     );
   }
 
@@ -111,6 +125,5 @@ export class SessionStore {
   }
 }
 
-const mode: MobileAuthMode =
-  process.env.EXPO_PUBLIC_AUTH_MODE === "firebase" ? "firebase" : "dev";
+const mode = resolveAuthMode(process.env.EXPO_PUBLIC_AUTH_MODE);
 export const sessionStore = new SessionStore(mode);

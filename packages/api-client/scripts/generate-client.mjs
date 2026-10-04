@@ -240,7 +240,7 @@ lines.push(
   "      method,",
   '      ...(body === undefined ? {} : { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),',
   "    });",
-  "    const payload = await response.json().catch(() => undefined);",
+  "    const payload = await response.json().catch((error: unknown) => { if (error instanceof SyntaxError) return undefined; throw error; });",
   '    if (!response.ok) throw new ApiError(response.status, payload as components["schemas"]["ErrorResponse"] | undefined);',
   "    return payload as T;",
   "  }",

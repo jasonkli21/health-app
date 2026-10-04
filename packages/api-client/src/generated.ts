@@ -990,7 +990,10 @@ export class HealthApiClient {
             body: JSON.stringify(body),
           }),
     });
-    const payload = await response.json().catch(() => undefined);
+    const payload = await response.json().catch((error: unknown) => {
+      if (error instanceof SyntaxError) return undefined;
+      throw error;
+    });
     if (!response.ok)
       throw new ApiError(
         response.status,

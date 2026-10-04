@@ -22,6 +22,8 @@ describe("Firebase mobile session lifecycle", () => {
       store,
       async () => "id-token-secret",
       fetcher,
+      undefined,
+      "https://api.example.test",
     );
 
     await authed("https://api.example.test/profile?q=private", {
@@ -53,6 +55,8 @@ describe("Firebase mobile session lifecycle", () => {
         return `token-${tokens.length}`;
       },
       fetcher,
+      undefined,
+      "https://api.example.test",
     );
 
     await authed("https://api.example.test/profile", {
@@ -77,6 +81,8 @@ describe("Firebase mobile session lifecycle", () => {
       store,
       async () => "bad-token",
       async () => response(401),
+      undefined,
+      "https://api.example.test",
     );
 
     await expect(
@@ -106,6 +112,8 @@ describe("Firebase mobile session lifecycle", () => {
       store,
       async () => "owner-1-token",
       fetcher,
+      undefined,
+      "https://api.example.test",
     );
     const request = expect(
       authed("https://api.example.test/profile", { method: "GET" }),
