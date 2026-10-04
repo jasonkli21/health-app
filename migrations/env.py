@@ -7,6 +7,7 @@ from typing import cast
 from alembic import context
 from health_api.config.settings import get_settings
 from health_api.config.settings import migration_database_url as resolve_migration_database_url
+from health_api.persistence.migration_lock import migration_release_lock
 from health_api.persistence.models import Base
 from sqlalchemy import Connection, engine_from_config, pool
 
@@ -42,9 +43,12 @@ def run_migrations_online() -> None:
     injected_connection = config.attributes.get("connection")
     if injected_connection is not None:
         connection = cast(Connection, injected_connection)
-        context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
-        with context.begin_transaction():
-            context.run_migrations()
+        with migration_release_lock(connection):
+            context.configure(
+                connection=connection, target_metadata=target_metadata, compare_type=True
+            )
+            with context.begin_transaction():
+                context.run_migrations()
         return
 
     configuration = config.get_section(config.config_ini_section, {})
@@ -55,7 +59,7 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
         echo=False,
     )
-    with connectable.connect() as connection:
+    with connectable.connect() as connection, migration_release_lock(connection):
         context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
         with context.begin_transaction():
             context.run_migrations()

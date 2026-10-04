@@ -27,4 +27,4 @@ STOPSIGNAL SIGTERM
 
 # Cloud Run injects PORT. The same image can run Alembic as a separate Job by
 # overriding the command; migrations never execute in the serving process.
-CMD ["sh", "-c", "exec uvicorn health_api.main:app --host 0.0.0.0 --port \"${PORT:-8080}\" --workers 1 --timeout-graceful-shutdown 8"]
+CMD ["sh", "-c", "exec uvicorn health_api.main:app --host 0.0.0.0 --port \"${PORT:-8080}\" --workers 1 --timeout-graceful-shutdown 8 --no-access-log --log-level warning"]
