@@ -66,13 +66,11 @@ def test_quantity_rejects_unsupported_units_and_boolean_numbers() -> None:
 
 
 def test_profile_metadata_is_bounded_and_rejects_non_finite_numbers() -> None:
-    assert ProfileMetadata.model_validate({"values": {"display_unit": "kg"}}).values == {
-        "display_unit": "kg"
-    }
+    assert ProfileMetadata.model_validate({"display_unit": "kg"}).root == {"display_unit": "kg"}
     with pytest.raises(ValidationError):
-        ProfileMetadata.model_validate({"values": {"display_unit": float("inf")}})
+        ProfileMetadata.model_validate({"display_unit": float("inf")})
     with pytest.raises(ValidationError):
-        ProfileMetadata.model_validate({"values": {"display_unit": "x" * 5000}})
+        ProfileMetadata.model_validate({"display_unit": "x" * 5000})
 
 
 def test_validity_requires_aware_ordered_instants_and_normalizes_to_utc() -> None:

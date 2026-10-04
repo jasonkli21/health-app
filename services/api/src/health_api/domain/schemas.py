@@ -17,6 +17,7 @@ from pydantic import (
     ConfigDict,
     Field,
     FiniteFloat,
+    RootModel,
     StrictBool,
     StrictFloat,
     StrictInt,
@@ -152,19 +153,20 @@ class ProfilePayloadV1(StrictModel):
         return self
 
 
-class ProfileMetadata(StrictModel):
+type MetadataKey = Annotated[StrictStr, StringConstraints(min_length=1, max_length=64)]
+
+
+class ProfileMetadata(RootModel[dict[MetadataKey, MetadataScalar]]):
     """Small display-safe extension map; never an unvalidated payload escape hatch."""
 
-    values: dict[
-        Annotated[StrictStr, StringConstraints(min_length=1, max_length=64)], MetadataScalar
-    ] = Field(default_factory=dict, max_length=30)
+    root: dict[MetadataKey, MetadataScalar] = Field(default_factory=dict, max_length=30)
 
     @model_validator(mode="after")
     def metadata_is_bounded_json(self) -> ProfileMetadata:
-        for value in self.values.values():
+        for value in self.root.values():
             if isinstance(value, float) and not isfinite(value):
                 raise ValueError("metadata numbers must be finite")
-        if len(json.dumps(self.values, ensure_ascii=False, allow_nan=False).encode("utf-8")) > 4096:
+        if len(json.dumps(self.root, ensure_ascii=False, allow_nan=False).encode("utf-8")) > 4096:
             raise ValueError("metadata exceeds 4096 bytes")
         return self
 

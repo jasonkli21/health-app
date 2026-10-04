@@ -2,7 +2,7 @@
 
 A mobile-first personal health application that maintains a structured, extensible health model and integrates with the Personal AI System for context-aware reasoning, research, insights, and recommendations.
 
-This repository is intentionally scaffolded for Codex handoff. It includes product, UX, architecture, data-model, security, AI-boundary, deployment, and phased implementation documentation plus minimal runnable shells. Substantive product phases are not implemented yet.
+This repository is being implemented phase by phase. Phase 1 establishes the versioned canonical Profile model, owner-scoped PostgreSQL persistence, revisions, API contract, generated client, and a usable mobile Profile flow. Later roadmap capabilities remain deferred until their phase is implemented.
 
 ## Product thesis
 
@@ -55,11 +55,11 @@ python -m pip install -c services/api/requirements-dev.lock -e 'services/api[dev
 uvicorn health_api.main:app --reload --app-dir services/api/src --host 127.0.0.1
 ```
 
-In another terminal, run `pnpm mobile:start`. The mobile shell uses Expo Go; Phase 0 has no API calls and the API healthcheck does not yet consume the environment settings or connect to Postgres.
+Run `.venv/bin/alembic upgrade head` before starting the API. In another terminal, run `pnpm mobile:start`. The mobile shell uses Expo Go; see the local guide for the Profile test database, configured development principal, API address, and device networking.
 
 ## Current implementation boundary
 
-Only Phase 0 repository foundation is scaffolded. Do not infer that documented Phase 1+ behavior already exists. The web extension roadmap is deferred until after Phase 9.
+Phase 1 implementation is in progress; consult its release evidence and Git history before assuming any phase is complete. The web extension roadmap is deferred until after Phase 9.
 
 Read these first:
 

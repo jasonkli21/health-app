@@ -1,3 +1,7 @@
 # Domain layer
 
-Canonical health concepts and invariants. Planned modules include profile, observations, events, regimens, contexts, goals, plans, experiments, trackers, insights, recommendations, and proposals.
+`schemas.py` is the Phase 1 versioned registry and Profile v1 contract. Keep
+kind/category compatibility, unknown versus false/zero, supported units, and
+half-open UTC validity rules here. New types and payload versions are added only
+with their owning roadmap phase; never reuse a registered version for a changed
+shape.
