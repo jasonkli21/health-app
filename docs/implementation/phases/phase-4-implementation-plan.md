@@ -37,9 +37,32 @@ The implementation follows these reconciled decisions (see
 
 ## Implementation-time reconciliation gate
 
-**Status: planned. Dependencies: accepted Phases 1–3.** Read [Phase 4 roadmap](../implementation-plan.md#phase-4--personal-planning), actual preceding evidence, object/schema/history/ownership conventions, Event/Observation and Today contracts, cloud auth and mobile features. Inspect generated DTOs and migration head. Record drift; update material design/ADR before code. Do not reuse a provisional path blindly.
+**Status: reconciliation complete; local implementation complete; acceptance remains open.** The repository, preceding evidence, owner/object/history conventions, Event/Observation and Today contracts, cloud auth, mobile routes, generated DTOs, and current migration head were inspected before implementation. Drift and design decisions are recorded above and in [ADR 0008](../../architecture/adr/0008-planning-tracker-storage.md). The additive Phase 4 migration is `d4e5f607a8b9` on `c3721f5a9a01`.
 
-Existing Phase 0 homes are `services/api/src/health_api/{domain,application,api,persistence}`, `services/api/tests`, `migrations`, `contracts/openapi`, `packages/api-client`, `apps/mobile/{app,src,tests}`. All features/contracts below are **planned/provisional**, including preceding product modules absent from today's scaffold.
+### Implementation status — October 5, 2026
+
+- **P4.1:** typed bounded domain payloads, lifecycle rules, stable item and
+  tracker-field identifiers, reference validation, and deterministic local
+  schedule/DST rules are implemented.
+- **P4.2:** owner-scoped goal, regimen, plan, context, and tracker CRUD,
+  optimistic revisions, history, stable plan-item links/reorder, and typed
+  OpenAPI routes are implemented.
+- **P4.3:** effective-dated schedule versions, bounded timezone-aware occurrence
+  expansion, reschedule-aware stable keys, action history/revision checks, and
+  additive Today planning/context fields are implemented.
+- **P4.4:** immutable tracker schema versions, owner/version-validated custom
+  Observation values, archive behavior, tracker builder/entry UI, and universal
+  Add access are implemented.
+- **P4.5:** Plan, schedule editor, Today actions, rescheduling, tracker entry,
+  and context linking flows are implemented. Generated contracts are current.
+
+This records source implementation only. No tests were added or run. Mobile/API-client static type
+checks, Python syntax compilation, lint, contract generation, and whitespace
+checks were run. PostgreSQL migration lifecycle/drift, the Phase 2 database
+gate, Phase 3 live-cloud acceptance, and device/accessibility review remain
+unverified; see the [Phase 4 evidence](../evidence/phase-4-release.md).
+
+The following work areas and contracts remain the design and acceptance reference for the implementation. Source code lives in `services/api/src/health_api/{domain,application,api,persistence}`, `migrations`, `contracts/openapi`, `packages/api-client`, and `apps/mobile/{app,src}`; automated and device acceptance gates are tracked separately above and in the release evidence.
 
 ## Goal / boundary
 
@@ -151,4 +174,4 @@ Accept when manual planning/tracking work with real Today, schedules remain corr
 
 Before Phase 5: Are every lifecycle/metric/schema version and occurrence action precise? Are unknowns visible? Does context selection have deterministic relevance without clinical override? Can all active planning data be read through owner-safe services? Are mobile/cloud regressions green?
 
-Implementing Luna Max must create planned `docs/implementation/evidence/phase-4-release.md` with migration head, actual routes/types/statuses/limits, schedule-key/edit/DST rules and fixtures, tracker version/entry decoder contract, Today additions, generated commands, mobile/local/cloud results, unresolved checks and context-builder consumption points.
+The [Phase 4 release evidence](../evidence/phase-4-release.md) records the migration head, implemented routes and types, schedule-key/edit/DST rules, tracker version/entry decoder contract, Today additions, generated commands, local checks, unresolved gates, and context-builder consumption points.

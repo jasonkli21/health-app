@@ -4,7 +4,7 @@ FastAPI request and response schemas are authoritative. The tracked, determinist
 
 ## Shared behavior
 
-The API is a private local-development service. `GET /healthz` is process liveness only and does not query storage. Profile routes use one server-configured local principal. A missing or disabled principal returns 401. Request bodies cannot set an owner, actor, source, lifecycle, or revision; `X-User-ID` and similar client identity headers are ignored. There is no internet authentication in this phase.
+`GET /healthz` is process liveness only and does not query storage. In development mode, owner-scoped routes use the server-configured local principal. In Firebase mode, the API verifies the bearer token and maps the verified issuer and subject to an owner. A missing/disabled local principal, invalid token, or unavailable account returns a sanitized authentication error. Request bodies cannot set an owner, actor, source, lifecycle, or revision; `X-User-ID` and similar client identity headers are ignored.
 
 Every HTTP response includes a server-generated `X-Request-ID`. Errors use `{ "code", "message", "field_errors", "request_id" }`; request validation field errors contain field paths and generic messages, never submitted values. Database failures return a sanitized 503. Request bodies are limited to 65,536 bytes. Profile labels are limited to 120 characters, text values to 2,000, notes to 4,000, metadata to 30 scalar entries and 4,096 encoded bytes, and list/history pages to 100 items.
 
@@ -25,9 +25,62 @@ The list supports `as_of` (defaults to server UTC now), `category`, and `limit` 
 
 Create requires `id` and a typed `profile` object. The server derives owner, manual source, confirmation state, recorded/created/updated timestamps, initial revision and active lifecycle. Optional validity, notes, bounded metadata, and restrictive permission choices are accepted. A first create returns 201; a retry with the same owner, UUID, and canonical content returns 200. Reuse of the UUID with different create content returns 409. The content fingerprint is immutable and excludes later edits.
 
-PATCH requires `expected_revision >= 1` and at least one change. The profile object and temporal validity are validated together before the transaction commits. A stale revision, archived edit, or incompatible create retry returns 409. Unknown or foreign IDs both return 404. Invalid payloads, units, timestamps, page limits, cursors, or schema fields return 422. Missing local principal returns 401. Request bodies over 65,536 bytes return 413. Database unavailability returns sanitized 503.
+PATCH requires `expected_revision >= 1` and at least one change. The profile object and temporal validity are validated together before the transaction commits. A stale revision, archived edit, or incompatible create retry returns 409. Unknown or foreign IDs both return 404. Invalid payloads, units, timestamps, page limits, cursors, or schema fields return 422. An unavailable or invalid owner identity returns 401. Request bodies over 65,536 bytes return 413. Database unavailability returns sanitized 503.
 
 The response includes the versioned typed payload; envelope status, title and temporal fields; UTC timestamps; manual-source summary; user-confirmation status; schema version and revision; notes and metadata; and the two restrictive permission flags. Each history entry contains the actor kind, reason, record time, revision, and a typed snapshot. The API does not expose a generic object write route or generic relationship graph endpoint.
+
+## Phase 4 planning and tracker routes
+
+Phase 4 uses the same verified owner dependency and canonical envelope. Create
+accepts a client UUID and typed payload; updates and lifecycle transitions
+require `expected_revision`; delete is a logical archive. Resource lists are
+owner-scoped keyset pages (default 50, maximum 100). A stale resource or
+occurrence revision returns 409, invalid fields/references/timezones return
+422, and unknown or foreign IDs return 404. Manual saves use the server-owned
+`manual` source, `user_confirmed`, and both permission flags false.
+
+| Resource | Routes                                                                                                                                          |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Goals    | `GET, POST /goals`; `GET, PATCH, DELETE /goals/{id}`; `PATCH /goals/{id}/lifecycle`; `GET /goals/{id}/history`                                  |
+| Regimens | `GET, POST /regimens`; `GET, PATCH, DELETE /regimens/{id}`; `PATCH /regimens/{id}/lifecycle`; `GET /regimens/{id}/history`                      |
+| Plans    | `GET, POST /plans`; `GET, PATCH, DELETE /plans/{id}`; `PATCH /plans/{id}/lifecycle`; `PUT /plans/{id}/items/order`; `GET /plans/{id}/history`   |
+| Contexts | `GET, POST /contexts`; `GET, PATCH, DELETE /contexts/{id}`; `PATCH /contexts/{id}/lifecycle`; `GET /contexts/{id}/history`                      |
+| Trackers | `GET, POST /trackers`; `GET, PATCH, DELETE /trackers/{id}`; `GET /trackers/{id}/history`; `GET /trackers/{id}/versions?after_version=…&limit=…` |
+
+Lifecycle values are `active`, `paused`, or `completed` for goals, regimens,
+and plans; `active` or `ended` for contexts. Tracker definitions are active or
+archived. Archival does not delete revisions, tracker schema versions, linked
+Observations, or occurrence history. Plan reorder sends the exact ordered item
+UUIDs and rejects missing, duplicate, or foreign IDs.
+
+Schedules are edited with `PUT /regimens/{id}/schedule` or
+`PUT /plans/{id}/items/{item_id}/schedule`; the matching `GET` paths return the
+latest saved definition or null when there is no schedule. Edits include an
+explicit effective date and the expected schedule revision. Existing schedules
+can only change from a future effective date, preserving earlier versions.
+Occurrence reads use
+`GET /regimens/{id}/occurrences` or `GET /plans/{id}/occurrences` with required
+`start_date`, `end_date`, and IANA `timezone`; a request spans at most 31 local
+calendar dates and returns at most 500 items. `PATCH /plan-occurrences/{key}`
+requires the expected schedule and override revisions. Actions are completed,
+skipped, or rescheduled. A reschedule supplies an offset-aware instant within
+31 days of its original slot; it retains the original occurrence key and
+appears on the new due date. Repeating an identical action is idempotent.
+
+`POST /daily-entries` and observation update accept the custom Observation
+variant: `{metric: "custom", unit: "custom", tracker_id, schema_version,
+values}`. The server resolves the tracker and immutable version for the owner,
+rejects malformed or foreign definitions, and validates every field against
+that schema. An archived tracker rejects new entries. Historical entries keep
+their saved version. Existing numeric daily summaries ignore custom values.
+
+`GET /today` preserves timeline, rollup, and cursor behavior and adds
+`plan_items` plus `active_contexts`. Occurrences show their original local slot,
+schedule revision, current explicit state, due instant, and DST resolution.
+Missing actions are `unknown`; completion is a user assertion and does not
+create a health Observation. Contexts are selected by validity date and sorted
+by explicit priority then stable ID; they do not change Profile or regimen
+state.
 
 ## Generation
 

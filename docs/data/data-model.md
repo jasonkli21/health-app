@@ -16,6 +16,43 @@ Quantities store value plus unit. Provenance distinguishes manual, confirmed, de
 
 Device retention preserves useful low-frequency samples while leaving high-frequency raw streams in HealthKit/external sources unless a feature requires them.
 
+## Phase 4 planning, schedules, and custom trackers
+
+Migration `d4e5f607a8b9` extends the existing owner-scoped `health_objects`
+envelope for goals, regimens, plans, contexts, and tracker definitions. Each has
+a typed `planning_resources` payload and subtype lifecycle; the shared envelope
+still owns identity, manual provenance, permissions, revision, and history.
+`planning_links` stores ordered stable plan items and explicit context
+relevance. Owner-consistent foreign keys prevent cross-owner links. Plan-item
+rows keep their IDs when the plan is edited or reordered so schedules remain
+attached to the intended item.
+
+Schedules represent intent. `planning_schedule_identities` assigns a stable ID
+to a regimen or plan item, and immutable `planning_schedules` rows hold
+effective-dated revisions. Occurrence keys encode the schedule ID and original
+local date/time, so a future edit does not rewrite prior actions. Explicit
+`planning_occurrence_overrides` store completed, skipped, or rescheduled state;
+`planning_occurrence_actions` records each user action revision. Occurrences
+are expanded for bounded reads instead of materialized indefinitely. Local
+slots use the schedule's IANA timezone, resolving a spring gap to the next
+valid minute and a fall overlap to its earlier offset. A rescheduled slot keeps
+its original key and appears on the new due day.
+
+Tracker definitions live as planning resources, while immutable
+`tracker_schema_versions` rows retain each field schema. Custom entries remain
+Observations: `observations.metric_key` is `custom`, its numeric summary value
+is null, and it stores the owner tracker ID, schema version, and a flat map of
+field IDs to validated values. Definition edits append a schema version;
+older observations continue to reference their original version. Archiving a
+tracker blocks new entries but does not remove its schema or observations.
+Custom values do not enter the existing fixed-metric Today summaries.
+
+Missing optional tracker fields are absent; explicit `false` and `0` remain
+values. Custom fields are limited to 20 per definition, 50 choices per enum,
+2,000 characters per text field, and 16 KiB per definition. Supported fields
+are text, number, boolean, enum, date, and quantity with a declared unit. No
+field executes code or derives clinical meaning.
+
 ## Phase 1 Profile v1 contract
 
 Phase 1 registers only `profile_item` schema version 1. Its payload has `kind`, `category`, stable lower-case `key`, display `label`, and a required `value`. A JSON `null` value means unknown. Tagged values are `text`, `boolean`, finite `number`, finite `quantity` with a supported unit, and a bounded `text_list`. `false` and `0` remain known values. Extra payload fields and unregistered type/version pairs are rejected. Category and kind must agree: fact/background, constraint/constraints, preference/preferences.

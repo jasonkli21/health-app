@@ -1,28 +1,39 @@
 # Implementation coordinator state
 
-## Current stop checkpoint — October 4, 2026
+## Current checkpoint — October 5, 2026
+
+The user explicitly authorized Phase 4 implementation on October 5. This
+supersedes the October 4 instruction below to stop before Phase 4. Phase 4
+source implementation and documentation are complete locally, with changes
+grouped into API/data, mobile, and release-documentation commits.
+
+Static verification passed: Python syntax compilation, Ruff check/format,
+mypy (28 API source files), OpenAPI export and generated client sync, API-client
+TypeScript, mobile TypeScript, mobile ESLint, and `git diff --check`. No tests
+were added or run. The Phase 4 release evidence records the exact commands and
+limitations.
+
+Acceptance remains open. The Phase 2 PostgreSQL gate, current migration
+upgrade/downgrade/re-upgrade and model-drift check, query-cost evidence, Phase 3
+live cloud/auth/storage parity, and mobile device/timezone/accessibility review
+remain unverified. Do not claim database, cloud, or device acceptance.
+
+### Historical checkpoints
+
+The following dated checkpoints preserve prior implementation decisions and
+verification history. They do not supersede this current status.
+
+## Previous stop checkpoint — October 4, 2026
 
 The user requested finishing the current phase and stopping before the next
-phase. Phase 3 local implementation and main-session review are complete
-through `a50bb52`, including fixes `4d2dd7a`, `f6dcf59`, `19fe52e` and
-`e802439`. Root lightly re-reviewed the actual persistence/session/transport,
-logging and migration-lock changes and reran checks: **90 API tests passed,
-43 PostgreSQL tests skipped; 79 mobile tests passed across 16 files**. Configured
-Python Ruff/format (48 files), mypy (26 sources), scaffold, mobile TypeScript
-and zero-warning ESLint, client TypeScript, reproducible contract generation
-and Terraform formatting passed. The fix agent's offline Terraform validation,
-signed provider-lock and iOS bundle evidence are retained separately.
-
-Phase 3 is complete for local implementation/review only. Database acceptance,
-container build/run, real staging auth/storage/migrations/rollback/resource
-measurements and owner-supplied cloud release inputs remain open. Do not claim
-live acceptance. **Stop here; do not start Phase 4 or resume automatic sequential
-implementation without a new user instruction.** Earlier loop/resume instructions
-below are historical and superseded by this explicit stop request.
+phase. Phase 3 local implementation and main-session review were complete
+through `e802439`; Phase 3 local-only status and its unverified database/cloud
+gates remain as historical context. The later October 5 request explicitly
+authorized Phase 4.
 
 Updated 2026-10-04 (PDT). Resume from this file, the phase plans, release evidence, and Git history; do not rely on conversation memory.
 
-- Current stage: Phase 3 local implementation and seven review fixes are committed through `e802439`, awaiting root re-review; P3.4 is offline IaC/runbook only, and P3.5 live acceptance is blocked on owner-supplied release inputs and staging. The user explicitly authorized skipping Phase 2's blocked database checks and continuing to Phase 3 on October 4. Phase 1 local review and Phase 2 code review are complete. Phase 2 database acceptance remains unverified (40 PostgreSQL tests, migration lifecycle/drift and query measurements); carry it forward before live release, without claiming it passed.
+- Stage at the October 4 checkpoint: Phase 3 local implementation and seven review fixes were committed through `e802439`; P3.4 was offline IaC/runbook only, and P3.5 live acceptance was blocked on owner-supplied release inputs and staging. The user explicitly authorized skipping Phase 2's blocked database checks and continuing to Phase 3 on October 4. Phase 1 local review and Phase 2 code review were complete. Phase 2 database acceptance remains unverified (40 PostgreSQL tests, migration lifecycle/drift and query measurements); carry it forward before live release, without claiming it passed.
 - Baseline: Phase 0 scaffold committed as `b06b93d` on `main`. This directory originally had no Git repository; Git was initialized to support the requested logical commits.
 - Governing instructions: `CODEX.md`, `docs/handoff/codex-handoff.md`, `docs/implementation/phases/README.md`, and the current phase plan. The user's explicit request authorizes implementing Phases 1–9 sequentially, overriding the earlier Phase 0-only handoff boundary.
 - Completed Phase 1 commits: `b491df0` (P1.1 schema/local principal), `433bc0d` (P1.2 PostgreSQL persistence/services), `4d1e365` (P1.3 Profile API/OpenAPI/generated client), `6f0b85b` (P1.4 mobile Profile flow/tests/docs), and `368ed43` (P1.5 release evidence and checks). Independent-review fixes are committed as `f75135d` (database payload identity checks) and `d388814` (mobile recovery, race, date, consent, and regression tests); the local-review checkpoint correction is `360d95a`.
