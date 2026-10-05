@@ -1,5 +1,40 @@
 # Phase 4 — Personal planning, contexts and custom trackers
 
+## Implementation-time reconciliation — October 5, 2026
+
+Phase 4 was implemented against the repository after Phase 3 local review. The
+user explicitly authorized this phase. Phase 2 PostgreSQL acceptance and Phase
+3 live-cloud acceptance remain inherited, unverified release gates; this work
+does not claim either gate passed.
+
+The planned paths were provisional. The actual API is under
+`services/api/src/health_api`, migrations use the current Alembic head
+`c3721f5a9a01`, generated DTOs come from FastAPI OpenAPI, and mobile features
+live under `apps/mobile/src/features` behind Expo Router. Phase 1–3 already
+provide the owner-scoped envelope, manual source, revision snapshots, verified
+cloud owner dependency, Event/Observation storage, and Today snapshot paging.
+
+The implementation follows these reconciled decisions (see
+[ADR 0008](../../architecture/adr/0008-planning-tracker-storage.md)):
+
+- Extend the existing envelope type/domain checks and add owner-consistent
+  subtype, plan-item, schedule-version, occurrence-override, and tracker-schema
+  tables. Do not create a second planner store or generic object-write route.
+- Keep envelope status `active`/`archived`; goals, regimens, plans, contexts,
+  and tracker definitions keep their richer lifecycle in typed subtype rows.
+  Revision snapshots include the subtype state. Manual writes remain
+  `user_confirmed` and permissions default to false.
+- Preserve existing Event/Observation rollup meanings. Custom tracker entries
+  use the existing Observation envelope/subtype and immutable tracker schema
+  version; they do not participate in Phase 2 numeric summaries unless they
+  declare a supported metric/unit mapping.
+- Today adds planning items and active contexts additively. Schedules expand
+  only for bounded reads; occurrence keys use the original local slot and
+  survive schedule revisions. Overrides are owner-resolved and revision
+  checked.
+- Phase 2 database test skips and Phase 3 real cloud/manual checks remain
+  explicit release evidence, not blockers to local implementation.
+
 ## Implementation-time reconciliation gate
 
 **Status: planned. Dependencies: accepted Phases 1–3.** Read [Phase 4 roadmap](../implementation-plan.md#phase-4--personal-planning), actual preceding evidence, object/schema/history/ownership conventions, Event/Observation and Today contracts, cloud auth and mobile features. Inspect generated DTOs and migration head. Record drift; update material design/ADR before code. Do not reuse a provisional path blindly.
