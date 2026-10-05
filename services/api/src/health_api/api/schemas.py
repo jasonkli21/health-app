@@ -6,7 +6,23 @@ from datetime import date, datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
+from pydantic import AwareDatetime, ConfigDict, Field, StrictBool, StrictInt, model_validator
+
 from health_api.domain.daily_rollups import MetricSummaryV1
+from health_api.domain.planning import (
+    ContextLifecycle,
+    ContextPayloadV1,
+    ContextRelation,
+    ContextType,
+    GoalLifecycle,
+    GoalPayloadV1,
+    PlanLifecycle,
+    PlanPayloadV1,
+    RegimenLifecycle,
+    RegimenPayloadV1,
+    ScheduleDefinitionV1,
+    TrackerDefinitionV1,
+)
 from health_api.domain.schemas import (
     ConfirmationStatus,
     DailyDomain,
@@ -19,7 +35,6 @@ from health_api.domain.schemas import (
     ProfileValidity,
     StrictModel,
 )
-from pydantic import AwareDatetime, ConfigDict, Field, StrictBool, StrictInt, model_validator
 
 
 def _non_null_openapi_schema(schema: dict[str, Any]) -> None:
@@ -143,6 +158,214 @@ class ProfileHistoryEntry(StrictModel):
 class ProfileHistoryResponse(StrictModel):
     items: list[ProfileHistoryEntry]
     next_after_revision: int | None
+
+
+class PlanningCreateRequestBase(StrictModel):
+    id: UUID
+    notes: DailyNotes | None = None
+
+
+class GoalCreateRequest(PlanningCreateRequestBase):
+    goal: GoalPayloadV1
+
+
+class RegimenCreateRequest(PlanningCreateRequestBase):
+    regimen: RegimenPayloadV1
+
+
+class PlanCreateRequest(PlanningCreateRequestBase):
+    plan: PlanPayloadV1
+
+
+class ContextCreateRequest(PlanningCreateRequestBase):
+    context: ContextPayloadV1
+
+
+class TrackerCreateRequest(PlanningCreateRequestBase):
+    definition: TrackerDefinitionV1
+
+
+class PlanningUpdateBase(StrictModel):
+    expected_revision: Annotated[StrictInt, Field(ge=1)]
+
+
+class GoalUpdateRequest(PlanningUpdateBase):
+    goal: GoalPayloadV1
+
+
+class RegimenUpdateRequest(PlanningUpdateBase):
+    regimen: RegimenPayloadV1
+
+
+class PlanUpdateRequest(PlanningUpdateBase):
+    plan: PlanPayloadV1
+
+
+class PlanOrderRequest(PlanningUpdateBase):
+    item_ids: list[UUID] = Field(min_length=0, max_length=50)
+
+
+class ScheduleEditRequest(StrictModel):
+    expected_schedule_revision: Annotated[StrictInt, Field(ge=1)] | None = None
+    effective_from: date
+    schedule: ScheduleDefinitionV1
+
+    @model_validator(mode="after")
+    def schedule_starts_after_boundary(self) -> ScheduleEditRequest:
+        if self.schedule.start_date < self.effective_from:
+            raise ValueError("schedule start_date must be on or after its effective date")
+        return self
+
+
+class ScheduleResponse(StrictModel):
+    schedule_id: UUID
+    schedule_revision: Annotated[StrictInt, Field(ge=1)]
+    effective_from: date
+    schedule: ScheduleDefinitionV1
+
+
+class OccurrenceActionRequest(StrictModel):
+    expected_schedule_revision: Annotated[StrictInt, Field(ge=1)]
+    expected_override_revision: Annotated[StrictInt, Field(ge=1)] | None = None
+    state: Literal["completed", "skipped", "rescheduled"]
+    rescheduled_at: AwareDatetime | None = None
+    linked_event_id: UUID | None = None
+
+    @model_validator(mode="after")
+    def reschedule_requires_new_due_time(self) -> OccurrenceActionRequest:
+        if (self.state == "rescheduled") != (self.rescheduled_at is not None):
+            raise ValueError("rescheduled_at is required only for a rescheduled occurrence")
+        return self
+
+
+class OccurrenceResponse(StrictModel):
+    key: Annotated[str, Field(min_length=1, max_length=160)]
+    parent_id: UUID
+    item_id: UUID | None
+    label: Annotated[str, Field(min_length=1, max_length=120)]
+    schedule_id: UUID
+    schedule_revision: Annotated[StrictInt, Field(ge=1)]
+    original_local_date: date
+    original_local_time: str
+    timezone: Annotated[str, Field(min_length=1, max_length=64)]
+    due_at: datetime
+    dst_resolution: Literal["exact", "earlier_offset", "next_valid_time"]
+    state: Literal["unknown", "completed", "skipped", "rescheduled"]
+    override_revision: Annotated[StrictInt, Field(ge=1)] | None
+    linked_event_id: UUID | None
+
+
+class OccurrenceListResponse(StrictModel):
+    items: list[OccurrenceResponse]
+
+
+class OccurrenceActionResponse(StrictModel):
+    key: Annotated[str, Field(min_length=1, max_length=160)]
+    state: Literal["completed", "skipped", "rescheduled"]
+    override_revision: Annotated[StrictInt, Field(ge=1)]
+    schedule_revision: Annotated[StrictInt, Field(ge=1)]
+    rescheduled_at: datetime | None
+    linked_event_id: UUID | None
+    updated_at: datetime
+
+
+class ContextUpdateRequest(PlanningUpdateBase):
+    context: ContextPayloadV1
+
+
+class TrackerUpdateRequest(PlanningUpdateBase):
+    definition: TrackerDefinitionV1
+
+
+class LifecycleUpdateRequest(PlanningUpdateBase):
+    lifecycle: GoalLifecycle | RegimenLifecycle | PlanLifecycle | ContextLifecycle
+
+
+class PlanningResourceResponseBase(StrictModel):
+    id: UUID
+    domain: str
+    status: Literal["active", "archived"]
+    title: Annotated[str, Field(min_length=1, max_length=120)]
+    valid_from: datetime | None
+    valid_to: datetime | None
+    recorded_at: datetime
+    created_at: datetime
+    updated_at: datetime
+    source: ProfileSource
+    confirmation_status: ConfirmationStatus
+    schema_version: Literal[1]
+    revision: Annotated[int, Field(ge=1)]
+    notes: DailyNotes | None
+    lifecycle: str
+
+
+class GoalResponse(PlanningResourceResponseBase):
+    object_type: Literal["goal"]
+    goal: GoalPayloadV1
+
+
+class RegimenResponse(PlanningResourceResponseBase):
+    object_type: Literal["regimen"]
+    regimen: RegimenPayloadV1
+
+
+class PlanResponse(PlanningResourceResponseBase):
+    object_type: Literal["plan"]
+    plan: PlanPayloadV1
+
+
+class ContextResponse(PlanningResourceResponseBase):
+    object_type: Literal["context"]
+    context: ContextPayloadV1
+
+
+class TrackerResponse(PlanningResourceResponseBase):
+    object_type: Literal["tracker_definition"]
+    current_schema_version: Annotated[StrictInt, Field(ge=1)]
+    definition: TrackerDefinitionV1
+
+
+class TrackerSchemaVersionResponse(StrictModel):
+    version: Annotated[StrictInt, Field(ge=1)]
+    definition: TrackerDefinitionV1
+    created_at: datetime
+
+
+class TrackerSchemaVersionListResponse(StrictModel):
+    items: list[TrackerSchemaVersionResponse]
+    next_after_version: StrictInt | None
+
+
+PlanningItemResponse = (
+    GoalResponse | RegimenResponse | PlanResponse | ContextResponse | TrackerResponse
+)
+
+
+class PlanningListResponse(StrictModel):
+    items: list[PlanningItemResponse]
+    next_cursor: str | None
+
+
+class PlanningHistoryEntry(StrictModel):
+    revision: Annotated[StrictInt, Field(ge=1)]
+    recorded_at: datetime
+    actor_kind: Literal["user"]
+    reason: Literal["create", "update", "archive"]
+    snapshot: dict[str, Any]
+
+
+class PlanningHistoryResponse(StrictModel):
+    items: list[PlanningHistoryEntry]
+    next_after_revision: int | None
+
+
+class TodayContextSummary(StrictModel):
+    id: UUID
+    label: Annotated[str, Field(min_length=1, max_length=120)]
+    context_type: ContextType
+    notes: DailyNotes | None
+    priority: Annotated[StrictInt, Field(ge=0, le=100)]
+    related: list[ContextRelation]
 
 
 class DailyEventCreateRequest(StrictModel):
@@ -272,6 +495,8 @@ class TodayResponse(StrictModel):
     profile_context_refs: list[ProfileContextReference]
     profile_context_truncated: bool
     includes_profile_context: bool
+    plan_items: list[OccurrenceResponse] = Field(default_factory=list)
+    active_contexts: list[TodayContextSummary] = Field(default_factory=list)
     next_cursor: str | None
 
 

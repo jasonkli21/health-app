@@ -7,6 +7,7 @@ from datetime import UTC, date, datetime
 from enum import StrEnum
 from math import isfinite
 from typing import Annotated, ClassVar, Literal
+from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import (
@@ -421,8 +422,30 @@ class SymptomSeverityV1(StrictModel):
     unit: Literal[MeasurementUnit.SCORE] = MeasurementUnit.SCORE
 
 
+class CustomTrackerQuantityV1(StrictModel):
+    value: FiniteDailyNumber
+    unit: ProfileUnit
+
+
+type CustomTrackerFieldValueV1 = Annotated[
+    StrictStr | StrictBool | FiniteDailyNumber | CustomTrackerQuantityV1,
+    Field(union_mode="left_to_right"),
+]
+
+
+class CustomTrackerValueV1(StrictModel):
+    metric: Literal["custom"]
+    unit: Literal["custom"] = "custom"
+    tracker_id: UUID
+    schema_version: Annotated[StrictInt, Field(ge=1)]
+    # Tracker definitions provide the schema for this flat map. Keep the
+    # transport shape open so generated clients can submit the bounded scalar
+    # union; validate_tracker_values checks it against the immutable version.
+    values: dict[StrictStr, object] = Field(max_length=20)
+
+
 type ObservationValueV1 = Annotated[
-    MeasurementValueV1 | SymptomSeverityV1,
+    MeasurementValueV1 | SymptomSeverityV1 | CustomTrackerValueV1,
     Field(discriminator="metric"),
 ]
 
@@ -463,7 +486,7 @@ class EventSchemaV1(StrictModel):
 
 
 class ObservationSchemaV1(StrictModel):
-    domain: Literal[DailyDomain.MEASUREMENTS, DailyDomain.SYMPTOMS]
+    domain: DailyDomain
     time: DailyTimePoint
     interval_end: UTCInstant | None = None
     payload: ObservationPayloadV1
@@ -472,6 +495,10 @@ class ObservationSchemaV1(StrictModel):
     @model_validator(mode="after")
     def observation_domain_and_interval_match(self) -> ObservationSchemaV1:
         metric = self.payload.value.metric
+        if metric == "custom":
+            if self.interval_end is not None:
+                raise ValueError("custom tracker entries cannot use interval duration")
+            return self
         expected = (
             DailyDomain.SYMPTOMS
             if metric == MetricKey.SYMPTOM_SEVERITY

@@ -6,6 +6,10 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from uuid import UUID
 
+from sqlalchemy import and_, or_, select, text
+from sqlalchemy.orm import Session, aliased
+from sqlalchemy.sql.elements import ColumnElement
+
 from health_api.application.errors import DailyNotFound, DailySnapshotLimitExceeded
 from health_api.domain.daily import local_day_bounds
 from health_api.domain.daily_rollups import MetricSummaryV1, summarize_today
@@ -23,9 +27,6 @@ from health_api.persistence.models import (
     ProfileItem,
     User,
 )
-from sqlalchemy import and_, or_, select, text
-from sqlalchemy.orm import Session, aliased
-from sqlalchemy.sql.elements import ColumnElement
 
 MAX_TODAY_OBJECTS = 10_000
 MAX_PROFILE_CONTEXT_REFERENCES = 100
@@ -233,6 +234,9 @@ def summarize_today_snapshot(
             }
         )
         metric = observation.payload.value.metric
+        if metric == "custom":
+            # Custom tracker values are visible in the timeline but have no fixed rollup.
+            continue
         if metric != MetricKey.SYMPTOM_SEVERITY or revision.object_id in linked_severity_ids:
             observations.append((revision.object_id, observation))
 

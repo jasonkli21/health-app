@@ -11,6 +11,9 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query, Response
+from pydantic import ValidationError
+from sqlalchemy.orm import Session
+
 from health_api.api.dependencies import get_current_owner, get_session
 from health_api.api.errors import APIError
 from health_api.api.schemas import (
@@ -28,7 +31,9 @@ from health_api.api.schemas import (
     DailyObservationResponse,
     DailyObservationUpdateRequest,
     ErrorResponse,
+    OccurrenceResponse,
     ProfileContextReference,
+    TodayContextSummary,
     TodayResponse,
 )
 from health_api.application.daily_service import (
@@ -45,6 +50,7 @@ from health_api.application.daily_service import (
     update_daily_item,
 )
 from health_api.application.errors import DailyNotFound
+from health_api.application.planning_service import load_today_planning
 from health_api.application.today_service import (
     is_today_snapshot_boundary,
     load_today_snapshot,
@@ -65,8 +71,6 @@ from health_api.persistence.models import (
     ObservationItem,
     Source,
 )
-from pydantic import ValidationError
-from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["daily"])
 
@@ -868,6 +872,9 @@ def get_today(
         )
 
     summaries = summarize_today_snapshot(snapshot.revisions, effective_date, effective_timezone)
+    plan_items, active_contexts = load_today_planning(
+        session, owner_id, effective_date, effective_timezone
+    )
     return TodayResponse(
         date=effective_date,
         timezone=effective_timezone,
@@ -880,5 +887,7 @@ def get_today(
         ],
         profile_context_truncated=snapshot.profile_context_truncated,
         includes_profile_context=cursor is None,
+        plan_items=[OccurrenceResponse.model_validate(item) for item in plan_items],
+        active_contexts=[TodayContextSummary.model_validate(item) for item in active_contexts],
         next_cursor=next_cursor,
     )

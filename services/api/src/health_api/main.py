@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from health_api.api.daily import router as daily_router
 from health_api.api.errors import install_error_handlers
 from health_api.api.middleware import RequestBoundaryMiddleware
+from health_api.api.planning import router as planning_router
 from health_api.api.profile import router as profile_router
 from health_api.config.settings import Settings, get_settings
 from health_api.integrations.firebase_auth import FirebaseTokenVerifier, IdentityVerifier
@@ -45,7 +46,7 @@ def create_app(
         title="Personal Health API",
         version="1.0.0",
         description=(
-            "Owner-scoped Profile v1 and daily Event/Observation v1 APIs. "
+            "Owner-scoped Profile, daily Event/Observation, and planning v1 APIs. "
             "Identity is resolved from server configuration or verified Firebase bearer tokens. "
             "Request bodies are limited to 65,536 bytes."
         ),
@@ -70,6 +71,7 @@ def create_app(
     install_error_handlers(app)
     app.include_router(profile_router)
     app.include_router(daily_router)
+    app.include_router(planning_router)
 
     @app.get("/healthz", tags=["system"], operation_id="healthcheck")
     def healthcheck() -> dict[str, str]:

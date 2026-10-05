@@ -8,17 +8,21 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
+
 from health_api.api.schemas import ErrorResponse, FieldError
 from health_api.application.errors import (
     DailyConflict,
     DailyNotFound,
     DailySnapshotLimitExceeded,
     DailyValidationError,
+    PlanningConflict,
+    PlanningNotFound,
+    PlanningValidationError,
     ProfileConflict,
     ProfileNotFound,
     ProfileValidationError,
 )
-from sqlalchemy.exc import SQLAlchemyError
 
 _SAFE_FIELD_NAMES = {
     "id",
@@ -54,6 +58,19 @@ _SAFE_FIELD_NAMES = {
     "local_date",
     "event_id",
     "observation_id",
+    "goal_id",
+    "regimen_id",
+    "plan_id",
+    "context_id",
+    "tracker_id",
+    "reference_id",
+    "expected_schedule_revision",
+    "schedule",
+    "occurrence_key",
+    "lifecycle",
+    "fields",
+    "values",
+    "items",
     "objects",
     "links",
 }
@@ -150,6 +167,20 @@ def install_error_handlers(app: FastAPI) -> None:
             "today_window_too_large",
             "The selected day has too many entries for a safe Today snapshot.",
         )
+
+    @app.exception_handler(PlanningNotFound)
+    async def planning_not_found_handler(request: Request, _exc: PlanningNotFound) -> JSONResponse:
+        return _error_response(request, 404, "not_found", "Planning resource was not found.")
+
+    @app.exception_handler(PlanningConflict)
+    async def planning_conflict_handler(request: Request, exc: PlanningConflict) -> JSONResponse:
+        return _error_response(request, 409, "conflict", str(exc) or "Planning update conflict.")
+
+    @app.exception_handler(PlanningValidationError)
+    async def planning_validation_handler(
+        request: Request, _exc: PlanningValidationError
+    ) -> JSONResponse:
+        return _error_response(request, 422, "validation_error", "Planning data is invalid.")
 
     @app.exception_handler(RequestValidationError)
     async def request_validation_handler(

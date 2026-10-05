@@ -7,9 +7,67 @@ export interface components {
       value: boolean;
     };
     ConfirmationStatus: "unconfirmed" | "user_confirmed";
+    ContextCreateRequest: {
+      context: components["schemas"]["ContextPayloadV1"];
+      id: string;
+      notes?: string | null;
+    };
+    ContextLifecycle: "active" | "ended";
+    ContextPayloadV1: {
+      context_type: components["schemas"]["ContextType"];
+      end_at?: string | null;
+      label: string;
+      notes?: string | null;
+      priority?: number;
+      related?: Array<components["schemas"]["ContextRelation"]>;
+      start_at?: string | null;
+    };
+    ContextRelation: {
+      object_id: string;
+      priority?: number;
+      relevance?: string;
+    };
+    ContextResponse: {
+      confirmation_status: components["schemas"]["ConfirmationStatus"];
+      context: components["schemas"]["ContextPayloadV1"];
+      created_at: string;
+      domain: string;
+      id: string;
+      lifecycle: string;
+      notes: string | null;
+      object_type: "context";
+      recorded_at: string;
+      revision: number;
+      schema_version: 1;
+      source: components["schemas"]["ProfileSource"];
+      status: "active" | "archived";
+      title: string;
+      updated_at: string;
+      valid_from: string | null;
+      valid_to: string | null;
+    };
+    ContextType:
+      | "travel"
+      | "illness"
+      | "recovery"
+      | "schedule_change"
+      | "other";
+    ContextUpdateRequest: {
+      context: components["schemas"]["ContextPayloadV1"];
+      expected_revision: number;
+    };
     CoverageV1: {
       known_count: number;
       total_count: number;
+    };
+    CustomTrackerValueV1: {
+      metric: "custom";
+      schema_version: number;
+      tracker_id: string;
+      unit?: "custom";
+      values: {
+        [key: string]: unknown;
+      };
     };
     DailyDomain:
       | "nutrition"
@@ -132,6 +190,10 @@ export interface components {
       unit: "kcal" | "kJ";
       value: components["schemas"]["FiniteDailyNumber"];
     };
+    EnteredQuantity: {
+      unit: components["schemas"]["ProfileUnit"];
+      value: components["schemas"]["FiniteDailyNumber"];
+    };
     ErrorResponse: {
       code: string;
       field_errors?: Array<components["schemas"]["FieldError"]> | null;
@@ -156,10 +218,63 @@ export interface components {
     };
     FiniteDailyNumber: number;
     FiniteProfileNumber: number;
+    GoalComparator: "at_least" | "at_most" | "equal";
+    GoalCreateRequest: {
+      goal: components["schemas"]["GoalPayloadV1"];
+      id: string;
+      notes?: string | null;
+    };
+    GoalDomain:
+      | "nutrition"
+      | "exercise"
+      | "sleep"
+      | "symptoms"
+      | "measurements"
+      | "general";
+    GoalLifecycle: "active" | "paused" | "completed";
+    GoalPayloadV1: {
+      domain: components["schemas"]["GoalDomain"];
+      label: string;
+      start_date?: string | null;
+      target?: components["schemas"]["MetricTarget"] | null;
+      target_date?: string | null;
+      target_period?: "day" | "week" | "month" | "year" | "once" | null;
+    };
+    GoalResponse: {
+      confirmation_status: components["schemas"]["ConfirmationStatus"];
+      created_at: string;
+      domain: string;
+      goal: components["schemas"]["GoalPayloadV1"];
+      id: string;
+      lifecycle: string;
+      notes: string | null;
+      object_type: "goal";
+      recorded_at: string;
+      revision: number;
+      schema_version: 1;
+      source: components["schemas"]["ProfileSource"];
+      status: "active" | "archived";
+      title: string;
+      updated_at: string;
+      valid_from: string | null;
+      valid_to: string | null;
+    };
+    GoalUpdateRequest: {
+      expected_revision: number;
+      goal: components["schemas"]["GoalPayloadV1"];
+    };
     InstantTimePoint: {
       occurred_at: components["schemas"]["UTCInstant"];
       precision: "instant";
       timezone: string;
+    };
+    LifecycleUpdateRequest: {
+      expected_revision: number;
+      lifecycle:
+        | components["schemas"]["GoalLifecycle"]
+        | components["schemas"]["RegimenLifecycle"]
+        | components["schemas"]["PlanLifecycle"]
+        | components["schemas"]["ContextLifecycle"];
     };
     MealEventV1: {
       energy?: components["schemas"]["EnergyQuantity"] | null;
@@ -216,6 +331,12 @@ export interface components {
       partial: boolean;
       unit: string;
     };
+    MetricTarget: {
+      comparator: components["schemas"]["GoalComparator"];
+      metric: components["schemas"]["MetricKey"];
+      unit: components["schemas"]["MeasurementUnit"];
+      value: components["schemas"]["FiniteDailyNumber"];
+    };
     NumberValue: {
       type: "number";
       value: components["schemas"]["FiniteProfileNumber"];
@@ -224,7 +345,7 @@ export interface components {
       value: components["schemas"]["ObservationValueV1"];
     };
     ObservationSchemaV1: {
-      domain: "measurements" | "symptoms";
+      domain: components["schemas"]["DailyDomain"];
       interval_end?: components["schemas"]["UTCInstant"] | null;
       notes?: string | null;
       payload: components["schemas"]["ObservationPayloadV1"];
@@ -232,7 +353,112 @@ export interface components {
     };
     ObservationValueV1:
       | components["schemas"]["MeasurementValueV1"]
-      | components["schemas"]["SymptomSeverityV1"];
+      | components["schemas"]["SymptomSeverityV1"]
+      | components["schemas"]["CustomTrackerValueV1"];
+    OccurrenceActionRequest: {
+      expected_override_revision?: number | null;
+      expected_schedule_revision: number;
+      linked_event_id?: string | null;
+      rescheduled_at?: string | null;
+      state: "completed" | "skipped" | "rescheduled";
+    };
+    OccurrenceActionResponse: {
+      key: string;
+      linked_event_id: string | null;
+      override_revision: number;
+      rescheduled_at: string | null;
+      schedule_revision: number;
+      state: "completed" | "skipped" | "rescheduled";
+      updated_at: string;
+    };
+    OccurrenceListResponse: {
+      items: Array<components["schemas"]["OccurrenceResponse"]>;
+    };
+    OccurrenceResponse: {
+      dst_resolution: "exact" | "earlier_offset" | "next_valid_time";
+      due_at: string;
+      item_id: string | null;
+      key: string;
+      label: string;
+      linked_event_id: string | null;
+      original_local_date: string;
+      original_local_time: string;
+      override_revision: number | null;
+      parent_id: string;
+      schedule_id: string;
+      schedule_revision: number;
+      state: "unknown" | "completed" | "skipped" | "rescheduled";
+      timezone: string;
+    };
+    PlanCreateRequest: {
+      id: string;
+      notes?: string | null;
+      plan: components["schemas"]["PlanPayloadV1"];
+    };
+    PlanItemInput: {
+      id: string;
+      kind: components["schemas"]["PlanItemKind"];
+      label: string;
+      reference_id?: string | null;
+    };
+    PlanItemKind: "goal" | "regimen" | "task";
+    PlanLifecycle: "active" | "paused" | "completed";
+    PlanningHistoryEntry: {
+      actor_kind: "user";
+      reason: "create" | "update" | "archive";
+      recorded_at: string;
+      revision: number;
+      snapshot: {
+        [key: string]: unknown;
+      };
+    };
+    PlanningHistoryResponse: {
+      items: Array<components["schemas"]["PlanningHistoryEntry"]>;
+      next_after_revision: number | null;
+    };
+    PlanningListResponse: {
+      items: Array<
+        | components["schemas"]["GoalResponse"]
+        | components["schemas"]["RegimenResponse"]
+        | components["schemas"]["PlanResponse"]
+        | components["schemas"]["ContextResponse"]
+        | components["schemas"]["TrackerResponse"]
+      >;
+      next_cursor: string | null;
+    };
+    PlanOrderRequest: {
+      expected_revision: number;
+      item_ids: Array<string>;
+    };
+    PlanPayloadV1: {
+      end_date?: string | null;
+      items?: Array<components["schemas"]["PlanItemInput"]>;
+      label: string;
+      start_date?: string | null;
+    };
+    PlanResponse: {
+      confirmation_status: components["schemas"]["ConfirmationStatus"];
+      created_at: string;
+      domain: string;
+      id: string;
+      lifecycle: string;
+      notes: string | null;
+      object_type: "plan";
+      plan: components["schemas"]["PlanPayloadV1"];
+      recorded_at: string;
+      revision: number;
+      schema_version: 1;
+      source: components["schemas"]["ProfileSource"];
+      status: "active" | "archived";
+      title: string;
+      updated_at: string;
+      valid_from: string | null;
+      valid_to: string | null;
+    };
+    PlanUpdateRequest: {
+      expected_revision: number;
+      plan: components["schemas"]["PlanPayloadV1"];
+    };
     ProfileCategory: "background" | "constraints" | "preferences";
     ProfileContextReference: {
       id: string;
@@ -343,6 +569,66 @@ export interface components {
       unit: components["schemas"]["ProfileUnit"];
       value: components["schemas"]["FiniteProfileNumber"];
     };
+    RegimenCreateRequest: {
+      id: string;
+      notes?: string | null;
+      regimen: components["schemas"]["RegimenPayloadV1"];
+    };
+    RegimenKind: "habit" | "medication" | "supplement" | "activity";
+    RegimenLifecycle: "active" | "paused" | "completed";
+    RegimenPayloadV1: {
+      domain?: components["schemas"]["GoalDomain"];
+      end_date?: string | null;
+      instructions?: string | null;
+      kind: components["schemas"]["RegimenKind"];
+      label: string;
+      quantity?: components["schemas"]["EnteredQuantity"] | null;
+      start_date?: string | null;
+    };
+    RegimenResponse: {
+      confirmation_status: components["schemas"]["ConfirmationStatus"];
+      created_at: string;
+      domain: string;
+      id: string;
+      lifecycle: string;
+      notes: string | null;
+      object_type: "regimen";
+      recorded_at: string;
+      regimen: components["schemas"]["RegimenPayloadV1"];
+      revision: number;
+      schema_version: 1;
+      source: components["schemas"]["ProfileSource"];
+      status: "active" | "archived";
+      title: string;
+      updated_at: string;
+      valid_from: string | null;
+      valid_to: string | null;
+    };
+    RegimenUpdateRequest: {
+      expected_revision: number;
+      regimen: components["schemas"]["RegimenPayloadV1"];
+    };
+    ScheduleDefinitionV1: {
+      end_date?: string | null;
+      interval?: number;
+      local_time: string;
+      recurrence: components["schemas"]["ScheduleRecurrence"];
+      start_date: string;
+      timezone: string;
+      weekdays?: Array<number>;
+    };
+    ScheduleEditRequest: {
+      effective_from: string;
+      expected_schedule_revision?: number | null;
+      schedule: components["schemas"]["ScheduleDefinitionV1"];
+    };
+    ScheduleRecurrence: "daily" | "weekly";
+    ScheduleResponse: {
+      effective_from: string;
+      schedule: components["schemas"]["ScheduleDefinitionV1"];
+      schedule_id: string;
+      schedule_revision: number;
+    };
     SleepEventV1: {
       kind: "sleep";
       label?: string;
@@ -365,7 +651,16 @@ export interface components {
       type: "text";
       value: string;
     };
+    TodayContextSummary: {
+      context_type: components["schemas"]["ContextType"];
+      id: string;
+      label: string;
+      notes: string | null;
+      priority: number;
+      related: Array<components["schemas"]["ContextRelation"]>;
+    };
     TodayResponse: {
+      active_contexts?: Array<components["schemas"]["TodayContextSummary"]>;
       as_of_sequence: number;
       date: string;
       includes_profile_context: boolean;
@@ -374,12 +669,71 @@ export interface components {
         | components["schemas"]["DailyObservationResponse"]
       >;
       next_cursor: string | null;
+      plan_items?: Array<components["schemas"]["OccurrenceResponse"]>;
       profile_context_refs: Array<
         components["schemas"]["ProfileContextReference"]
       >;
       profile_context_truncated: boolean;
       summaries: Array<components["schemas"]["MetricSummaryV1"]>;
       timezone: string;
+    };
+    TrackerCreateRequest: {
+      definition: components["schemas"]["TrackerDefinitionV1"];
+      id: string;
+      notes?: string | null;
+    };
+    TrackerDefinitionV1: {
+      domain: components["schemas"]["DailyDomain"];
+      fields: Array<components["schemas"]["TrackerFieldV1"]>;
+      name: string;
+    };
+    TrackerFieldKind:
+      | "text"
+      | "number"
+      | "boolean"
+      | "enum"
+      | "date"
+      | "quantity";
+    TrackerFieldV1: {
+      choices?: Array<string>;
+      id: string;
+      kind: components["schemas"]["TrackerFieldKind"];
+      label: string;
+      required?: boolean;
+      unit?: components["schemas"]["ProfileUnit"] | null;
+    };
+    TrackerResponse: {
+      confirmation_status: components["schemas"]["ConfirmationStatus"];
+      created_at: string;
+      current_schema_version: number;
+      definition: components["schemas"]["TrackerDefinitionV1"];
+      domain: string;
+      id: string;
+      lifecycle: string;
+      notes: string | null;
+      object_type: "tracker_definition";
+      recorded_at: string;
+      revision: number;
+      schema_version: 1;
+      source: components["schemas"]["ProfileSource"];
+      status: "active" | "archived";
+      title: string;
+      updated_at: string;
+      valid_from: string | null;
+      valid_to: string | null;
+    };
+    TrackerSchemaVersionListResponse: {
+      items: Array<components["schemas"]["TrackerSchemaVersionResponse"]>;
+      next_after_version: number | null;
+    };
+    TrackerSchemaVersionResponse: {
+      created_at: string;
+      definition: components["schemas"]["TrackerDefinitionV1"];
+      version: number;
+    };
+    TrackerUpdateRequest: {
+      definition: components["schemas"]["TrackerDefinitionV1"];
+      expected_revision: number;
     };
     UTCInstant: string;
     WorkoutEventV1: {
@@ -392,6 +746,21 @@ export interface components {
 }
 
 export interface operations {
+  archiveContext: {
+    path: {
+      context_id: string;
+    };
+    query: {
+      expected_revision: number;
+    };
+    responses: {
+      "200": components["schemas"]["ContextResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   archiveEvent: {
     path: {
       event_id: string;
@@ -404,6 +773,21 @@ export interface operations {
       "401": components["schemas"]["ErrorResponse"];
       "404": components["schemas"]["ErrorResponse"];
       "409": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  archiveGoal: {
+    path: {
+      goal_id: string;
+    };
+    query: {
+      expected_revision: number;
+    };
+    responses: {
+      "200": components["schemas"]["GoalResponse"];
+      "401": components["schemas"]["ErrorResponse"];
       "413": components["schemas"]["ErrorResponse"];
       "422": components["schemas"]["ErrorResponse"];
       "503": components["schemas"]["ErrorResponse"];
@@ -426,6 +810,21 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  archivePlan: {
+    path: {
+      plan_id: string;
+    };
+    query: {
+      expected_revision: number;
+    };
+    responses: {
+      "200": components["schemas"]["PlanResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   archiveProfileItem: {
     path: {
       item_id: string;
@@ -438,6 +837,46 @@ export interface operations {
       "401": components["schemas"]["ErrorResponse"];
       "404": components["schemas"]["ErrorResponse"];
       "409": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  archiveRegimen: {
+    path: {
+      regimen_id: string;
+    };
+    query: {
+      expected_revision: number;
+    };
+    responses: {
+      "200": components["schemas"]["RegimenResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  archiveTracker: {
+    path: {
+      tracker_id: string;
+    };
+    query: {
+      expected_revision: number;
+    };
+    responses: {
+      "200": components["schemas"]["TrackerResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  createContext: {
+    requestBody: components["schemas"]["ContextCreateRequest"];
+    responses: {
+      "201": components["schemas"]["ContextResponse"];
+      "401": components["schemas"]["ErrorResponse"];
       "413": components["schemas"]["ErrorResponse"];
       "422": components["schemas"]["ErrorResponse"];
       "503": components["schemas"]["ErrorResponse"];
@@ -467,6 +906,16 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  createGoal: {
+    requestBody: components["schemas"]["GoalCreateRequest"];
+    responses: {
+      "201": components["schemas"]["GoalResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   createObservation: {
     requestBody: components["schemas"]["DailyObservationCreateRequest"];
     responses: {
@@ -479,6 +928,16 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  createPlan: {
+    requestBody: components["schemas"]["PlanCreateRequest"];
+    responses: {
+      "201": components["schemas"]["PlanResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   createProfileItem: {
     requestBody: components["schemas"]["ProfileCreateRequest"];
     responses: {
@@ -486,6 +945,65 @@ export interface operations {
       "201": components["schemas"]["ProfileItemResponse"];
       "401": components["schemas"]["ErrorResponse"];
       "409": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  createRegimen: {
+    requestBody: components["schemas"]["RegimenCreateRequest"];
+    responses: {
+      "201": components["schemas"]["RegimenResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  createTracker: {
+    requestBody: components["schemas"]["TrackerCreateRequest"];
+    responses: {
+      "201": components["schemas"]["TrackerResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  editPlanItemSchedule: {
+    path: {
+      plan_id: string;
+      item_id: string;
+    };
+    requestBody: components["schemas"]["ScheduleEditRequest"];
+    responses: {
+      "200": components["schemas"]["ScheduleResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  editRegimenSchedule: {
+    path: {
+      regimen_id: string;
+    };
+    requestBody: components["schemas"]["ScheduleEditRequest"];
+    responses: {
+      "200": components["schemas"]["ScheduleResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  getContext: {
+    path: {
+      context_id: string;
+    };
+    responses: {
+      "200": components["schemas"]["ContextResponse"];
+      "401": components["schemas"]["ErrorResponse"];
       "413": components["schemas"]["ErrorResponse"];
       "422": components["schemas"]["ErrorResponse"];
       "503": components["schemas"]["ErrorResponse"];
@@ -504,6 +1022,18 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  getGoal: {
+    path: {
+      goal_id: string;
+    };
+    responses: {
+      "200": components["schemas"]["GoalResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   getObservation: {
     path: {
       observation_id: string;
@@ -517,6 +1047,31 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  getPlan: {
+    path: {
+      plan_id: string;
+    };
+    responses: {
+      "200": components["schemas"]["PlanResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  getPlanItemSchedule: {
+    path: {
+      plan_id: string;
+      item_id: string;
+    };
+    responses: {
+      "200": components["schemas"]["ScheduleResponse"] | null;
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   getProfileItem: {
     path: {
       item_id: string;
@@ -525,6 +1080,30 @@ export interface operations {
       "200": components["schemas"]["ProfileItemResponse"];
       "401": components["schemas"]["ErrorResponse"];
       "404": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  getRegimen: {
+    path: {
+      regimen_id: string;
+    };
+    responses: {
+      "200": components["schemas"]["RegimenResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  getRegimenSchedule: {
+    path: {
+      regimen_id: string;
+    };
+    responses: {
+      "200": components["schemas"]["ScheduleResponse"] | null;
+      "401": components["schemas"]["ErrorResponse"];
       "413": components["schemas"]["ErrorResponse"];
       "422": components["schemas"]["ErrorResponse"];
       "503": components["schemas"]["ErrorResponse"];
@@ -545,11 +1124,53 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  getTracker: {
+    path: {
+      tracker_id: string;
+    };
+    responses: {
+      "200": components["schemas"]["TrackerResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   healthcheck: {
     responses: {
       "200": {
         [key: string]: string;
       };
+    };
+  };
+  listContextHistory: {
+    path: {
+      context_id: string;
+    };
+    query?: {
+      after_revision?: number;
+      limit?: number;
+    };
+    responses: {
+      "200": components["schemas"]["PlanningHistoryResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  listContexts: {
+    query?: {
+      limit?: number;
+      lifecycle?: components["schemas"]["ContextLifecycle"] | null;
+      cursor?: string | null;
+    };
+    responses: {
+      "200": components["schemas"]["PlanningListResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
     };
   };
   listEventHistory: {
@@ -579,6 +1200,36 @@ export interface operations {
     };
     responses: {
       "200": components["schemas"]["DailyEventListResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  listGoalHistory: {
+    path: {
+      goal_id: string;
+    };
+    query?: {
+      after_revision?: number;
+      limit?: number;
+    };
+    responses: {
+      "200": components["schemas"]["PlanningHistoryResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  listGoals: {
+    query?: {
+      limit?: number;
+      lifecycle?: components["schemas"]["GoalLifecycle"] | null;
+      cursor?: string | null;
+    };
+    responses: {
+      "200": components["schemas"]["PlanningListResponse"];
       "401": components["schemas"]["ErrorResponse"];
       "413": components["schemas"]["ErrorResponse"];
       "422": components["schemas"]["ErrorResponse"];
@@ -618,6 +1269,53 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  listPlanHistory: {
+    path: {
+      plan_id: string;
+    };
+    query?: {
+      after_revision?: number;
+      limit?: number;
+    };
+    responses: {
+      "200": components["schemas"]["PlanningHistoryResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  listPlanOccurrences: {
+    path: {
+      plan_id: string;
+    };
+    query: {
+      start_date: string;
+      end_date: string;
+      timezone: string;
+    };
+    responses: {
+      "200": components["schemas"]["OccurrenceListResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  listPlans: {
+    query?: {
+      limit?: number;
+      lifecycle?: components["schemas"]["PlanLifecycle"] | null;
+      cursor?: string | null;
+    };
+    responses: {
+      "200": components["schemas"]["PlanningListResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   listProfileHistory: {
     path: {
       item_id: string;
@@ -650,6 +1348,176 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  listRegimenHistory: {
+    path: {
+      regimen_id: string;
+    };
+    query?: {
+      after_revision?: number;
+      limit?: number;
+    };
+    responses: {
+      "200": components["schemas"]["PlanningHistoryResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  listRegimenOccurrences: {
+    path: {
+      regimen_id: string;
+    };
+    query: {
+      start_date: string;
+      end_date: string;
+      timezone: string;
+    };
+    responses: {
+      "200": components["schemas"]["OccurrenceListResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  listRegimens: {
+    query?: {
+      limit?: number;
+      lifecycle?: components["schemas"]["RegimenLifecycle"] | null;
+      cursor?: string | null;
+    };
+    responses: {
+      "200": components["schemas"]["PlanningListResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  listTrackerHistory: {
+    path: {
+      tracker_id: string;
+    };
+    query?: {
+      after_revision?: number;
+      limit?: number;
+    };
+    responses: {
+      "200": components["schemas"]["PlanningHistoryResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  listTrackers: {
+    query?: {
+      limit?: number;
+      cursor?: string | null;
+    };
+    responses: {
+      "200": components["schemas"]["PlanningListResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  listTrackerVersions: {
+    path: {
+      tracker_id: string;
+    };
+    query?: {
+      after_version?: number;
+      limit?: number;
+    };
+    responses: {
+      "200": components["schemas"]["TrackerSchemaVersionListResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  reorderPlanItems: {
+    path: {
+      plan_id: string;
+    };
+    requestBody: components["schemas"]["PlanOrderRequest"];
+    responses: {
+      "200": components["schemas"]["PlanResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  transitionContext: {
+    path: {
+      context_id: string;
+    };
+    requestBody: components["schemas"]["LifecycleUpdateRequest"];
+    responses: {
+      "200": components["schemas"]["ContextResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  transitionGoal: {
+    path: {
+      goal_id: string;
+    };
+    requestBody: components["schemas"]["LifecycleUpdateRequest"];
+    responses: {
+      "200": components["schemas"]["GoalResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  transitionPlan: {
+    path: {
+      plan_id: string;
+    };
+    requestBody: components["schemas"]["LifecycleUpdateRequest"];
+    responses: {
+      "200": components["schemas"]["PlanResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  transitionRegimen: {
+    path: {
+      regimen_id: string;
+    };
+    requestBody: components["schemas"]["LifecycleUpdateRequest"];
+    responses: {
+      "200": components["schemas"]["RegimenResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  updateContext: {
+    path: {
+      context_id: string;
+    };
+    requestBody: components["schemas"]["ContextUpdateRequest"];
+    responses: {
+      "200": components["schemas"]["ContextResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   updateEvent: {
     path: {
       event_id: string;
@@ -660,6 +1528,19 @@ export interface operations {
       "401": components["schemas"]["ErrorResponse"];
       "404": components["schemas"]["ErrorResponse"];
       "409": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  updateGoal: {
+    path: {
+      goal_id: string;
+    };
+    requestBody: components["schemas"]["GoalUpdateRequest"];
+    responses: {
+      "200": components["schemas"]["GoalResponse"];
+      "401": components["schemas"]["ErrorResponse"];
       "413": components["schemas"]["ErrorResponse"];
       "422": components["schemas"]["ErrorResponse"];
       "503": components["schemas"]["ErrorResponse"];
@@ -680,6 +1561,32 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  updatePlan: {
+    path: {
+      plan_id: string;
+    };
+    requestBody: components["schemas"]["PlanUpdateRequest"];
+    responses: {
+      "200": components["schemas"]["PlanResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  updatePlanOccurrence: {
+    path: {
+      occurrence_key: string;
+    };
+    requestBody: components["schemas"]["OccurrenceActionRequest"];
+    responses: {
+      "200": components["schemas"]["OccurrenceActionResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   updateProfileItem: {
     path: {
       item_id: string;
@@ -690,6 +1597,32 @@ export interface operations {
       "401": components["schemas"]["ErrorResponse"];
       "404": components["schemas"]["ErrorResponse"];
       "409": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  updateRegimen: {
+    path: {
+      regimen_id: string;
+    };
+    requestBody: components["schemas"]["RegimenUpdateRequest"];
+    responses: {
+      "200": components["schemas"]["RegimenResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  updateTracker: {
+    path: {
+      tracker_id: string;
+    };
+    requestBody: components["schemas"]["TrackerUpdateRequest"];
+    responses: {
+      "200": components["schemas"]["TrackerResponse"];
+      "401": components["schemas"]["ErrorResponse"];
       "413": components["schemas"]["ErrorResponse"];
       "422": components["schemas"]["ErrorResponse"];
       "503": components["schemas"]["ErrorResponse"];
@@ -729,6 +1662,18 @@ export class HealthApiClient {
     this.fetcher = fetcher;
   }
 
+  async archiveContext(
+    path: operations["archiveContext"]["path"],
+    query: operations["archiveContext"]["query"],
+  ): Promise<components["schemas"]["ContextResponse"]> {
+    return this.request<components["schemas"]["ContextResponse"]>(
+      "DELETE",
+      `/contexts/${encodeURIComponent(path.context_id)}`,
+      query,
+      undefined,
+    );
+  }
+
   async archiveEvent(
     path: operations["archiveEvent"]["path"],
     query: operations["archiveEvent"]["query"],
@@ -736,6 +1681,18 @@ export class HealthApiClient {
     return this.request<components["schemas"]["DailyEventResponse"]>(
       "DELETE",
       `/events/${encodeURIComponent(path.event_id)}`,
+      query,
+      undefined,
+    );
+  }
+
+  async archiveGoal(
+    path: operations["archiveGoal"]["path"],
+    query: operations["archiveGoal"]["query"],
+  ): Promise<components["schemas"]["GoalResponse"]> {
+    return this.request<components["schemas"]["GoalResponse"]>(
+      "DELETE",
+      `/goals/${encodeURIComponent(path.goal_id)}`,
       query,
       undefined,
     );
@@ -753,6 +1710,18 @@ export class HealthApiClient {
     );
   }
 
+  async archivePlan(
+    path: operations["archivePlan"]["path"],
+    query: operations["archivePlan"]["query"],
+  ): Promise<components["schemas"]["PlanResponse"]> {
+    return this.request<components["schemas"]["PlanResponse"]>(
+      "DELETE",
+      `/plans/${encodeURIComponent(path.plan_id)}`,
+      query,
+      undefined,
+    );
+  }
+
   async archiveProfileItem(
     path: operations["archiveProfileItem"]["path"],
     query: operations["archiveProfileItem"]["query"],
@@ -762,6 +1731,41 @@ export class HealthApiClient {
       `/profile/${encodeURIComponent(path.item_id)}`,
       query,
       undefined,
+    );
+  }
+
+  async archiveRegimen(
+    path: operations["archiveRegimen"]["path"],
+    query: operations["archiveRegimen"]["query"],
+  ): Promise<components["schemas"]["RegimenResponse"]> {
+    return this.request<components["schemas"]["RegimenResponse"]>(
+      "DELETE",
+      `/regimens/${encodeURIComponent(path.regimen_id)}`,
+      query,
+      undefined,
+    );
+  }
+
+  async archiveTracker(
+    path: operations["archiveTracker"]["path"],
+    query: operations["archiveTracker"]["query"],
+  ): Promise<components["schemas"]["TrackerResponse"]> {
+    return this.request<components["schemas"]["TrackerResponse"]>(
+      "DELETE",
+      `/trackers/${encodeURIComponent(path.tracker_id)}`,
+      query,
+      undefined,
+    );
+  }
+
+  async createContext(
+    requestBody: operations["createContext"]["requestBody"],
+  ): Promise<components["schemas"]["ContextResponse"]> {
+    return this.request<components["schemas"]["ContextResponse"]>(
+      "POST",
+      `/contexts`,
+      undefined,
+      requestBody,
     );
   }
 
@@ -787,12 +1791,34 @@ export class HealthApiClient {
     );
   }
 
+  async createGoal(
+    requestBody: operations["createGoal"]["requestBody"],
+  ): Promise<components["schemas"]["GoalResponse"]> {
+    return this.request<components["schemas"]["GoalResponse"]>(
+      "POST",
+      `/goals`,
+      undefined,
+      requestBody,
+    );
+  }
+
   async createObservation(
     requestBody: operations["createObservation"]["requestBody"],
   ): Promise<components["schemas"]["DailyObservationResponse"]> {
     return this.request<components["schemas"]["DailyObservationResponse"]>(
       "POST",
       `/observations`,
+      undefined,
+      requestBody,
+    );
+  }
+
+  async createPlan(
+    requestBody: operations["createPlan"]["requestBody"],
+  ): Promise<components["schemas"]["PlanResponse"]> {
+    return this.request<components["schemas"]["PlanResponse"]>(
+      "POST",
+      `/plans`,
       undefined,
       requestBody,
     );
@@ -809,12 +1835,80 @@ export class HealthApiClient {
     );
   }
 
+  async createRegimen(
+    requestBody: operations["createRegimen"]["requestBody"],
+  ): Promise<components["schemas"]["RegimenResponse"]> {
+    return this.request<components["schemas"]["RegimenResponse"]>(
+      "POST",
+      `/regimens`,
+      undefined,
+      requestBody,
+    );
+  }
+
+  async createTracker(
+    requestBody: operations["createTracker"]["requestBody"],
+  ): Promise<components["schemas"]["TrackerResponse"]> {
+    return this.request<components["schemas"]["TrackerResponse"]>(
+      "POST",
+      `/trackers`,
+      undefined,
+      requestBody,
+    );
+  }
+
+  async editPlanItemSchedule(
+    path: operations["editPlanItemSchedule"]["path"],
+    requestBody: operations["editPlanItemSchedule"]["requestBody"],
+  ): Promise<components["schemas"]["ScheduleResponse"]> {
+    return this.request<components["schemas"]["ScheduleResponse"]>(
+      "PUT",
+      `/plans/${encodeURIComponent(path.plan_id)}/items/${encodeURIComponent(path.item_id)}/schedule`,
+      undefined,
+      requestBody,
+    );
+  }
+
+  async editRegimenSchedule(
+    path: operations["editRegimenSchedule"]["path"],
+    requestBody: operations["editRegimenSchedule"]["requestBody"],
+  ): Promise<components["schemas"]["ScheduleResponse"]> {
+    return this.request<components["schemas"]["ScheduleResponse"]>(
+      "PUT",
+      `/regimens/${encodeURIComponent(path.regimen_id)}/schedule`,
+      undefined,
+      requestBody,
+    );
+  }
+
+  async getContext(
+    path: operations["getContext"]["path"],
+  ): Promise<components["schemas"]["ContextResponse"]> {
+    return this.request<components["schemas"]["ContextResponse"]>(
+      "GET",
+      `/contexts/${encodeURIComponent(path.context_id)}`,
+      undefined,
+      undefined,
+    );
+  }
+
   async getEvent(
     path: operations["getEvent"]["path"],
   ): Promise<components["schemas"]["DailyEventResponse"]> {
     return this.request<components["schemas"]["DailyEventResponse"]>(
       "GET",
       `/events/${encodeURIComponent(path.event_id)}`,
+      undefined,
+      undefined,
+    );
+  }
+
+  async getGoal(
+    path: operations["getGoal"]["path"],
+  ): Promise<components["schemas"]["GoalResponse"]> {
+    return this.request<components["schemas"]["GoalResponse"]>(
+      "GET",
+      `/goals/${encodeURIComponent(path.goal_id)}`,
       undefined,
       undefined,
     );
@@ -831,12 +1925,56 @@ export class HealthApiClient {
     );
   }
 
+  async getPlan(
+    path: operations["getPlan"]["path"],
+  ): Promise<components["schemas"]["PlanResponse"]> {
+    return this.request<components["schemas"]["PlanResponse"]>(
+      "GET",
+      `/plans/${encodeURIComponent(path.plan_id)}`,
+      undefined,
+      undefined,
+    );
+  }
+
+  async getPlanItemSchedule(
+    path: operations["getPlanItemSchedule"]["path"],
+  ): Promise<components["schemas"]["ScheduleResponse"] | null> {
+    return this.request<components["schemas"]["ScheduleResponse"] | null>(
+      "GET",
+      `/plans/${encodeURIComponent(path.plan_id)}/items/${encodeURIComponent(path.item_id)}/schedule`,
+      undefined,
+      undefined,
+    );
+  }
+
   async getProfileItem(
     path: operations["getProfileItem"]["path"],
   ): Promise<components["schemas"]["ProfileItemResponse"]> {
     return this.request<components["schemas"]["ProfileItemResponse"]>(
       "GET",
       `/profile/${encodeURIComponent(path.item_id)}`,
+      undefined,
+      undefined,
+    );
+  }
+
+  async getRegimen(
+    path: operations["getRegimen"]["path"],
+  ): Promise<components["schemas"]["RegimenResponse"]> {
+    return this.request<components["schemas"]["RegimenResponse"]>(
+      "GET",
+      `/regimens/${encodeURIComponent(path.regimen_id)}`,
+      undefined,
+      undefined,
+    );
+  }
+
+  async getRegimenSchedule(
+    path: operations["getRegimenSchedule"]["path"],
+  ): Promise<components["schemas"]["ScheduleResponse"] | null> {
+    return this.request<components["schemas"]["ScheduleResponse"] | null>(
+      "GET",
+      `/regimens/${encodeURIComponent(path.regimen_id)}/schedule`,
       undefined,
       undefined,
     );
@@ -853,12 +1991,46 @@ export class HealthApiClient {
     );
   }
 
+  async getTracker(
+    path: operations["getTracker"]["path"],
+  ): Promise<components["schemas"]["TrackerResponse"]> {
+    return this.request<components["schemas"]["TrackerResponse"]>(
+      "GET",
+      `/trackers/${encodeURIComponent(path.tracker_id)}`,
+      undefined,
+      undefined,
+    );
+  }
+
   async healthcheck(): Promise<{
     [key: string]: string;
   }> {
     return this.request<{
       [key: string]: string;
     }>("GET", `/healthz`, undefined, undefined);
+  }
+
+  async listContextHistory(
+    path: operations["listContextHistory"]["path"],
+    query?: operations["listContextHistory"]["query"],
+  ): Promise<components["schemas"]["PlanningHistoryResponse"]> {
+    return this.request<components["schemas"]["PlanningHistoryResponse"]>(
+      "GET",
+      `/contexts/${encodeURIComponent(path.context_id)}/history`,
+      query,
+      undefined,
+    );
+  }
+
+  async listContexts(
+    query?: operations["listContexts"]["query"],
+  ): Promise<components["schemas"]["PlanningListResponse"]> {
+    return this.request<components["schemas"]["PlanningListResponse"]>(
+      "GET",
+      `/contexts`,
+      query,
+      undefined,
+    );
   }
 
   async listEventHistory(
@@ -879,6 +2051,29 @@ export class HealthApiClient {
     return this.request<components["schemas"]["DailyEventListResponse"]>(
       "GET",
       `/events`,
+      query,
+      undefined,
+    );
+  }
+
+  async listGoalHistory(
+    path: operations["listGoalHistory"]["path"],
+    query?: operations["listGoalHistory"]["query"],
+  ): Promise<components["schemas"]["PlanningHistoryResponse"]> {
+    return this.request<components["schemas"]["PlanningHistoryResponse"]>(
+      "GET",
+      `/goals/${encodeURIComponent(path.goal_id)}/history`,
+      query,
+      undefined,
+    );
+  }
+
+  async listGoals(
+    query?: operations["listGoals"]["query"],
+  ): Promise<components["schemas"]["PlanningListResponse"]> {
+    return this.request<components["schemas"]["PlanningListResponse"]>(
+      "GET",
+      `/goals`,
       query,
       undefined,
     );
@@ -907,6 +2102,41 @@ export class HealthApiClient {
     );
   }
 
+  async listPlanHistory(
+    path: operations["listPlanHistory"]["path"],
+    query?: operations["listPlanHistory"]["query"],
+  ): Promise<components["schemas"]["PlanningHistoryResponse"]> {
+    return this.request<components["schemas"]["PlanningHistoryResponse"]>(
+      "GET",
+      `/plans/${encodeURIComponent(path.plan_id)}/history`,
+      query,
+      undefined,
+    );
+  }
+
+  async listPlanOccurrences(
+    path: operations["listPlanOccurrences"]["path"],
+    query: operations["listPlanOccurrences"]["query"],
+  ): Promise<components["schemas"]["OccurrenceListResponse"]> {
+    return this.request<components["schemas"]["OccurrenceListResponse"]>(
+      "GET",
+      `/plans/${encodeURIComponent(path.plan_id)}/occurrences`,
+      query,
+      undefined,
+    );
+  }
+
+  async listPlans(
+    query?: operations["listPlans"]["query"],
+  ): Promise<components["schemas"]["PlanningListResponse"]> {
+    return this.request<components["schemas"]["PlanningListResponse"]>(
+      "GET",
+      `/plans`,
+      query,
+      undefined,
+    );
+  }
+
   async listProfileHistory(
     path: operations["listProfileHistory"]["path"],
     query?: operations["listProfileHistory"]["query"],
@@ -930,6 +2160,150 @@ export class HealthApiClient {
     );
   }
 
+  async listRegimenHistory(
+    path: operations["listRegimenHistory"]["path"],
+    query?: operations["listRegimenHistory"]["query"],
+  ): Promise<components["schemas"]["PlanningHistoryResponse"]> {
+    return this.request<components["schemas"]["PlanningHistoryResponse"]>(
+      "GET",
+      `/regimens/${encodeURIComponent(path.regimen_id)}/history`,
+      query,
+      undefined,
+    );
+  }
+
+  async listRegimenOccurrences(
+    path: operations["listRegimenOccurrences"]["path"],
+    query: operations["listRegimenOccurrences"]["query"],
+  ): Promise<components["schemas"]["OccurrenceListResponse"]> {
+    return this.request<components["schemas"]["OccurrenceListResponse"]>(
+      "GET",
+      `/regimens/${encodeURIComponent(path.regimen_id)}/occurrences`,
+      query,
+      undefined,
+    );
+  }
+
+  async listRegimens(
+    query?: operations["listRegimens"]["query"],
+  ): Promise<components["schemas"]["PlanningListResponse"]> {
+    return this.request<components["schemas"]["PlanningListResponse"]>(
+      "GET",
+      `/regimens`,
+      query,
+      undefined,
+    );
+  }
+
+  async listTrackerHistory(
+    path: operations["listTrackerHistory"]["path"],
+    query?: operations["listTrackerHistory"]["query"],
+  ): Promise<components["schemas"]["PlanningHistoryResponse"]> {
+    return this.request<components["schemas"]["PlanningHistoryResponse"]>(
+      "GET",
+      `/trackers/${encodeURIComponent(path.tracker_id)}/history`,
+      query,
+      undefined,
+    );
+  }
+
+  async listTrackers(
+    query?: operations["listTrackers"]["query"],
+  ): Promise<components["schemas"]["PlanningListResponse"]> {
+    return this.request<components["schemas"]["PlanningListResponse"]>(
+      "GET",
+      `/trackers`,
+      query,
+      undefined,
+    );
+  }
+
+  async listTrackerVersions(
+    path: operations["listTrackerVersions"]["path"],
+    query?: operations["listTrackerVersions"]["query"],
+  ): Promise<components["schemas"]["TrackerSchemaVersionListResponse"]> {
+    return this.request<
+      components["schemas"]["TrackerSchemaVersionListResponse"]
+    >(
+      "GET",
+      `/trackers/${encodeURIComponent(path.tracker_id)}/versions`,
+      query,
+      undefined,
+    );
+  }
+
+  async reorderPlanItems(
+    path: operations["reorderPlanItems"]["path"],
+    requestBody: operations["reorderPlanItems"]["requestBody"],
+  ): Promise<components["schemas"]["PlanResponse"]> {
+    return this.request<components["schemas"]["PlanResponse"]>(
+      "PUT",
+      `/plans/${encodeURIComponent(path.plan_id)}/items/order`,
+      undefined,
+      requestBody,
+    );
+  }
+
+  async transitionContext(
+    path: operations["transitionContext"]["path"],
+    requestBody: operations["transitionContext"]["requestBody"],
+  ): Promise<components["schemas"]["ContextResponse"]> {
+    return this.request<components["schemas"]["ContextResponse"]>(
+      "PATCH",
+      `/contexts/${encodeURIComponent(path.context_id)}/lifecycle`,
+      undefined,
+      requestBody,
+    );
+  }
+
+  async transitionGoal(
+    path: operations["transitionGoal"]["path"],
+    requestBody: operations["transitionGoal"]["requestBody"],
+  ): Promise<components["schemas"]["GoalResponse"]> {
+    return this.request<components["schemas"]["GoalResponse"]>(
+      "PATCH",
+      `/goals/${encodeURIComponent(path.goal_id)}/lifecycle`,
+      undefined,
+      requestBody,
+    );
+  }
+
+  async transitionPlan(
+    path: operations["transitionPlan"]["path"],
+    requestBody: operations["transitionPlan"]["requestBody"],
+  ): Promise<components["schemas"]["PlanResponse"]> {
+    return this.request<components["schemas"]["PlanResponse"]>(
+      "PATCH",
+      `/plans/${encodeURIComponent(path.plan_id)}/lifecycle`,
+      undefined,
+      requestBody,
+    );
+  }
+
+  async transitionRegimen(
+    path: operations["transitionRegimen"]["path"],
+    requestBody: operations["transitionRegimen"]["requestBody"],
+  ): Promise<components["schemas"]["RegimenResponse"]> {
+    return this.request<components["schemas"]["RegimenResponse"]>(
+      "PATCH",
+      `/regimens/${encodeURIComponent(path.regimen_id)}/lifecycle`,
+      undefined,
+      requestBody,
+    );
+  }
+
+  async updateContext(
+    path: operations["updateContext"]["path"],
+    requestBody: operations["updateContext"]["requestBody"],
+  ): Promise<components["schemas"]["ContextResponse"]> {
+    return this.request<components["schemas"]["ContextResponse"]>(
+      "PATCH",
+      `/contexts/${encodeURIComponent(path.context_id)}`,
+      undefined,
+      requestBody,
+    );
+  }
+
   async updateEvent(
     path: operations["updateEvent"]["path"],
     requestBody: operations["updateEvent"]["requestBody"],
@@ -937,6 +2311,18 @@ export class HealthApiClient {
     return this.request<components["schemas"]["DailyEventResponse"]>(
       "PATCH",
       `/events/${encodeURIComponent(path.event_id)}`,
+      undefined,
+      requestBody,
+    );
+  }
+
+  async updateGoal(
+    path: operations["updateGoal"]["path"],
+    requestBody: operations["updateGoal"]["requestBody"],
+  ): Promise<components["schemas"]["GoalResponse"]> {
+    return this.request<components["schemas"]["GoalResponse"]>(
+      "PATCH",
+      `/goals/${encodeURIComponent(path.goal_id)}`,
       undefined,
       requestBody,
     );
@@ -954,6 +2340,30 @@ export class HealthApiClient {
     );
   }
 
+  async updatePlan(
+    path: operations["updatePlan"]["path"],
+    requestBody: operations["updatePlan"]["requestBody"],
+  ): Promise<components["schemas"]["PlanResponse"]> {
+    return this.request<components["schemas"]["PlanResponse"]>(
+      "PATCH",
+      `/plans/${encodeURIComponent(path.plan_id)}`,
+      undefined,
+      requestBody,
+    );
+  }
+
+  async updatePlanOccurrence(
+    path: operations["updatePlanOccurrence"]["path"],
+    requestBody: operations["updatePlanOccurrence"]["requestBody"],
+  ): Promise<components["schemas"]["OccurrenceActionResponse"]> {
+    return this.request<components["schemas"]["OccurrenceActionResponse"]>(
+      "PATCH",
+      `/plan-occurrences/${encodeURIComponent(path.occurrence_key)}`,
+      undefined,
+      requestBody,
+    );
+  }
+
   async updateProfileItem(
     path: operations["updateProfileItem"]["path"],
     requestBody: operations["updateProfileItem"]["requestBody"],
@@ -961,6 +2371,30 @@ export class HealthApiClient {
     return this.request<components["schemas"]["ProfileItemResponse"]>(
       "PATCH",
       `/profile/${encodeURIComponent(path.item_id)}`,
+      undefined,
+      requestBody,
+    );
+  }
+
+  async updateRegimen(
+    path: operations["updateRegimen"]["path"],
+    requestBody: operations["updateRegimen"]["requestBody"],
+  ): Promise<components["schemas"]["RegimenResponse"]> {
+    return this.request<components["schemas"]["RegimenResponse"]>(
+      "PATCH",
+      `/regimens/${encodeURIComponent(path.regimen_id)}`,
+      undefined,
+      requestBody,
+    );
+  }
+
+  async updateTracker(
+    path: operations["updateTracker"]["path"],
+    requestBody: operations["updateTracker"]["requestBody"],
+  ): Promise<components["schemas"]["TrackerResponse"]> {
+    return this.request<components["schemas"]["TrackerResponse"]>(
+      "PATCH",
+      `/trackers/${encodeURIComponent(path.tracker_id)}`,
       undefined,
       requestBody,
     );

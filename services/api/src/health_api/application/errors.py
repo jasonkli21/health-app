@@ -27,3 +27,15 @@ class DailyValidationError(Exception):
 
 class DailySnapshotLimitExceeded(Exception):
     pass
+
+
+class PlanningNotFound(Exception):
+    pass
+
+
+class PlanningConflict(Exception):
+    pass
+
+
+class PlanningValidationError(Exception):
+    pass

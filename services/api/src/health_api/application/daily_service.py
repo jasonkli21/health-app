@@ -9,10 +9,17 @@ from datetime import date, datetime, timedelta
 from typing import Any, TypeGuard
 from uuid import UUID
 
+from pydantic import ValidationError
+from sqlalchemy import and_, or_, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
 from health_api.application.envelope_service import manual_source, next_daily_sequence
 from health_api.application.errors import DailyConflict, DailyNotFound, DailyValidationError
 from health_api.domain.daily import local_day_bounds
+from health_api.domain.planning import TrackerDefinitionV1, validate_tracker_values
 from health_api.domain.schemas import (
+    CustomTrackerValueV1,
     DailyDomain,
     EventKind,
     EventPayloadSchemaV1,
@@ -29,13 +36,11 @@ from health_api.persistence.models import (
     HealthObject,
     HealthObjectRevision,
     ObservationItem,
+    PlanningResource,
     Source,
+    TrackerSchemaVersion,
     User,
 )
-from pydantic import ValidationError
-from sqlalchemy import and_, or_, select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
 type EventAggregate = tuple[HealthObject, EventItem, Source, tuple[UUID, ...]]
 type ObservationAggregate = tuple[HealthObject, ObservationItem, Source]
@@ -117,8 +122,7 @@ def _event_fields(schema: EventSchemaV1) -> dict[str, Any]:
 def _observation_fields(schema: ObservationSchemaV1) -> dict[str, Any]:
     time_point = schema.time
     value = schema.payload.value
-    return {
-        "metric_key": value.metric.value,
+    fields: dict[str, Any] = {
         "time_precision": time_point.precision,
         "observed_at": time_point.occurred_at if isinstance(time_point, InstantTimePoint) else None,
         "local_date": time_point.local_date
@@ -126,10 +130,75 @@ def _observation_fields(schema: ObservationSchemaV1) -> dict[str, Any]:
         else None,
         "timezone": time_point.timezone,
         "interval_end": schema.interval_end,
-        "numeric_value": float(value.value),
-        "unit": value.unit.value,
         "payload": schema.payload.model_dump(mode="json"),
     }
+    if isinstance(value, CustomTrackerValueV1):
+        fields.update(
+            {
+                "metric_key": "custom",
+                "numeric_value": None,
+                "unit": "custom",
+                "tracker_id": value.tracker_id,
+                "tracker_schema_version": value.schema_version,
+                "tracker_values": value.values,
+            }
+        )
+    else:
+        fields.update(
+            {
+                "metric_key": value.metric.value,
+                "numeric_value": float(value.value),
+                "unit": value.unit.value,
+                "tracker_id": None,
+                "tracker_schema_version": None,
+                "tracker_values": None,
+            }
+        )
+    return fields
+
+
+def _validate_tracker_observation(
+    session: Session, owner_id: UUID, schema: ObservationSchemaV1, *, allow_archived: bool = False
+) -> None:
+    value = schema.payload.value
+    if not isinstance(value, CustomTrackerValueV1):
+        return
+    row = session.execute(
+        select(HealthObject, PlanningResource)
+        .join(
+            PlanningResource,
+            and_(
+                PlanningResource.owner_id == HealthObject.owner_id,
+                PlanningResource.object_id == HealthObject.id,
+            ),
+        )
+        .where(
+            HealthObject.owner_id == owner_id,
+            HealthObject.id == value.tracker_id,
+            HealthObject.object_type == "tracker_definition",
+        )
+        .with_for_update()
+    ).one_or_none()
+    if row is None:
+        raise DailyNotFound
+    tracker, resource = row
+    if not allow_archived and (tracker.status != "active" or resource.lifecycle != "active"):
+        raise DailyValidationError("archived trackers do not accept new entries")
+    schema_version = session.get(
+        TrackerSchemaVersion, (owner_id, value.tracker_id, value.schema_version)
+    )
+    if schema_version is None:
+        raise DailyNotFound
+    try:
+        definition = TrackerDefinitionV1.model_validate(schema_version.definition)
+        values = validate_tracker_values(definition, value.values)
+    except (ValidationError, ValueError) as exc:
+        raise DailyValidationError(
+            "tracker values do not match the selected schema version"
+        ) from exc
+    if definition.domain != schema.domain:
+        raise DailyValidationError("tracker domain does not match the Observation")
+    value.values = values
 
 
 def _validate_compound(command: CreateDailyEntry) -> None:
@@ -630,6 +699,7 @@ def create_daily_entry(
 
             for observation_entry in command.observations:
                 observation_schema = observation_entry.observation
+                _validate_tracker_observation(session, owner_id, observation_schema)
                 try:
                     validated = ProfileSchemaRegistry.validate(
                         "observation", 1, observation_schema.payload.model_dump(mode="json")
@@ -644,7 +714,11 @@ def create_daily_entry(
                     object_id=observation_entry.id,
                     object_type="observation",
                     domain=observation_schema.domain,
-                    title=observation_schema.payload.value.metric.value.replace("_", " ").title(),
+                    title=(
+                        "Custom tracker entry"
+                        if isinstance(observation_schema.payload.value, CustomTrackerValueV1)
+                        else observation_schema.payload.value.metric.value.replace("_", " ").title()
+                    ),
                     notes=observation_schema.notes,
                     source=source,
                     fingerprint=expected_fingerprints[observation_entry.id],
@@ -777,6 +851,7 @@ def update_daily_item(
                 if not _is_observation_aggregate(aggregate):
                     raise RuntimeError("Observation aggregate is invalid")
                 _, observation, _ = aggregate
+                _validate_tracker_observation(session, owner_id, record, allow_archived=True)
                 try:
                     validated = ProfileSchemaRegistry.validate(
                         "observation", 1, record.payload.model_dump(mode="json")
@@ -808,7 +883,11 @@ def update_daily_item(
                 for name, value in observation_values.items():
                     setattr(observation, name, value)
                 obj.domain = record.domain.value
-                obj.title = record.payload.value.metric.value.replace("_", " ").title()
+                obj.title = (
+                    "Custom tracker entry"
+                    if isinstance(record.payload.value, CustomTrackerValueV1)
+                    else record.payload.value.metric.value.replace("_", " ").title()
+                )
                 obj.notes = record.notes
                 obj.revision += 1
                 sequence = next_daily_sequence(session, owner_id)

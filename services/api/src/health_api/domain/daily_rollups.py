@@ -9,6 +9,8 @@ from typing import Annotated
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
+from pydantic import Field
+
 from health_api.domain.daily import (
     TODAY_METHOD_VERSION,
     UNIT_CONVERSION_VERSION,
@@ -18,6 +20,7 @@ from health_api.domain.daily import (
     local_day_bounds,
 )
 from health_api.domain.schemas import (
+    CustomTrackerValueV1,
     DailyDomain,
     DateOnlyTimePoint,
     EventKind,
@@ -27,7 +30,6 @@ from health_api.domain.schemas import (
     ObservationSchemaV1,
     StrictModel,
 )
-from pydantic import Field
 
 
 class CoverageV1(StrictModel):
@@ -245,6 +247,8 @@ def summarize_today(
     )
     for object_id, observation in day_observations:
         value = observation.payload.value
+        if isinstance(value, CustomTrackerValueV1):
+            continue
         metric = value.metric
         normalized = convert_value(metric, float(value.value), value.unit)
         metric_observations[metric].append((object_id, observation, normalized))
