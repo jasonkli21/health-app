@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Link, useFocusEffect, useRouter } from "expo-router";
 import {
   Alert,
@@ -18,6 +18,8 @@ import {
 } from "../../profile/components/Ui";
 import { planningApi, planningErrorMessage } from "../api";
 import type { PlanningItem } from "../api";
+import { RequestScope, requestNextPage } from "../../profile/requestScope";
+import { sessionStore } from "../../../auth/sessionStore";
 
 const GROUPS: { kind: string; label: string; add: boolean }[] = [
   { kind: "goal", label: "Goals", add: true },
@@ -39,11 +41,15 @@ export default function PlanningOverviewScreen() {
     {},
   );
   const [loadingMore, setLoadingMore] = useState<string | null>(null);
+  const requestScope = useRef(new RequestScope());
+  const scopeKey = `planning:${showArchived}:${refresh}`;
 
   useFocusEffect(
     useCallback(() => {
       let current = true;
-      if (refresh > 0) setLoading(true);
+      const scope = requestScope.current.start(scopeKey);
+      setLoading(true);
+      setLoadingMore(null);
       Promise.all([
         planningApi.listGoals({ limit: 100, archived: showArchived }),
         planningApi.listRegimens({ limit: 100, archived: showArchived }),
@@ -72,37 +78,53 @@ export default function PlanningOverviewScreen() {
         });
       return () => {
         current = false;
+        requestScope.current.invalidate(scope);
       };
-    }, [refresh, showArchived]),
+    }, [showArchived, scopeKey]),
   );
 
   async function loadMore(kind: string) {
     const cursor = nextCursors[kind];
-    if (!cursor || loadingMore) return;
-    setLoadingMore(kind);
-    setError(null);
-    try {
-      const query = { limit: 100, cursor, archived: showArchived };
-      const page =
-        kind === "goal"
-          ? await planningApi.listGoals(query)
-          : kind === "regimen"
-            ? await planningApi.listRegimens(query)
-            : kind === "plan"
-              ? await planningApi.listPlans(query)
-              : kind === "context"
-                ? await planningApi.listContexts(query)
-                : await planningApi.listTrackers(query);
-      setItems((current) => [...current, ...page.items]);
-      setNextCursors((current) => ({ ...current, [kind]: page.next_cursor }));
-    } catch (requestError) {
-      setError(planningErrorMessage(requestError));
-    } finally {
-      setLoadingMore(null);
-    }
+    const scope = requestScope.current.tokenFor(scopeKey);
+    if (!cursor || loadingMore || loading || !scope) return;
+    await requestNextPage(
+      requestScope.current,
+      scope,
+      cursor,
+      async () => {
+        const query = { limit: 100, cursor, archived: showArchived };
+        const page =
+          kind === "goal"
+            ? await planningApi.listGoals(query)
+            : kind === "regimen"
+              ? await planningApi.listRegimens(query)
+              : kind === "plan"
+                ? await planningApi.listPlans(query)
+                : kind === "context"
+                  ? await planningApi.listContexts(query)
+                  : await planningApi.listTrackers(query);
+        return page;
+      },
+      {
+        onStart: () => {
+          setLoadingMore(kind);
+          setError(null);
+        },
+        onSuccess: (page) => {
+          setItems((current) => [...current, ...page.items]);
+          setNextCursors((current) => ({
+            ...current,
+            [kind]: page.next_cursor,
+          }));
+        },
+        onError: (error) => setError(planningErrorMessage(error)),
+        onFinish: () => setLoadingMore(null),
+      },
+    );
   }
 
   async function archive(item: PlanningItem) {
+    const epoch = sessionStore.getSnapshot().epoch;
     setBusyId(item.id);
     try {
       const query = { expected_revision: item.revision };
@@ -126,12 +148,14 @@ export default function PlanningOverviewScreen() {
           { tracker_id: item.id },
           query,
         );
+      if (sessionStore.getSnapshot().epoch !== epoch) return;
       setRefresh((value) => value + 1);
       router.push({
         pathname: "/planning/[kind]/[id]",
         params: { kind: archived.object_type, id: archived.id },
       });
     } catch (requestError) {
+      if (sessionStore.getSnapshot().epoch !== epoch) return;
       setError(planningErrorMessage(requestError));
     } finally {
       setBusyId(null);
@@ -139,6 +163,7 @@ export default function PlanningOverviewScreen() {
   }
 
   async function transition(item: PlanningItem, lifecycle: string) {
+    const epoch = sessionStore.getSnapshot().epoch;
     setBusyId(item.id);
     try {
       const expected_revision = item.revision;
@@ -174,8 +199,10 @@ export default function PlanningOverviewScreen() {
             lifecycle: lifecycle as components["schemas"]["ContextLifecycle"],
           },
         );
+      if (sessionStore.getSnapshot().epoch !== epoch) return;
       setRefresh((value) => value + 1);
     } catch (requestError) {
+      if (sessionStore.getSnapshot().epoch !== epoch) return;
       setError(planningErrorMessage(requestError));
     } finally {
       setBusyId(null);
@@ -351,7 +378,10 @@ export default function PlanningOverviewScreen() {
                   label={`Load more ${group.label.toLowerCase()}`}
                   secondary
                   busy={loadingMore === group.kind}
-                  disabled={loadingMore !== null && loadingMore !== group.kind}
+                  disabled={
+                    loading ||
+                    (loadingMore !== null && loadingMore !== group.kind)
+                  }
                   onPress={() => void loadMore(group.kind)}
                 />
               ) : null}

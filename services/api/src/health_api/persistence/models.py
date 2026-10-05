@@ -601,8 +601,9 @@ class PlanningLink(Base):
             name="ck_planning_links_kind",
         ),
         CheckConstraint(
+            "link_kind = 'plan_retired' OR "
             "(link_kind = 'plan_task' AND target_object_id IS NULL) OR "
-            "(link_kind <> 'plan_task' AND target_object_id IS NOT NULL)",
+            "(link_kind NOT IN ('plan_task', 'plan_retired') AND target_object_id IS NOT NULL)",
             name="ck_planning_links_target",
         ),
         CheckConstraint("position >= 0", name="ck_planning_links_position"),

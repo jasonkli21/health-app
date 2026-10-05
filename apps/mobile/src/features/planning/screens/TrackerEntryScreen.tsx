@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
 import {
   Pressable,
   SafeAreaView,
@@ -19,6 +19,7 @@ import {
 } from "../api";
 import { collectTrackerValues, setTrackerInput } from "../trackerEntry";
 import type { TrackerField, TrackerInputMap } from "../trackerEntry";
+import { RequestScope } from "../../profile/requestScope";
 import {
   dailyApi,
   isDailyCreateAttemptCurrent,
@@ -50,67 +51,121 @@ export default function TrackerEntryScreen() {
     null,
   );
   const [loadingMoreTrackers, setLoadingMoreTrackers] = useState(false);
+  const [refresh, setRefresh] = useState(0);
+  const requestScope = useRef(new RequestScope());
+  const scopeKey = `trackers:${refresh}`;
   const [recoveryAttempt, setRecoveryAttempt] =
-    useState<DailyCreateAttempt | null>(null);
+    useState<DailyCreateAttempt | null>(() =>
+      activeTrackerCreateRecovery.retryOriginal(),
+    );
   const selected =
     trackers.find((tracker) => tracker.id === selectedId) ?? null;
+  const selectedRef = useRef<Tracker | null>(null);
+  useEffect(() => {
+    selectedRef.current = selected;
+  }, [selected]);
   const recovered = Boolean(
     recoveryAttempt && activeTrackerCreateRecovery.isUncertain,
   );
 
-  useEffect(() => {
-    let current = true;
-    planningApi
-      .listTrackers({ limit: 100 })
-      .then((page) => {
-        if (!current) return;
-        const active = page.items.filter(
-          (item): item is Tracker =>
-            item.object_type === "tracker_definition" &&
-            item.status === "active",
-        );
-        setTrackers(active);
-        setNextTrackerCursor(page.next_cursor);
-        const attempt = activeTrackerCreateRecovery.retryOriginal();
-        const observation = attempt?.request.observations?.[0]?.observation;
-        const custom = observation?.payload.value;
-        if (attempt && custom?.metric === "custom") {
-          setRecoveryAttempt(attempt);
-          setSelectedId(custom.tracker_id);
-        } else {
-          setSelectedId(active[0]?.id ?? null);
-        }
-      })
-      .catch((requestError: unknown) => {
-        if (current) setError(planningErrorMessage(requestError));
-      })
-      .finally(() => {
-        if (current) setLoading(false);
-      });
-    return () => {
-      current = false;
-    };
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      let current = true;
+      const scope = requestScope.current.start(scopeKey);
+      setLoadingMoreTrackers(false);
+      setNextTrackerCursor(null);
+      const priorTracker = selectedRef.current;
+      planningApi
+        .listTrackers({ limit: 100 })
+        .then(async (page) => {
+          if (!current) return;
+          const active = page.items.filter(
+            (item): item is Tracker =>
+              item.object_type === "tracker_definition" &&
+              item.status === "active",
+          );
+          let retained = priorTracker
+            ? active.find((item) => item.id === priorTracker.id)
+            : null;
+          if (priorTracker && !retained) {
+            try {
+              const latest = await planningApi.getTracker({
+                tracker_id: priorTracker.id,
+              });
+              if (latest.status === "active") retained = latest;
+            } catch {
+              // Retain the draft on lookup/network failure; the write still
+              // validates archive status and the immutable schema on the server.
+              retained = priorTracker;
+            }
+          }
+          if (!current) return;
+          if (retained && priorTracker) {
+            // Existing values belong to the schema the user started with. Do not
+            // silently reinterpret them against a new definition on refocus.
+            setTrackers([
+              priorTracker,
+              ...active.filter((item) => item.id !== priorTracker.id),
+            ]);
+          } else {
+            setTrackers(active);
+          }
+          setNextTrackerCursor(page.next_cursor);
+          const attempt = activeTrackerCreateRecovery.retryOriginal();
+          const observation = attempt?.request.observations?.[0]?.observation;
+          const custom = observation?.payload.value;
+          if (attempt && custom?.metric === "custom") {
+            setRecoveryAttempt(attempt);
+            setSelectedId(custom.tracker_id);
+          } else {
+            const nextId = retained?.id ?? active[0]?.id ?? null;
+            setSelectedId(nextId);
+            if (priorTracker && nextId !== priorTracker.id) setValues({});
+          }
+        })
+        .catch((requestError: unknown) => {
+          if (current) setError(planningErrorMessage(requestError));
+        })
+        .finally(() => {
+          if (current) setLoading(false);
+        });
+      return () => {
+        current = false;
+        requestScope.current.invalidate(scope);
+      };
+    }, [scopeKey]),
+  );
 
   async function loadMoreTrackers() {
-    if (!nextTrackerCursor || loadingMoreTrackers) return;
+    const scope = requestScope.current.tokenFor(scopeKey);
+    if (!nextTrackerCursor || loadingMoreTrackers || !scope) return;
+    const cursor = nextTrackerCursor;
+    if (!requestScope.current.beginPage(scope, cursor)) return;
     setLoadingMoreTrackers(true);
     setError(null);
     try {
       const page = await planningApi.listTrackers({
         limit: 100,
-        cursor: nextTrackerCursor,
+        cursor,
       });
+      if (!requestScope.current.isCurrent(scope)) return;
       const active = page.items.filter(
         (item): item is Tracker =>
           item.object_type === "tracker_definition" && item.status === "active",
       );
-      setTrackers((current) => [...current, ...active]);
+      setTrackers((current) => [
+        ...current,
+        ...active.filter(
+          (item) => !current.some((loaded) => loaded.id === item.id),
+        ),
+      ]);
       setNextTrackerCursor(page.next_cursor);
     } catch (requestError) {
-      setError(planningErrorMessage(requestError));
+      if (requestScope.current.isCurrent(scope))
+        setError(planningErrorMessage(requestError));
     } finally {
-      setLoadingMoreTrackers(false);
+      requestScope.current.finishPage(scope, cursor);
+      if (requestScope.current.isCurrent(scope)) setLoadingMoreTrackers(false);
     }
   }
 
@@ -250,6 +305,12 @@ export default function TrackerEntryScreen() {
             tone="error"
           />
         ) : null}
+        <ActionButton
+          label="Refresh trackers"
+          secondary
+          disabled={busy}
+          onPress={() => setRefresh((value) => value + 1)}
+        />
         {trackers.length === 0 && !recoveryAttempt ? (
           <View style={styles.empty}>
             <Text style={styles.cardTitle}>No active custom trackers</Text>

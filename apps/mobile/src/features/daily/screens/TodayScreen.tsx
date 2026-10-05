@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { dailyApi, dailyErrorMessage } from "../api";
 import { planningApi, planningErrorMessage } from "../../planning/api";
+import { sessionStore } from "../../../auth/sessionStore";
 import {
   DAILY_DOMAINS,
   DEVICE_TIMEZONE,
@@ -71,7 +72,7 @@ export default function TodayScreen() {
   const [stale, setStale] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [occurrenceLinks, setOccurrenceLinks] = useState<
-    Record<string, string>
+    Record<string, string | null>
   >({});
   const [linkPickerKey, setLinkPickerKey] = useState<string | null>(null);
   const [visibleResultScopeKey, setVisibleResultScopeKey] = useState<
@@ -198,6 +199,13 @@ export default function TodayScreen() {
     state: "completed" | "skipped",
     linkedRecord?: DailyItem,
   ) {
+    const epoch = sessionStore.getSnapshot().epoch;
+    const scope = requestScope.current.tokenFor(scopeKey);
+    if (!scope) return;
+    if (occurrenceLinks[key] && !linkedRecord) {
+      setError("The selected record is unavailable. Choose a record again.");
+      return;
+    }
     try {
       await planningApi.updatePlanOccurrence(
         { occurrence_key: key },
@@ -205,16 +213,32 @@ export default function TodayScreen() {
           expected_schedule_revision: scheduleRevision,
           expected_override_revision: overrideRevision,
           state,
-          linked_event_id:
-            linkedRecord?.object_type === "event" ? linkedRecord.id : null,
-          linked_observation_id:
-            linkedRecord?.object_type === "observation"
-              ? linkedRecord.id
-              : null,
+          ...(occurrenceLinks[key] !== undefined
+            ? {
+                linked_event_id:
+                  linkedRecord?.object_type === "event"
+                    ? linkedRecord.id
+                    : null,
+                linked_observation_id:
+                  linkedRecord?.object_type === "observation"
+                    ? linkedRecord.id
+                    : null,
+              }
+            : {}),
         },
       );
+      if (
+        sessionStore.getSnapshot().epoch !== epoch ||
+        !requestScope.current.isCurrent(scope)
+      )
+        return;
       setRefresh((value) => value + 1);
     } catch (requestError) {
+      if (
+        sessionStore.getSnapshot().epoch !== epoch ||
+        !requestScope.current.isCurrent(scope)
+      )
+        return;
       setError(planningErrorMessage(requestError));
       setRefresh((value) => value + 1);
     }
@@ -432,11 +456,9 @@ export default function TodayScreen() {
                         ? ""
                         : ` · ${occurrence.dst_resolution.replaceAll("_", " ")}`}
                     </Text>
-                    {occurrence.state === "rescheduled" ? (
-                      <Text style={styles.cardMeta}>
-                        New due time: {occurrence.due_at}
-                      </Text>
-                    ) : null}
+                    <Text style={styles.cardMeta}>
+                      Due time: {occurrence.due_at}
+                    </Text>
                     {occurrence.linked_event_id ||
                     occurrence.linked_observation_id ? (
                       <Text style={styles.cardMeta}>
@@ -452,13 +474,14 @@ export default function TodayScreen() {
                           : "Associate existing record"
                       }
                       secondary
+                      disabled={!occurrence.can_act}
                       onPress={() =>
                         setLinkPickerKey((current) =>
                           current === occurrence.key ? null : occurrence.key,
                         )
                       }
                     />
-                    {linkPickerKey === occurrence.key ? (
+                    {occurrence.can_act && linkPickerKey === occurrence.key ? (
                       <View style={styles.linkChoices}>
                         <Text style={styles.cardMeta}>
                           Optional link to an Event or Observation already shown
@@ -472,7 +495,7 @@ export default function TodayScreen() {
                           onPress={() =>
                             setOccurrenceLinks((current) => {
                               const next = { ...current };
-                              delete next[occurrence.key];
+                              next[occurrence.key] = null;
                               return next;
                             })
                           }
@@ -517,6 +540,7 @@ export default function TodayScreen() {
                       <ActionButton
                         label="Mark complete"
                         secondary
+                        disabled={!occurrence.can_act}
                         onPress={() =>
                           void updateOccurrence(
                             occurrence.key,
@@ -533,6 +557,7 @@ export default function TodayScreen() {
                       <ActionButton
                         label="Mark skipped"
                         secondary
+                        disabled={!occurrence.can_act}
                         onPress={() =>
                           void updateOccurrence(
                             occurrence.key,
@@ -561,6 +586,7 @@ export default function TodayScreen() {
                       <ActionButton
                         label="Reschedule"
                         secondary
+                        disabled={!occurrence.can_act}
                         onPress={() =>
                           router.push({
                             pathname: "/planning/reschedule",

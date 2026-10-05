@@ -5,6 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { profileApi, ProfileUserError } from "../api";
 import { ProfileForm } from "../components/ProfileForm";
 import { newProfileId } from "../model";
+import { sessionStore } from "../../../auth/sessionStore";
 import type { BuiltProfileFields } from "../model";
 import {
   activeProfileCreateRecovery,
@@ -20,11 +21,17 @@ export default function ProfileCreateScreen() {
   );
 
   async function submitAttempt(attempt: ProfileCreateAttempt) {
+    const session = sessionStore.getSnapshot();
+    const isCurrent = () => {
+      const latest = sessionStore.getSnapshot();
+      return latest.epoch === session.epoch && latest.userId === session.userId;
+    };
     try {
       const item = await profileApi.createProfileItem({
         id: attempt.id,
         ...attempt.fields,
       });
+      if (!isCurrent()) return;
       recovery.resolve();
       setHasUncertainSave(false);
       router.replace({
@@ -32,6 +39,7 @@ export default function ProfileCreateScreen() {
         params: { itemId: item.id },
       });
     } catch (error) {
+      if (!isCurrent()) return;
       const uncertain = recovery.markFailure(attempt, error);
       setHasUncertainSave(uncertain);
       if (uncertain) {

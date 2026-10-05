@@ -404,6 +404,7 @@ export interface components {
       items: Array<components["schemas"]["OccurrenceResponse"]>;
     };
     OccurrenceResponse: {
+      can_act?: boolean;
       dst_resolution: "exact" | "earlier_offset" | "next_valid_time";
       due_at: string;
       item_id: string | null;

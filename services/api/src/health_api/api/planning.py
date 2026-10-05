@@ -1168,6 +1168,7 @@ def update_occurrence(
             body.rescheduled_at,
             body.linked_event_id,
             body.linked_observation_id,
+            replace_link=bool({"linked_event_id", "linked_observation_id"} & body.model_fields_set),
         )
     )
 

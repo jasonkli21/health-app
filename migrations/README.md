@@ -4,8 +4,9 @@ Alembic is the only schema creation/update path. The root `alembic.ini`, this
 environment, and immutable revisions under `versions/` are authoritative. The
 initial Phase 1 revision is `22dad79c2ee1`; Phase 4 extends the same canonical
 store at `d4e5f607a8b9` with planning, schedules, occurrence actions, tracker
-schema versions, and custom Observation columns. The current repository head is
-`d4e5f607a8b9`.
+schema versions, and custom Observation columns. Review corrections follow at `a7f014edc620`; the current repository head is
+`b8a125fec731`, which allows retired scheduled manual tasks to retain their
+NULL reference target. Its downgrade refuses to discard that retained history.
 The API never calls `metadata.create_all()` and never runs migrations during a
 request or startup.
 

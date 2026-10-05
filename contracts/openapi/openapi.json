@@ -2271,6 +2271,11 @@
       "OccurrenceResponse": {
         "additionalProperties": false,
         "properties": {
+          "can_act": {
+            "default": true,
+            "title": "Can Act",
+            "type": "boolean"
+          },
           "dst_resolution": {
             "enum": [
               "exact",

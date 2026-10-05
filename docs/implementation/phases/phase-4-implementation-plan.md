@@ -56,9 +56,9 @@ The implementation follows these reconciled decisions (see
 - **P4.5:** Plan, schedule editor, Today actions, rescheduling, tracker entry,
   and context linking flows are implemented. Generated contracts are current.
 
-This records source implementation only. No tests were added or run. Mobile/API-client static type
-checks, Python syntax compilation, lint, contract generation, and whitespace
-checks were run. PostgreSQL migration lifecycle/drift, the Phase 2 database
+Automated regression tests and mobile/API-client static checks were run; see
+the [independent audit evidence](../evidence/phase-4-audit.md) for results and
+remaining acceptance gates. Contract generation and changed-file lint were verified. PostgreSQL migration lifecycle/drift, the Phase 2 database
 gate, Phase 3 live-cloud acceptance, and device/accessibility review remain
 unverified; see the [Phase 4 evidence](../evidence/phase-4-release.md).
 

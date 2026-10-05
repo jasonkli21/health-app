@@ -141,8 +141,8 @@ behavior, cloud parity, or device behavior.
   implementation.
 - **Mobile:** Simulator/device layout, real timezone and DST presentation,
   keyboard navigation, VoiceOver, and end-to-end session/error behavior remain
-  manual review items. This checkpoint did not run a mobile bundle or test
-  suite.
+  manual review items. This checkpoint did not run a mobile bundle or device
+  acceptance scenario; the automated mobile suite ran as listed above.
 
 ## Future context-builder inputs
 
@@ -152,3 +152,8 @@ scheduled intent separately from occurrence action state and actual Events or
 Observations. Preserve unknown state and provenance; these records express
 user intent and self-report, not clinical truth, adherence, or inferred
 progress. Context must not silently override Profile or pause a regimen.
+
+## Follow-up audit of `80a8c96`
+
+See [independent audit evidence](phase-4-audit.md) for additional corrections,
+current verification counts, and open acceptance gates.

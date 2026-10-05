@@ -10,6 +10,7 @@ import {
 
 import { ActionButton, StatusMessage } from "../../profile/components/Ui";
 import { planningApi, planningErrorMessage } from "../api";
+import { sessionStore } from "../../../auth/sessionStore";
 
 export default function RescheduleScreen() {
   const params = useLocalSearchParams<{
@@ -29,6 +30,7 @@ export default function RescheduleScreen() {
   );
 
   async function save() {
+    const epoch = sessionStore.getSnapshot().epoch;
     setError(null);
     if (!validRoute || !params.key) {
       setError(
@@ -70,8 +72,10 @@ export default function RescheduleScreen() {
           rescheduled_at: new Date(dueAt.trim()).toISOString(),
         },
       );
+      if (sessionStore.getSnapshot().epoch !== epoch) return;
       router.back();
     } catch (requestError) {
+      if (sessionStore.getSnapshot().epoch !== epoch) return;
       setError(
         `${planningErrorMessage(requestError)} Refresh Today before trying again.`,
       );

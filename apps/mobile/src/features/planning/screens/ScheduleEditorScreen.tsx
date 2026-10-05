@@ -66,6 +66,8 @@ export default function ScheduleEditorScreen() {
   const [reloadToken, setReloadToken] = useState(0);
   const [reloadRequired, setReloadRequired] = useState(false);
   const initialized = useRef(false);
+  const replaceDraftOnReload = useRef(false);
+  const baselineRevision = useRef<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [localTime, setLocalTime] = useState("08:00");
@@ -87,17 +89,39 @@ export default function ScheduleEditorScreen() {
             plan_id: params.parentId,
             item_id: params.itemId!,
           });
-    setLoading(!initialized.current);
+    setLoading(!initialized.current || replaceDraftOnReload.current);
     request
       .then((schedule) => {
         if (!active) return;
+        if (initialized.current && !replaceDraftOnReload.current) {
+          if (
+            baselineRevision.current !== (schedule?.schedule_revision ?? null)
+          ) {
+            setReloadRequired(true);
+            setError(
+              "The schedule changed. Reload it before saving this draft.",
+            );
+          }
+          return;
+        }
+        replaceDraftOnReload.current = false;
+        baselineRevision.current = schedule?.schedule_revision ?? null;
         setLoaded(true);
         setError(null);
         setReloadRequired(false);
         setCurrent(schedule);
-        if (initialized.current) return;
         initialized.current = true;
-        if (!schedule) return;
+        if (!schedule) {
+          setLocalTime("08:00");
+          setTimezone(DEVICE_TIMEZONE);
+          setStartDate(today);
+          setEffectiveFrom(today);
+          setEndDate("");
+          setRecurrence("daily");
+          setInterval("1");
+          setWeekdays([]);
+          return;
+        }
         setLocalTime(schedule.schedule.local_time.slice(0, 5));
         setTimezone(schedule.schedule.timezone);
         setStartDate(schedule.schedule.start_date);
@@ -137,7 +161,10 @@ export default function ScheduleEditorScreen() {
       );
     };
     setError(null);
-    setReloadRequired(false);
+    if (reloadRequired) {
+      setError("Reload the latest schedule before saving this draft.");
+      return;
+    }
     if (!loaded) {
       setError("Load the current schedule before saving changes.");
       return;
@@ -269,11 +296,14 @@ export default function ScheduleEditorScreen() {
           <ActionButton
             label={
               reloadRequired
-                ? "Reload latest schedule; keep this draft"
+                ? "Reload latest schedule and replace this draft"
                 : "Retry loading schedule"
             }
             secondary
-            onPress={() => setReloadToken((value) => value + 1)}
+            onPress={() => {
+              replaceDraftOnReload.current = true;
+              setReloadToken((value) => value + 1);
+            }}
           />
         ) : null}
         <Input
@@ -353,6 +383,7 @@ export default function ScheduleEditorScreen() {
         <ActionButton
           label="Save schedule"
           busy={busy}
+          disabled={reloadRequired}
           onPress={() => void save()}
         />
         <ActionButton

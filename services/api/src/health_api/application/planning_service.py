@@ -10,7 +10,7 @@ from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ValidationError
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, exists, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -208,14 +208,20 @@ def _sync_links(
                 PlanningLink.owner_id == owner_id,
                 PlanningLink.parent_object_id == object_id,
             )
+            .order_by(PlanningLink.position, PlanningLink.link_id)
             .with_for_update()
         )
     )
     # Move positions out of the unique user-visible range before replacing an
     # order, avoiding transient collisions while retaining FK-referenced plan
     # item rows and their stable IDs.
+    # Retired rows already occupy positions >= 100. The temporary range must
+    # also be disjoint from those rows and the final retained-history range.
+    temporary_base = (
+        max((row.position for row in existing), default=0) + len(existing) + len(specs) + 101
+    )
     for position, existing_row in enumerate(existing):
-        existing_row.position = 100 + position
+        existing_row.position = temporary_base + position
     session.flush()
     wanted_ids = {spec[0] for spec in specs}
     existing_by_id = {row.link_id: row for row in existing}
@@ -810,6 +816,8 @@ def _parse_schedule_key(key: str) -> tuple[UUID, date, str]:
         parsed_time = datetime.fromisoformat(f"2000-01-01T{data['t']}").time()
         if (
             str(schedule_id) != data["s"]
+            or local_date <= date.min + timedelta(days=1)
+            or local_date >= date.max - timedelta(days=1)
             or local_date.isoformat() != data["d"]
             or parsed_time.isoformat() != data["t"]
             or raw != _canonical({"s": data["s"], "d": data["d"], "t": data["t"]}).encode()
@@ -868,7 +876,7 @@ def set_planning_schedule(
                     PlanningLink.link_id == item_id,
                 )
             )
-            if item is None:
+            if item is None or item.link_kind == "plan_retired":
                 raise PlanningNotFound
         today = datetime.now(ZoneInfo(definition.timezone)).date()
         if effective_from < today:
@@ -903,6 +911,8 @@ def set_planning_schedule(
                     .order_by(PlanningSchedule.revision.desc())
                 )
             )
+            if identity.retired_at is not None:
+                raise PlanningConflict("retired plan items cannot be scheduled")
             if not rows:
                 raise RuntimeError("schedule identity has no version")
             current = rows[0]
@@ -1158,25 +1168,34 @@ def list_planning_occurrences(
     for versions in versions_by_schedule.values():
         versions.sort(key=lambda version: (version.effective_from, version.revision))
     overrides_by_schedule: dict[UUID, list[PlanningOccurrenceOverride]] = {}
+    try:
+        original_window_start = window_start - timedelta(days=2)
+    except OverflowError:
+        original_window_start = datetime.min.replace(tzinfo=UTC)
+    try:
+        original_window_end = window_end + timedelta(days=2)
+    except OverflowError:
+        original_window_end = datetime.max.replace(tzinfo=UTC)
     for override in session.scalars(
         select(PlanningOccurrenceOverride).where(
             PlanningOccurrenceOverride.owner_id == owner_id,
             PlanningOccurrenceOverride.schedule_id.in_(schedule_ids),
+            or_(
+                # Legacy overrides have no immutable due instant yet; decode
+                # those against their saved schedule version until updated.
+                PlanningOccurrenceOverride.original_due_at.is_(None),
+                and_(
+                    PlanningOccurrenceOverride.original_due_at >= original_window_start,
+                    PlanningOccurrenceOverride.original_due_at < original_window_end,
+                ),
+                and_(
+                    PlanningOccurrenceOverride.rescheduled_at >= window_start,
+                    PlanningOccurrenceOverride.rescheduled_at < window_end,
+                ),
+            ),
         )
     ):
         overrides_by_schedule.setdefault(override.schedule_id, []).append(override)
-    labels = {
-        row.link_id: row.label
-        for row in session.scalars(
-            select(PlanningLink).where(
-                PlanningLink.owner_id == owner_id,
-                PlanningLink.parent_object_id == parent_id,
-                PlanningLink.link_id.in_(
-                    [identity.item_id for identity in identities if identity.item_id is not None]
-                ),
-            )
-        )
-    }
     links_by_id = {
         row.link_id: row
         for row in session.scalars(
@@ -1206,6 +1225,7 @@ def list_planning_occurrences(
             .where(HealthObject.owner_id == owner_id, HealthObject.id.in_(target_ids))
         )
     }
+    labels = {link_id: link.label for link_id, link in links_by_id.items()}
     output: list[dict[str, Any]] = []
     for identity in identities:
         label = labels.get(identity.item_id) if identity.item_id is not None else None
@@ -1214,6 +1234,7 @@ def list_planning_occurrences(
         versions = versions_by_schedule.get(identity.schedule_id, [])
         overrides = overrides_by_schedule.get(identity.schedule_id, [])
         recorded: set[str] = set()
+        recorded_dates = {_parse_schedule_key(override.occurrence_key)[1] for override in overrides}
         for override in overrides:
             details = _recorded_occurrence_details(
                 override, versions, identity.schedule_id, parent_id, identity.item_id
@@ -1237,6 +1258,18 @@ def list_planning_occurrences(
                     "due_at": due_at,
                     "dst_resolution": dst_resolution,
                     "state": override.state,
+                    "can_act": identity.retired_at is None
+                    and _occurrence_is_eligible(
+                        session,
+                        owner_id,
+                        parent[0],
+                        parent[1],
+                        identity,
+                        original_date,
+                        timezone_name,
+                        links_by_id,
+                        targets_by_id,
+                    ),
                     "override_revision": override.override_revision,
                     "linked_event_id": override.linked_event_id,
                     "linked_observation_id": override.linked_observation_id,
@@ -1268,9 +1301,7 @@ def list_planning_occurrences(
             key = _schedule_key(identity.schedule_id, original_date, local_time_value)
             if key in recorded:
                 continue
-            if any(
-                _parse_schedule_key(item.occurrence_key)[1] == original_date for item in overrides
-            ):
+            if original_date in recorded_dates:
                 continue
             if not _occurrence_is_eligible(
                 session,
@@ -1279,7 +1310,7 @@ def list_planning_occurrences(
                 parent[1],
                 identity,
                 original_date,
-                timezone,
+                definition.timezone,
                 links_by_id,
                 targets_by_id,
             ):
@@ -1312,6 +1343,7 @@ def list_planning_occurrences(
                     "due_at": expanded_due_at,
                     "dst_resolution": slot["dst_resolution"],
                     "state": "unknown",
+                    "can_act": True,
                     "override_revision": None,
                     "linked_event_id": None,
                     "linked_observation_id": None,
@@ -1333,6 +1365,7 @@ def record_occurrence_action(
     rescheduled_at: datetime | None,
     linked_event_id: UUID | None,
     linked_observation_id: UUID | None = None,
+    replace_link: bool = True,
 ) -> dict[str, Any]:
     schedule_id, local_date, local_time = _parse_schedule_key(key)
     with session.begin():
@@ -1358,11 +1391,21 @@ def record_occurrence_action(
             raise PlanningNotFound
         if parent[0].status != "active" or parent[1].lifecycle != "active":
             raise PlanningConflict("inactive planning resources cannot change occurrences")
-        version = _schedule_row_for_date(session, owner_id, schedule_id, local_date)
+        current = session.get(PlanningOccurrenceOverride, (owner_id, key))
+        version = (
+            session.get(
+                PlanningSchedule, (owner_id, schedule_id, current.expected_schedule_revision)
+            )
+            if current is not None
+            else _schedule_row_for_date(session, owner_id, schedule_id, local_date)
+        )
         if version is None:
             raise PlanningNotFound
         if version.revision != expected_schedule_revision:
             raise PlanningConflict("schedule changed; refresh occurrences before acting")
+        if current is not None and not replace_link:
+            linked_event_id = current.linked_event_id
+            linked_observation_id = current.linked_observation_id
         definition = ScheduleDefinitionV1.model_validate(version.definition)
         if definition.local_time.isoformat() != local_time or not schedule_matches_day(
             definition, local_date
@@ -1411,7 +1454,7 @@ def record_occurrence_action(
             normalized_due = None
         if linked_event_id is not None and linked_observation_id is not None:
             raise PlanningValidationError("link at most one existing Event or Observation")
-        if linked_event_id is not None:
+        if linked_event_id is not None and (current is None or replace_link):
             linked = session.scalar(
                 select(HealthObject.id)
                 .join(
@@ -1430,7 +1473,7 @@ def record_occurrence_action(
             )
             if linked is None:
                 raise PlanningNotFound
-        if linked_observation_id is not None:
+        if linked_observation_id is not None and (current is None or replace_link):
             linked = session.scalar(
                 select(HealthObject.id)
                 .join(
@@ -1449,7 +1492,6 @@ def record_occurrence_action(
             )
             if linked is None:
                 raise PlanningNotFound
-        current = session.get(PlanningOccurrenceOverride, (owner_id, key))
         effective_moved_at = normalized_due
         if state != "rescheduled" and current is not None:
             effective_moved_at = current.rescheduled_at
@@ -1496,7 +1538,15 @@ def record_occurrence_action(
             ):
                 raise PlanningConflict("occurrence action has changed; refresh before saving")
             next_override_revision = current.override_revision + 1
-            current.expected_schedule_revision = expected_schedule_revision
+            # Backfill legacy immutable provenance while retaining the schedule
+            # version that created this recorded occurrence.
+            current.original_due_at = current.original_due_at or cast(
+                datetime, occurrence["due_at"]
+            )
+            current.original_timezone = current.original_timezone or definition.timezone
+            current.dst_resolution = current.dst_resolution or cast(
+                str, occurrence["dst_resolution"]
+            )
             current.override_revision = next_override_revision
             current.state = state
             current.rescheduled_at = effective_moved_at
@@ -1554,13 +1604,33 @@ def list_occurrence_history(
 def load_today_planning(
     session: Session, owner_id: UUID, local_date: date, timezone: str
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    if local_date <= date.min + timedelta(days=1) or local_date >= date.max - timedelta(days=1):
+        raise PlanningValidationError("Today date is outside the supported planning calendar")
     starts_on_or_before = PlanningResource.payload["start_at"].as_string() <= local_date.isoformat()
     ends_after = PlanningResource.payload["end_at"].as_string() > local_date.isoformat()
-    schedule_starts_on_or_before = (
-        PlanningResource.payload["start_date"].as_string() <= local_date.isoformat()
-    )
-    schedule_ends_on_or_after = (
-        PlanningResource.payload["end_date"].as_string() >= local_date.isoformat()
+    window_start, window_end = local_day_bounds(local_date, timezone)
+    # Discovery includes recorded history, even when the parent or item was
+    # retired. The occurrence reader separately decides whether intent is active.
+    recorded_in_window = exists(
+        select(PlanningOccurrenceOverride.occurrence_key).where(
+            PlanningOccurrenceOverride.owner_id == PlanningScheduleIdentity.owner_id,
+            PlanningOccurrenceOverride.schedule_id == PlanningScheduleIdentity.schedule_id,
+            or_(
+                PlanningOccurrenceOverride.original_due_at.is_(None),
+                and_(
+                    func.coalesce(
+                        PlanningOccurrenceOverride.rescheduled_at,
+                        PlanningOccurrenceOverride.original_due_at,
+                    )
+                    >= window_start,
+                    func.coalesce(
+                        PlanningOccurrenceOverride.rescheduled_at,
+                        PlanningOccurrenceOverride.original_due_at,
+                    )
+                    < window_end,
+                ),
+            ),
+        )
     )
     context_rows = session.execute(
         select(HealthObject, PlanningResource)
@@ -1618,21 +1688,30 @@ def load_today_planning(
                 and_(
                     PlanningScheduleIdentity.owner_id == HealthObject.owner_id,
                     PlanningScheduleIdentity.parent_object_id == HealthObject.id,
-                    PlanningScheduleIdentity.retired_at.is_(None),
                 ),
             )
             .where(
                 HealthObject.owner_id == owner_id,
-                HealthObject.status == "active",
                 HealthObject.object_type.in_(["plan", "regimen"]),
-                PlanningResource.lifecycle == "active",
                 or_(
-                    PlanningResource.payload["start_date"].as_string().is_(None),
-                    schedule_starts_on_or_before,
-                ),
-                or_(
-                    PlanningResource.payload["end_date"].as_string().is_(None),
-                    schedule_ends_on_or_after,
+                    and_(
+                        HealthObject.status == "active",
+                        PlanningResource.lifecycle == "active",
+                        PlanningScheduleIdentity.retired_at.is_(None),
+                        # Resource validity uses the schedule's local date, which
+                        # can be adjacent to the requested display date.
+                        or_(
+                            PlanningResource.payload["start_date"].as_string().is_(None),
+                            PlanningResource.payload["start_date"].as_string()
+                            <= (local_date + timedelta(days=1)).isoformat(),
+                        ),
+                        or_(
+                            PlanningResource.payload["end_date"].as_string().is_(None),
+                            PlanningResource.payload["end_date"].as_string()
+                            >= (local_date - timedelta(days=1)).isoformat(),
+                        ),
+                    ),
+                    recorded_in_window,
                 ),
             )
             .distinct()
@@ -1655,4 +1734,5 @@ def load_today_planning(
         )
         if len(plan_items) > 500:
             raise PlanningValidationError("Today has too many planned occurrences")
+    plan_items.sort(key=lambda item: (item["due_at"], str(item["parent_id"]), item["key"]))
     return plan_items, contexts

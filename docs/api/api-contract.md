@@ -103,3 +103,14 @@ pnpm --filter @personal-health/api-client typecheck
 ```
 
 Generation does not connect to the database or cloud. FastAPI exports the OpenAPI JSON, then the repository-owned Node standard-library generator emits client schemas, operation types, and typed fetch methods. It intentionally supports the OpenAPI schema subset used by this service; extend its checks and tests before adding a new construct.
+
+### Occurrence history and action eligibility
+
+Recorded occurrences retain their original schedule revision and remain visible
+in Today after schedule edits, item retirement, or parent lifecycle changes.
+`can_act` indicates whether the current parent/item state permits another action;
+historical occurrences remain readable when it is false. A moved due instant
+remains the display instant after completion or skipping. PATCH association
+fields omitted together preserve an existing Event/Observation link; explicitly
+supplying null clears it. Existing recorded slots use their immutable schedule
+revision for subsequent actions, with optimistic occurrence revision checks.

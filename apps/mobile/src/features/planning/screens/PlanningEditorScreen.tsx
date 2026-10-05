@@ -29,6 +29,8 @@ import {
   sendPlanningCreate,
 } from "../api";
 import { nextTrackerFieldId } from "../trackerEntry";
+import { canAdvancePlanningRevision } from "../editState";
+import { RequestScope } from "../../profile/requestScope";
 
 type Kind = "goal" | "regimen" | "plan" | "context" | "tracker_definition";
 type TrackerField = components["schemas"]["TrackerFieldV1"];
@@ -164,22 +166,37 @@ export default function PlanningEditorScreen() {
   const [aiUseAllowed, setAiUseAllowed] = useState(false);
   const [crossDomainUseAllowed, setCrossDomainUseAllowed] = useState(false);
   const originalRef = useRef<PlanningItem | null>(null);
+  const replaceDraftOnReload = useRef(false);
+  const pickerScope = useRef(new RequestScope());
+  const pickerReadyGeneration = useRef<number | null>(null);
+  const pickerScopeKey = `pickers:${kind}:${reloadToken}`;
 
   useEffect(() => {
+    const scope = pickerScope.current;
+    const pickerToken = scope.start(pickerScopeKey);
+    pickerReadyGeneration.current = null;
+    const pickerIsCurrent = () => scope.isCurrent(pickerToken);
     if (kind === "plan") {
       Promise.all([
         planningApi.listGoals({ limit: 100 }),
         planningApi.listRegimens({ limit: 100 }),
       ])
         .then(([goals, regimens]) => {
+          if (!pickerIsCurrent()) return;
           setAvailableReferences([...goals.items, ...regimens.items]);
+          pickerReadyGeneration.current = pickerToken.generation;
           setPickerCursors((current) => ({
             ...current,
             goal: goals.next_cursor,
             regimen: regimens.next_cursor,
           }));
         })
-        .catch(() => setAvailableReferences([]));
+        .catch((error: unknown) => {
+          if (pickerIsCurrent()) setError(planningErrorMessage(error));
+        })
+        .finally(() => {
+          if (pickerIsCurrent()) setLoadingPicker(null);
+        });
     }
     if (kind === "context") {
       Promise.all([
@@ -188,6 +205,8 @@ export default function PlanningEditorScreen() {
         profileApi.listProfileItems({ limit: 100 }),
       ])
         .then(([goals, regimens, profiles]) => {
+          if (!pickerIsCurrent()) return;
+          pickerReadyGeneration.current = pickerToken.generation;
           setContextTargets([
             ...goals.items.map((item) => ({
               id: item.id,
@@ -212,11 +231,16 @@ export default function PlanningEditorScreen() {
             profile: profiles.next_cursor,
           }));
         })
-        .catch(() => setContextTargets([]));
+        .catch((error: unknown) => {
+          if (pickerIsCurrent()) setError(planningErrorMessage(error));
+        })
+        .finally(() => {
+          if (pickerIsCurrent()) setLoadingPicker(null);
+        });
     }
-    if (!editing || !params.id) return;
+    if (!editing || !params.id) return () => scope.invalidate(pickerToken);
     let current = true;
-    if (!originalRef.current) setLoading(true);
+    if (!originalRef.current || replaceDraftOnReload.current) setLoading(true);
     const request = async () => {
       if (kind === "goal") return planningApi.getGoal({ goal_id: params.id! });
       if (kind === "regimen")
@@ -229,12 +253,24 @@ export default function PlanningEditorScreen() {
     request()
       .then((item) => {
         if (!current) return;
-        if (originalRef.current?.id === item.id) {
+        if (
+          originalRef.current?.id === item.id &&
+          !replaceDraftOnReload.current
+        ) {
+          if (!canAdvancePlanningRevision(originalRef.current, item)) {
+            setConflictReloadRequired(true);
+            setError(
+              "Server content changed. Your draft is retained. Reload the latest item before replacing its content.",
+            );
+            return;
+          }
           originalRef.current = item;
           setOriginal(item);
           setError(null);
           return;
         }
+        replaceDraftOnReload.current = false;
+        setConflictReloadRequired(false);
         originalRef.current = item;
         setOriginal(item);
         setAiUseAllowed(item.ai_use_allowed);
@@ -250,6 +286,10 @@ export default function PlanningEditorScreen() {
             setTargetValue(String(item.goal.target.value));
             setTargetUnit(item.goal.target.unit);
             setTargetPeriod(item.goal.target_period ?? "once");
+          } else {
+            setTargetMetric("none");
+            setTargetValue("");
+            setTargetPeriod("once");
           }
         } else if (item.object_type === "regimen") {
           setLabel(item.regimen.label);
@@ -289,17 +329,23 @@ export default function PlanningEditorScreen() {
       });
     return () => {
       current = false;
+      scope.invalidate(pickerToken);
     };
-  }, [editing, kind, params.id, reloadToken]);
+  }, [editing, kind, params.id, reloadToken, pickerScopeKey]);
 
   async function loadMorePicker(targetKind: "goal" | "regimen" | "profile") {
     const cursor = pickerCursors[targetKind];
-    if (!cursor || loadingPicker) return;
+    const token = pickerScope.current.tokenFor(pickerScopeKey);
+    if (!cursor || loadingPicker || !token) return;
+    if (pickerReadyGeneration.current !== token.generation) return;
+    if (!pickerScope.current.beginPage(token, `${targetKind}:${cursor}`))
+      return;
     setLoadingPicker(targetKind);
     setError(null);
     try {
       if (targetKind === "profile") {
         const page = await profileApi.listProfileItems({ limit: 100, cursor });
+        if (!pickerScope.current.isCurrent(token)) return;
         setContextTargets((current) => [
           ...current,
           ...page.items.map((item) => ({
@@ -317,6 +363,7 @@ export default function PlanningEditorScreen() {
           targetKind === "goal"
             ? await planningApi.listGoals({ limit: 100, cursor })
             : await planningApi.listRegimens({ limit: 100, cursor });
+        if (!pickerScope.current.isCurrent(token)) return;
         setPickerCursors((current) => ({
           ...current,
           [targetKind]: page.next_cursor,
@@ -334,9 +381,11 @@ export default function PlanningEditorScreen() {
           ]);
       }
     } catch (requestError) {
-      setError(planningErrorMessage(requestError));
+      if (pickerScope.current.isCurrent(token))
+        setError(planningErrorMessage(requestError));
     } finally {
-      setLoadingPicker(null);
+      pickerScope.current.finishPage(token, `${targetKind}:${cursor}`);
+      if (pickerScope.current.isCurrent(token)) setLoadingPicker(null);
     }
   }
 
@@ -346,8 +395,8 @@ export default function PlanningEditorScreen() {
         firstFocus.current = false;
         return;
       }
-      if (editing) setReloadToken((value) => value + 1);
-    }, [editing]),
+      setReloadToken((value) => value + 1);
+    }, []),
   );
 
   async function sendCreate(attempt: PlanningCreateAttempt): Promise<boolean> {
@@ -429,7 +478,10 @@ export default function PlanningEditorScreen() {
       );
     };
     setError(null);
-    setConflictReloadRequired(false);
+    if (editing && conflictReloadRequired) {
+      setError("Reload the latest planning item before saving this draft.");
+      return;
+    }
     if (editing && !original) {
       setError("Load the planning item before saving changes.");
       return;
@@ -844,11 +896,11 @@ export default function PlanningEditorScreen() {
         ) : null}
         {editing && conflictReloadRequired ? (
           <ActionButton
-            label="Reload latest; keep this draft"
+            label="Reload latest and replace this draft"
             secondary
             onPress={() => {
               setError(null);
-              setConflictReloadRequired(false);
+              replaceDraftOnReload.current = true;
               setReloadToken((value) => value + 1);
             }}
           />
@@ -1415,6 +1467,7 @@ export default function PlanningEditorScreen() {
             editing ? "Save changes" : `Create ${kindLabel(kind).toLowerCase()}`
           }
           busy={busy}
+          disabled={conflictReloadRequired}
           onPress={() => void submit()}
         />
         <ActionButton

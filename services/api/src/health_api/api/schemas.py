@@ -260,6 +260,7 @@ class OccurrenceResponse(StrictModel):
     due_at: datetime
     dst_resolution: Literal["exact", "earlier_offset", "next_valid_time"]
     state: Literal["unknown", "completed", "skipped", "rescheduled"]
+    can_act: bool = True
     override_revision: Annotated[StrictInt, Field(ge=1)] | None
     linked_event_id: UUID | None
     linked_observation_id: UUID | None = None
