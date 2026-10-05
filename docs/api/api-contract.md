@@ -37,7 +37,10 @@ require `expected_revision`; delete is a logical archive. Resource lists are
 owner-scoped keyset pages (default 50, maximum 100). A stale resource or
 occurrence revision returns 409, invalid fields/references/timezones return
 422, and unknown or foreign IDs return 404. Manual saves use the server-owned
-`manual` source, `user_confirmed`, and both permission flags false.
+`manual` source and `user_confirmed`. AI and cross-domain use permissions
+default to false; create and update accept explicit values, return them, and
+include them in revision snapshots. Lists omit archived resources by default;
+`?archived=true` returns the owner's archived resources.
 
 | Resource | Routes                                                                                                                                          |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -58,6 +61,9 @@ Schedules are edited with `PUT /regimens/{id}/schedule` or
 latest saved definition or null when there is no schedule. Edits include an
 explicit effective date and the expected schedule revision. Existing schedules
 can only change from a future effective date, preserving earlier versions.
+The recurrence `start_date` remains its original alignment anchor when a new
+version takes effect. Removing a scheduled plan item retires future intent
+without deleting its schedule identity, revisions, or recorded actions.
 Occurrence reads use
 `GET /regimens/{id}/occurrences` or `GET /plans/{id}/occurrences` with required
 `start_date`, `end_date`, and IANA `timezone`; a request spans at most 31 local
@@ -65,7 +71,12 @@ calendar dates and returns at most 500 items. `PATCH /plan-occurrences/{key}`
 requires the expected schedule and override revisions. Actions are completed,
 skipped, or rescheduled. A reschedule supplies an offset-aware instant within
 31 days of its original slot; it retains the original occurrence key and
-appears on the new due date. Repeating an identical action is idempotent.
+appears on the new due date. Completing or skipping a moved occurrence retains
+its moved due instant. Actions may link one existing owner Event or Observation;
+this does not create a record. Repeating an identical action is idempotent.
+`GET /plan-occurrences/{key}/history` returns owner-scoped, paginated action
+revisions, including recorded time, schedule revision, moved time, and linked
+record IDs.
 
 `POST /daily-entries` and observation update accept the custom Observation
 variant: `{metric: "custom", unit: "custom", tracker_id, schema_version,

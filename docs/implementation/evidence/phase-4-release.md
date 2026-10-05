@@ -1,7 +1,8 @@
 # Phase 4 release evidence
 
-**Checkpoint:** October 5, 2026; local implementation and static review are
-complete, with database, cloud, and device acceptance gates still open.
+**Checkpoint:** October 5, 2026; phase 4 review corrections are implemented
+and locally verified, with database, cloud, and device acceptance gates still
+open.
 
 ## Implemented surface
 
@@ -11,6 +12,12 @@ Migration `d4e5f607a8b9` follows `c3721f5a9a01`. It adds planning resources,
 stable plan links and regimen schedule identities, effective schedule versions,
 occurrence overrides/actions, tracker schema versions, and custom tracker
 references/values on Observations. The downgrade refuses to drop Phase 4 data.
+
+Migration `a7f014edc620` follows `d4e5f607a8b9` and preserves retired schedule
+identity, original occurrence timing and DST resolution, and optional
+Observation links for occurrence actions. Its downgrade refuses to discard
+review-correction data. ORM relationships now select the Observation envelope
+foreign key explicitly, and absent tracker JSON binds as SQL `NULL`.
 
 Resource lists use owner-scoped cursor pagination (default 50, maximum 100).
 Create is idempotent for the same owner, UUID, and canonical content. Resource
@@ -45,6 +52,12 @@ the [API contract](../../api/api-contract.md#phase-4-planning-and-tracker-routes
   offset-aware instant within 31 days of the original slot. Identical retries
   are idempotent; stale schedule/action revisions conflict. Completion is an
   explicit user assertion and creates no Event or Observation.
+- Recorded assertions retain their occurrence key, original timing and
+  timezone across schedule edits, parent lifecycle changes, and item
+  retirement. A moved due instant remains attached after completion or skip.
+  Legacy assertions without the new timing fields are reconstructed from their
+  immutable schedule revision. Owner-scoped paginated action history is
+  available by occurrence key.
 - Occurrences without an action remain `unknown`; the service does not infer
   adherence or missed activity.
 
@@ -68,9 +81,14 @@ from the entry's saved schema version.
 The Plan surface groups goals, regimens, plans, contexts, and trackers. It
 supports create/edit/detail/history and lifecycle actions, plan item ordering,
 schedule editing, and context links to Profile, goals, and regimens. Archived
-resources have read-only detail. Today shows active contexts and scheduled
-occurrences with explicit complete, skip, and reschedule actions; conflicts
-refresh the current data. Universal Add links to custom tracker logging.
+resources have read-only detail and can be rediscovered from the archived list;
+ended contexts remain visible. List and reference pickers expose user-driven
+pagination. Today shows active contexts and scheduled occurrences with explicit
+complete, skip, reschedule, and optional existing Event/Observation association
+actions. Conflicts refresh current data while preserving drafts. Universal Add
+links to custom tracker logging. Create recovery keeps the original ID and
+request across uncertain responses and is scoped to the session owner and
+epoch. Late responses cannot restore another account's recovery state.
 Tracker forms use the active schema and the existing uncertain-save recovery
 path. Historical custom observations display labels from the exact saved
 schema version and cannot be edited through the standard Observation editor.
@@ -85,25 +103,35 @@ CI=true PATH="/Users/jasonkli/projects/health-app/.venv/bin:/Users/jasonkli/.cac
   pnpm dlx pnpm@9.15.0 --filter @personal-health/api-client generate
 ```
 
-The following static checks passed after the final source edits:
+The following local checks passed after the final source edits:
 
-- `.venv/bin/python -m compileall -q services/api/src migrations`
-- `.venv/bin/mypy services/api/src/health_api` — 28 source files
-- `.venv/bin/ruff check` and `.venv/bin/ruff format --check` on changed API and
-  migration Python files
-- `pnpm --filter @personal-health/api-client typecheck`
-- `pnpm --filter @personal-health/mobile typecheck`
-- `pnpm --filter @personal-health/mobile lint`
-- OpenAPI export and API client regeneration
-- `git diff --check`
+- API suite: `.venv/bin/python -m pytest services/api/tests -q` — **99 passed,
+  43 skipped**. Thirteen focused regressions cover mapper setup, SQL NULL
+  binding, schedule anchor edits, strict occurrence-key parsing, historical
+  occurrence timing, resource eligibility, permission defaults, association
+  contracts, range and numeric overflow, and repeated plan references.
+- Mobile suite: bundled Node `vitest.mjs run` — **87 passed across 18 files**.
+  Added focused session-recovery, uncertain planning-create, tracker input, and
+  stable field-ID coverage.
+- Mobile TypeScript: `tsc --noEmit` — passed.
+- Mobile ESLint — passed with no warnings.
+- API typing: `.venv/bin/mypy services/api/src/health_api` — passed for 28
+  source files.
+- `.venv/bin/ruff check`, `.venv/bin/ruff format --check`, and Python
+  `compileall` on changed API, test, and migration files — passed.
+- Prettier check on changed mobile/client files — passed.
+- OpenAPI export and TypeScript client regeneration — passed; generated files
+  are committed with their source contract.
+- `git diff --check` — passed.
 
-No tests were added or run. Static checks and generated contracts do not prove
-database behavior, cloud parity, or device behavior.
+The API run skipped 43 database-dependent tests because no `TEST_DATABASE_URL`
+was supplied. Local tests and generated contracts do not prove database
+behavior, cloud parity, or device behavior.
 
 ## Open acceptance gates
 
 - **Database:** Phase 2 PostgreSQL acceptance is still open. The Phase 4
-  migration has not been applied to a live disposable database in this
+  migrations have not been applied to a live disposable database in this
   checkpoint; upgrade/downgrade/re-upgrade, constraint behavior, model drift,
   query plans, and current query-cost measurements remain unverified. The
   prior attempt to create a disposable PostgreSQL cluster is documented in the

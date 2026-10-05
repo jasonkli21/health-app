@@ -10,7 +10,13 @@ import {
 } from "react-native";
 
 import { DailyEntryForm } from "../components/DailyEntryForm";
-import { activeDailyCreateRecovery, dailyApi, DailyUserError } from "../api";
+import { sessionStore } from "../../../auth/sessionStore";
+import {
+  activeDailyCreateRecovery,
+  dailyApi,
+  DailyUserError,
+  isDailyCreateAttemptCurrent,
+} from "../api";
 import {
   DAILY_DOMAINS,
   type DailyCreateRequest,
@@ -50,8 +56,12 @@ export default function DailyAddScreen() {
       ReturnType<typeof activeDailyCreateRecovery.retryOriginal>
     >,
   ) {
+    const isCurrent = () =>
+      isDailyCreateAttemptCurrent(attempt, sessionStore.getSnapshot());
+    if (!isCurrent()) return;
     try {
       const result = await dailyApi.createDailyEntry(attempt.request);
+      if (!isCurrent()) return;
       activeDailyCreateRecovery.resolve();
       setHasUncertainSave(false);
       const item = [...result.events, ...result.observations].find(
@@ -72,6 +82,7 @@ export default function DailyAddScreen() {
         },
       });
     } catch (error) {
+      if (!isCurrent()) return;
       const uncertain = activeDailyCreateRecovery.markFailure(attempt, error);
       setHasUncertainSave(uncertain);
       if (uncertain) {
@@ -92,6 +103,8 @@ export default function DailyAddScreen() {
       primaryId: primary.id,
       domain,
       draft: { ...draft },
+      sessionEpoch: sessionStore.getSnapshot().epoch,
+      sessionUserId: sessionStore.getSnapshot().userId,
     });
     await submitAttempt(attempt);
   }

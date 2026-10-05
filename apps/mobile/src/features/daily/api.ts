@@ -37,7 +37,20 @@ export type DailyCreateAttempt = {
   primaryId: string;
   domain: DailyDomain;
   draft: DailyDraft;
+  sessionEpoch?: number;
+  sessionUserId?: string | null;
 };
+
+export function isDailyCreateAttemptCurrent(
+  attempt: DailyCreateAttempt,
+  session: { epoch: number; userId: string | null },
+): boolean {
+  return (
+    attempt.sessionEpoch === undefined ||
+    (attempt.sessionEpoch === session.epoch &&
+      attempt.sessionUserId === session.userId)
+  );
+}
 
 function stableJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;

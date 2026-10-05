@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   Pressable,
   SafeAreaView,
@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import type { components } from "@personal-health/api-client";
+import { ApiError } from "@personal-health/api-client";
 
 import {
   ActionButton,
@@ -17,9 +18,17 @@ import {
   StatusMessage,
 } from "../../profile/components/Ui";
 import { newDailyId } from "../../daily/model";
+import { sessionStore } from "../../../auth/sessionStore";
 import { profileApi } from "../../profile/api";
-import { planningApi, planningErrorMessage } from "../api";
-import type { PlanningItem } from "../api";
+import {
+  activePlanningCreateRecovery,
+  type PlanningCreateAttempt,
+  type PlanningItem,
+  planningApi,
+  planningErrorMessage,
+  sendPlanningCreate,
+} from "../api";
+import { nextTrackerFieldId } from "../trackerEntry";
 
 type Kind = "goal" | "regimen" | "plan" | "context" | "tracker_definition";
 type TrackerField = components["schemas"]["TrackerFieldV1"];
@@ -122,6 +131,10 @@ export default function PlanningEditorScreen() {
   const [contextPriority, setContextPriority] = useState("0");
   const [contextTargets, setContextTargets] = useState<ContextTarget[]>([]);
   const [contextRelated, setContextRelated] = useState<ContextRelation[]>([]);
+  const [pickerCursors, setPickerCursors] = useState<
+    Record<string, string | null>
+  >({});
+  const [loadingPicker, setLoadingPicker] = useState<string | null>(null);
   const [fields, setFields] = useState<TrackerField[]>([
     { id: "value", label: "Value", kind: "text", required: false, choices: [] },
   ]);
@@ -141,6 +154,16 @@ export default function PlanningEditorScreen() {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(editing);
   const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+  const [conflictReloadRequired, setConflictReloadRequired] = useState(false);
+  const firstFocus = useRef(true);
+  const [recoveryAttempt, setRecoveryAttempt] =
+    useState<PlanningCreateAttempt | null>(() =>
+      activePlanningCreateRecovery.retryOriginal(),
+    );
+  const [aiUseAllowed, setAiUseAllowed] = useState(false);
+  const [crossDomainUseAllowed, setCrossDomainUseAllowed] = useState(false);
+  const originalRef = useRef<PlanningItem | null>(null);
 
   useEffect(() => {
     if (kind === "plan") {
@@ -148,9 +171,14 @@ export default function PlanningEditorScreen() {
         planningApi.listGoals({ limit: 100 }),
         planningApi.listRegimens({ limit: 100 }),
       ])
-        .then(([goals, regimens]) =>
-          setAvailableReferences([...goals.items, ...regimens.items]),
-        )
+        .then(([goals, regimens]) => {
+          setAvailableReferences([...goals.items, ...regimens.items]);
+          setPickerCursors((current) => ({
+            ...current,
+            goal: goals.next_cursor,
+            regimen: regimens.next_cursor,
+          }));
+        })
         .catch(() => setAvailableReferences([]));
     }
     if (kind === "context") {
@@ -159,7 +187,7 @@ export default function PlanningEditorScreen() {
         planningApi.listRegimens({ limit: 100 }),
         profileApi.listProfileItems({ limit: 100 }),
       ])
-        .then(([goals, regimens, profiles]) =>
+        .then(([goals, regimens, profiles]) => {
           setContextTargets([
             ...goals.items.map((item) => ({
               id: item.id,
@@ -176,12 +204,19 @@ export default function PlanningEditorScreen() {
               title: item.title,
               kind: "Profile",
             })),
-          ]),
-        )
+          ]);
+          setPickerCursors((current) => ({
+            ...current,
+            goal: goals.next_cursor,
+            regimen: regimens.next_cursor,
+            profile: profiles.next_cursor,
+          }));
+        })
         .catch(() => setContextTargets([]));
     }
     if (!editing || !params.id) return;
     let current = true;
+    if (!originalRef.current) setLoading(true);
     const request = async () => {
       if (kind === "goal") return planningApi.getGoal({ goal_id: params.id! });
       if (kind === "regimen")
@@ -194,7 +229,16 @@ export default function PlanningEditorScreen() {
     request()
       .then((item) => {
         if (!current) return;
+        if (originalRef.current?.id === item.id) {
+          originalRef.current = item;
+          setOriginal(item);
+          setError(null);
+          return;
+        }
+        originalRef.current = item;
         setOriginal(item);
+        setAiUseAllowed(item.ai_use_allowed);
+        setCrossDomainUseAllowed(item.cross_domain_use_allowed);
         if (item.object_type === "goal") {
           setLabel(item.goal.label);
           setDomain(item.goal.domain);
@@ -246,7 +290,129 @@ export default function PlanningEditorScreen() {
     return () => {
       current = false;
     };
-  }, [editing, kind, params.id]);
+  }, [editing, kind, params.id, reloadToken]);
+
+  async function loadMorePicker(targetKind: "goal" | "regimen" | "profile") {
+    const cursor = pickerCursors[targetKind];
+    if (!cursor || loadingPicker) return;
+    setLoadingPicker(targetKind);
+    setError(null);
+    try {
+      if (targetKind === "profile") {
+        const page = await profileApi.listProfileItems({ limit: 100, cursor });
+        setContextTargets((current) => [
+          ...current,
+          ...page.items.map((item) => ({
+            id: item.id,
+            title: item.title,
+            kind: "Profile",
+          })),
+        ]);
+        setPickerCursors((current) => ({
+          ...current,
+          profile: page.next_cursor,
+        }));
+      } else {
+        const page =
+          targetKind === "goal"
+            ? await planningApi.listGoals({ limit: 100, cursor })
+            : await planningApi.listRegimens({ limit: 100, cursor });
+        setPickerCursors((current) => ({
+          ...current,
+          [targetKind]: page.next_cursor,
+        }));
+        if (kind === "plan")
+          setAvailableReferences((current) => [...current, ...page.items]);
+        else
+          setContextTargets((current) => [
+            ...current,
+            ...page.items.map((item) => ({
+              id: item.id,
+              title: item.title,
+              kind: item.object_type,
+            })),
+          ]);
+      }
+    } catch (requestError) {
+      setError(planningErrorMessage(requestError));
+    } finally {
+      setLoadingPicker(null);
+    }
+  }
+
+  useFocusEffect(
+    useCallback(() => {
+      if (firstFocus.current) {
+        firstFocus.current = false;
+        return;
+      }
+      if (editing) setReloadToken((value) => value + 1);
+    }, [editing]),
+  );
+
+  async function sendCreate(attempt: PlanningCreateAttempt): Promise<boolean> {
+    const isCurrent = () => {
+      const latest = sessionStore.getSnapshot();
+      return (
+        latest.epoch === attempt.sessionEpoch &&
+        latest.userId === attempt.sessionUserId
+      );
+    };
+    if (!isCurrent()) return false;
+    const prepared = activePlanningCreateRecovery.prepare(attempt);
+    try {
+      await sendPlanningCreate(prepared);
+      if (!isCurrent()) return false;
+      activePlanningCreateRecovery.resolve();
+      setRecoveryAttempt(null);
+      return true;
+    } catch (requestError) {
+      if (!isCurrent()) return false;
+      const uncertain = activePlanningCreateRecovery.markFailure(
+        prepared,
+        requestError,
+      );
+      setRecoveryAttempt(uncertain ? prepared : null);
+      if (uncertain) {
+        throw new Error(
+          "The save result is uncertain. Retry the original request before changing details.",
+        );
+      }
+      throw requestError;
+    }
+  }
+
+  async function retryOriginalCreate() {
+    if (!recoveryAttempt) return;
+    const latest = sessionStore.getSnapshot();
+    if (
+      latest.epoch !== recoveryAttempt.sessionEpoch ||
+      latest.userId !== recoveryAttempt.sessionUserId
+    )
+      return;
+    setBusy(true);
+    setError(null);
+    try {
+      if (await sendCreate(recoveryAttempt)) router.replace("/planning");
+    } catch (requestError) {
+      if (requestError instanceof ApiError)
+        setError(planningErrorMessage(requestError));
+      else
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : planningErrorMessage(requestError),
+        );
+    } finally {
+      const current = sessionStore.getSnapshot();
+      if (
+        current.epoch === recoveryAttempt.sessionEpoch &&
+        current.userId === recoveryAttempt.sessionUserId
+      ) {
+        setBusy(false);
+      }
+    }
+  }
 
   const title = useMemo(
     () => `${editing ? "Edit" : "Create"} ${kindLabel(kind)}`,
@@ -254,7 +420,20 @@ export default function PlanningEditorScreen() {
   );
 
   async function submit() {
+    const sessionAtSubmit = sessionStore.getSnapshot();
+    const isCurrentSession = () => {
+      const latest = sessionStore.getSnapshot();
+      return (
+        latest.epoch === sessionAtSubmit.epoch &&
+        latest.userId === sessionAtSubmit.userId
+      );
+    };
     setError(null);
+    setConflictReloadRequired(false);
+    if (editing && !original) {
+      setError("Load the planning item before saving changes.");
+      return;
+    }
     if (!label.trim()) {
       setError("Enter a name before saving.");
       return;
@@ -281,6 +460,7 @@ export default function PlanningEditorScreen() {
     try {
       const id = original?.id ?? newDailyId();
       const revision = original?.revision ?? 0;
+      const session = sessionStore.getSnapshot();
       if (kind === "goal") {
         let target: components["schemas"]["MetricTarget"] | null = null;
         if (targetMetric !== "none") {
@@ -321,9 +501,27 @@ export default function PlanningEditorScreen() {
         if (editing)
           await planningApi.updateGoal(
             { goal_id: id },
-            { expected_revision: revision, goal },
+            {
+              expected_revision: revision,
+              goal,
+              ai_use_allowed: aiUseAllowed,
+              cross_domain_use_allowed: crossDomainUseAllowed,
+            },
           );
-        else await planningApi.createGoal({ id, goal });
+        else if (
+          !(await sendCreate({
+            kind: "goal",
+            body: {
+              id,
+              goal,
+              ai_use_allowed: aiUseAllowed,
+              cross_domain_use_allowed: crossDomainUseAllowed,
+            },
+            sessionEpoch: session.epoch,
+            sessionUserId: session.userId,
+          }))
+        )
+          return;
       } else if (kind === "regimen") {
         const quantityValue = regimenQuantity.trim()
           ? Number(regimenQuantity)
@@ -358,9 +556,27 @@ export default function PlanningEditorScreen() {
         if (editing)
           await planningApi.updateRegimen(
             { regimen_id: id },
-            { expected_revision: revision, regimen },
+            {
+              expected_revision: revision,
+              regimen,
+              ai_use_allowed: aiUseAllowed,
+              cross_domain_use_allowed: crossDomainUseAllowed,
+            },
           );
-        else await planningApi.createRegimen({ id, regimen });
+        else if (
+          !(await sendCreate({
+            kind: "regimen",
+            body: {
+              id,
+              regimen,
+              ai_use_allowed: aiUseAllowed,
+              cross_domain_use_allowed: crossDomainUseAllowed,
+            },
+            sessionEpoch: session.epoch,
+            sessionUserId: session.userId,
+          }))
+        )
+          return;
       } else if (kind === "plan") {
         const plan: components["schemas"]["PlanPayloadV1"] = {
           ...(original?.object_type === "plan" ? original.plan : {}),
@@ -372,9 +588,27 @@ export default function PlanningEditorScreen() {
         if (editing)
           await planningApi.updatePlan(
             { plan_id: id },
-            { expected_revision: revision, plan },
+            {
+              expected_revision: revision,
+              plan,
+              ai_use_allowed: aiUseAllowed,
+              cross_domain_use_allowed: crossDomainUseAllowed,
+            },
           );
-        else await planningApi.createPlan({ id, plan });
+        else if (
+          !(await sendCreate({
+            kind: "plan",
+            body: {
+              id,
+              plan,
+              ai_use_allowed: aiUseAllowed,
+              cross_domain_use_allowed: crossDomainUseAllowed,
+            },
+            sessionEpoch: session.epoch,
+            sessionUserId: session.userId,
+          }))
+        )
+          return;
       } else if (kind === "context") {
         const priority = Number(contextPriority);
         if (!Number.isInteger(priority) || priority < 0 || priority > 100) {
@@ -400,9 +634,27 @@ export default function PlanningEditorScreen() {
         if (editing)
           await planningApi.updateContext(
             { context_id: id },
-            { expected_revision: revision, context },
+            {
+              expected_revision: revision,
+              context,
+              ai_use_allowed: aiUseAllowed,
+              cross_domain_use_allowed: crossDomainUseAllowed,
+            },
           );
-        else await planningApi.createContext({ id, context });
+        else if (
+          !(await sendCreate({
+            kind: "context",
+            body: {
+              id,
+              context,
+              ai_use_allowed: aiUseAllowed,
+              cross_domain_use_allowed: crossDomainUseAllowed,
+            },
+            sessionEpoch: session.epoch,
+            sessionUserId: session.userId,
+          }))
+        )
+          return;
       } else {
         if (
           fields.length === 0 ||
@@ -425,19 +677,114 @@ export default function PlanningEditorScreen() {
         if (editing)
           await planningApi.updateTracker(
             { tracker_id: id },
-            { expected_revision: revision, definition },
+            {
+              expected_revision: revision,
+              definition,
+              ai_use_allowed: aiUseAllowed,
+              cross_domain_use_allowed: crossDomainUseAllowed,
+            },
           );
-        else await planningApi.createTracker({ id, definition });
+        else if (
+          !(await sendCreate({
+            kind: "tracker_definition",
+            body: {
+              id,
+              definition,
+              ai_use_allowed: aiUseAllowed,
+              cross_domain_use_allowed: crossDomainUseAllowed,
+            },
+            sessionEpoch: session.epoch,
+            sessionUserId: session.userId,
+          }))
+        )
+          return;
       }
+      if (!isCurrentSession()) return;
       router.replace("/planning");
     } catch (requestError) {
-      setError(planningErrorMessage(requestError));
+      if (!isCurrentSession()) return;
+      setConflictReloadRequired(
+        requestError instanceof ApiError && requestError.status === 409,
+      );
+      setError(
+        requestError instanceof ApiError
+          ? planningErrorMessage(requestError)
+          : requestError instanceof Error
+            ? requestError.message
+            : planningErrorMessage(requestError),
+      );
     } finally {
-      setBusy(false);
+      if (isCurrentSession()) setBusy(false);
     }
   }
 
   if (loading) return <LoadingMessage label="Loading planning item" />;
+  if (editing && !original) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView contentContainerStyle={styles.content}>
+          <Text accessibilityRole="header" style={styles.title}>
+            Planning item not loaded
+          </Text>
+          <StatusMessage
+            title="Could not load planning item"
+            message={
+              error ??
+              "The editor needs current server data before it can save."
+            }
+            tone="error"
+          />
+          <ActionButton
+            label="Retry loading item"
+            busy={loading}
+            onPress={() => setReloadToken((value) => value + 1)}
+          />
+          <ActionButton label="Back" secondary onPress={() => router.back()} />
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+  const currentSession = sessionStore.getSnapshot();
+  const pendingCreate =
+    recoveryAttempt &&
+    recoveryAttempt.sessionEpoch === currentSession.epoch &&
+    recoveryAttempt.sessionUserId === currentSession.userId
+      ? recoveryAttempt
+      : null;
+  if (pendingCreate) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView contentContainerStyle={styles.content}>
+          <Text accessibilityRole="header" style={styles.title}>
+            Recover planning save
+          </Text>
+          <Text style={styles.subtitle}>
+            The original {kindLabel(pendingCreate.kind).toLowerCase()} save may
+            have completed. Retry its retained ID and request before editing or
+            creating another item.
+          </Text>
+          {error ? (
+            <StatusMessage
+              title="Save recovery failed"
+              message={error}
+              tone="error"
+            />
+          ) : null}
+          <ActionButton
+            label="Retry original save"
+            busy={busy}
+            onPress={() => void retryOriginalCreate()}
+          />
+          <ActionButton
+            label="Back to Plan"
+            secondary
+            disabled={busy}
+            onPress={() => router.replace("/planning")}
+          />
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
   if (original?.status === "archived") {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -449,6 +796,11 @@ export default function PlanningEditorScreen() {
             <Text style={styles.cardTitle}>{original.title}</Text>
             <Text style={styles.noteText}>
               Revision {original.revision} · retained in history
+            </Text>
+            <Text style={styles.noteText}>
+              AI use: {original.ai_use_allowed ? "allowed" : "not allowed"} ·
+              cross-domain use:{" "}
+              {original.cross_domain_use_allowed ? "allowed" : "not allowed"}
             </Text>
             <Text style={styles.body}>{archivedDetails(original)}</Text>
             {original.notes ? (
@@ -490,11 +842,42 @@ export default function PlanningEditorScreen() {
         {error ? (
           <StatusMessage title="Could not save" message={error} tone="error" />
         ) : null}
+        {editing && conflictReloadRequired ? (
+          <ActionButton
+            label="Reload latest; keep this draft"
+            secondary
+            onPress={() => {
+              setError(null);
+              setConflictReloadRequired(false);
+              setReloadToken((value) => value + 1);
+            }}
+          />
+        ) : null}
         <Input
           label={kind === "tracker_definition" ? "Tracker name" : "Name"}
           value={label}
           onChange={setLabel}
         />
+
+        <View style={styles.fieldCard}>
+          <Text accessibilityRole="header" style={styles.sectionTitle}>
+            Permissions
+          </Text>
+          <Text style={styles.noteText}>
+            These permissions default off. Turn them on only when you want to
+            authorize the stated use.
+          </Text>
+          <ActionButton
+            label={`AI use: ${aiUseAllowed ? "allowed" : "not allowed"}`}
+            secondary
+            onPress={() => setAiUseAllowed((value) => !value)}
+          />
+          <ActionButton
+            label={`Cross-domain use: ${crossDomainUseAllowed ? "allowed" : "not allowed"}`}
+            secondary
+            onPress={() => setCrossDomainUseAllowed((value) => !value)}
+          />
+        </View>
 
         {kind === "goal" || kind === "regimen" ? (
           <ChoiceField
@@ -707,6 +1090,20 @@ export default function PlanningEditorScreen() {
                 </Pressable>
               );
             })}
+            {(["goal", "regimen", "profile"] as const).map((targetKind) =>
+              pickerCursors[targetKind] ? (
+                <ActionButton
+                  key={targetKind}
+                  label={`Load more ${targetKind === "profile" ? "Profile items" : `${targetKind}s`}`}
+                  secondary
+                  busy={loadingPicker === targetKind}
+                  disabled={
+                    loadingPicker !== null && loadingPicker !== targetKind
+                  }
+                  onPress={() => void loadMorePicker(targetKind)}
+                />
+              ) : null,
+            )}
             {contextTargets.length === 0 ? (
               <Text style={styles.noteText}>
                 No Profile items, goals, or regimens are available to link.
@@ -804,7 +1201,7 @@ export default function PlanningEditorScreen() {
                 setFields((current) => [
                   ...current,
                   {
-                    id: `field_${current.length + 1}`,
+                    id: nextTrackerFieldId(current),
                     label: "New field",
                     kind: "text",
                     required: false,
@@ -939,6 +1336,17 @@ export default function PlanningEditorScreen() {
                   <Text style={styles.noteText}>
                     Create an active {planItemKind} first.
                   </Text>
+                ) : null}
+                {pickerCursors[planItemKind] ? (
+                  <ActionButton
+                    label={`Load more ${planItemKind}s`}
+                    secondary
+                    busy={loadingPicker === planItemKind}
+                    disabled={
+                      loadingPicker !== null && loadingPicker !== planItemKind
+                    }
+                    onPress={() => void loadMorePicker(planItemKind)}
+                  />
                 ) : null}
               </View>
             )}

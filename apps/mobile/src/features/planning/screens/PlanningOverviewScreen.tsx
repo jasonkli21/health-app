@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
+import { Link, useFocusEffect, useRouter } from "expo-router";
 import {
   Alert,
   Pressable,
@@ -34,32 +34,73 @@ export default function PlanningOverviewScreen() {
   const [refresh, setRefresh] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [nextCursors, setNextCursors] = useState<Record<string, string | null>>(
+    {},
+  );
+  const [loadingMore, setLoadingMore] = useState<string | null>(null);
 
-  useEffect(() => {
-    let current = true;
-    Promise.all([
-      planningApi.listGoals({ limit: 100 }),
-      planningApi.listRegimens({ limit: 100 }),
-      planningApi.listPlans({ limit: 100 }),
-      planningApi.listContexts({ limit: 100 }),
-      planningApi.listTrackers({ limit: 100 }),
-    ])
-      .then((pages) => {
-        if (current) {
-          setItems(pages.flatMap((page) => page.items));
-          setError(null);
-        }
-      })
-      .catch((requestError: unknown) => {
-        if (current) setError(planningErrorMessage(requestError));
-      })
-      .finally(() => {
-        if (current) setLoading(false);
-      });
-    return () => {
-      current = false;
-    };
-  }, [refresh]);
+  useFocusEffect(
+    useCallback(() => {
+      let current = true;
+      if (refresh > 0) setLoading(true);
+      Promise.all([
+        planningApi.listGoals({ limit: 100, archived: showArchived }),
+        planningApi.listRegimens({ limit: 100, archived: showArchived }),
+        planningApi.listPlans({ limit: 100, archived: showArchived }),
+        planningApi.listContexts({ limit: 100, archived: showArchived }),
+        planningApi.listTrackers({ limit: 100, archived: showArchived }),
+      ])
+        .then((pages) => {
+          if (current) {
+            setItems(pages.flatMap((page) => page.items));
+            setNextCursors({
+              goal: pages[0].next_cursor,
+              regimen: pages[1].next_cursor,
+              plan: pages[2].next_cursor,
+              context: pages[3].next_cursor,
+              tracker_definition: pages[4].next_cursor,
+            });
+            setError(null);
+          }
+        })
+        .catch((requestError: unknown) => {
+          if (current) setError(planningErrorMessage(requestError));
+        })
+        .finally(() => {
+          if (current) setLoading(false);
+        });
+      return () => {
+        current = false;
+      };
+    }, [refresh, showArchived]),
+  );
+
+  async function loadMore(kind: string) {
+    const cursor = nextCursors[kind];
+    if (!cursor || loadingMore) return;
+    setLoadingMore(kind);
+    setError(null);
+    try {
+      const query = { limit: 100, cursor, archived: showArchived };
+      const page =
+        kind === "goal"
+          ? await planningApi.listGoals(query)
+          : kind === "regimen"
+            ? await planningApi.listRegimens(query)
+            : kind === "plan"
+              ? await planningApi.listPlans(query)
+              : kind === "context"
+                ? await planningApi.listContexts(query)
+                : await planningApi.listTrackers(query);
+      setItems((current) => [...current, ...page.items]);
+      setNextCursors((current) => ({ ...current, [kind]: page.next_cursor }));
+    } catch (requestError) {
+      setError(planningErrorMessage(requestError));
+    } finally {
+      setLoadingMore(null);
+    }
+  }
 
   async function archive(item: PlanningItem) {
     setBusyId(item.id);
@@ -141,7 +182,9 @@ export default function PlanningOverviewScreen() {
     }
   }
 
-  const visible = items.filter((item) => item.status === "active");
+  const visible = items.filter((item) =>
+    showArchived ? item.status === "archived" : item.status === "active",
+  );
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -164,6 +207,11 @@ export default function PlanningOverviewScreen() {
               onPress={() => router.push("/planning/log-tracker")}
             />
           </View>
+          <ActionButton
+            label={showArchived ? "Show active items" : "Show archived items"}
+            secondary
+            onPress={() => setShowArchived((value) => !value)}
+          />
           <View style={styles.actions}>
             <Link href="/profile" style={styles.link}>
               Profile
@@ -196,9 +244,7 @@ export default function PlanningOverviewScreen() {
 
         {GROUPS.map((group) => {
           const groupItems = visible.filter(
-            (item) =>
-              item.object_type === group.kind &&
-              (group.kind !== "context" || item.lifecycle === "active"),
+            (item) => item.object_type === group.kind,
           );
           return (
             <View key={group.kind} style={styles.section}>
@@ -238,9 +284,10 @@ export default function PlanningOverviewScreen() {
                     </Text>
                     <Text style={styles.meta}>{summary(item)}</Text>
                   </Pressable>
-                  {item.object_type === "goal" ||
-                  item.object_type === "regimen" ||
-                  item.object_type === "plan" ? (
+                  {item.status === "active" &&
+                  (item.object_type === "goal" ||
+                    item.object_type === "regimen" ||
+                    item.object_type === "plan") ? (
                     <View style={styles.actions}>
                       {item.lifecycle === "active" ? (
                         <ActionButton
@@ -266,7 +313,8 @@ export default function PlanningOverviewScreen() {
                         />
                       ) : null}
                     </View>
-                  ) : item.object_type === "context" &&
+                  ) : item.status === "active" &&
+                    item.object_type === "context" &&
                     item.lifecycle === "active" ? (
                     <ActionButton
                       label="End context"
@@ -275,27 +323,38 @@ export default function PlanningOverviewScreen() {
                       onPress={() => void transition(item, "ended")}
                     />
                   ) : null}
-                  <ActionButton
-                    label="Archive"
-                    secondary
-                    busy={busyId === item.id}
-                    onPress={() =>
-                      Alert.alert(
-                        "Archive this item?",
-                        "It will remain available in history.",
-                        [
-                          { text: "Cancel", style: "cancel" },
-                          {
-                            text: "Archive",
-                            style: "destructive",
-                            onPress: () => void archive(item),
-                          },
-                        ],
-                      )
-                    }
-                  />
+                  {item.status === "active" ? (
+                    <ActionButton
+                      label="Archive"
+                      secondary
+                      busy={busyId === item.id}
+                      onPress={() =>
+                        Alert.alert(
+                          "Archive this item?",
+                          "It will remain available in history.",
+                          [
+                            { text: "Cancel", style: "cancel" },
+                            {
+                              text: "Archive",
+                              style: "destructive",
+                              onPress: () => void archive(item),
+                            },
+                          ],
+                        )
+                      }
+                    />
+                  ) : null}
                 </View>
               ))}
+              {nextCursors[group.kind] ? (
+                <ActionButton
+                  label={`Load more ${group.label.toLowerCase()}`}
+                  secondary
+                  busy={loadingMore === group.kind}
+                  disabled={loadingMore !== null && loadingMore !== group.kind}
+                  onPress={() => void loadMore(group.kind)}
+                />
+              ) : null}
             </View>
           );
         })}

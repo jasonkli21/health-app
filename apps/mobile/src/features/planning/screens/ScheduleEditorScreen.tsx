@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Pressable,
   SafeAreaView,
@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import type { components } from "@personal-health/api-client";
+import { ApiError } from "@personal-health/api-client";
 
 import {
   ActionButton,
@@ -17,6 +18,7 @@ import {
   StatusMessage,
 } from "../../profile/components/Ui";
 import { DEVICE_TIMEZONE, localCalendarDate } from "../../daily/model";
+import { sessionStore } from "../../../auth/sessionStore";
 import { planningApi, planningErrorMessage } from "../api";
 
 type ParentKind = "regimen" | "plan";
@@ -60,6 +62,10 @@ export default function ScheduleEditorScreen() {
     components["schemas"]["ScheduleResponse"] | null
   >(null);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
+  const [reloadRequired, setReloadRequired] = useState(false);
+  const initialized = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [localTime, setLocalTime] = useState("08:00");
@@ -81,10 +87,17 @@ export default function ScheduleEditorScreen() {
             plan_id: params.parentId,
             item_id: params.itemId!,
           });
+    setLoading(!initialized.current);
     request
       .then((schedule) => {
-        if (!active || !schedule) return;
+        if (!active) return;
+        setLoaded(true);
+        setError(null);
+        setReloadRequired(false);
         setCurrent(schedule);
+        if (initialized.current) return;
+        initialized.current = true;
+        if (!schedule) return;
         setLocalTime(schedule.schedule.local_time.slice(0, 5));
         setTimezone(schedule.schedule.timezone);
         setStartDate(schedule.schedule.start_date);
@@ -105,10 +118,30 @@ export default function ScheduleEditorScreen() {
     return () => {
       active = false;
     };
-  }, [parentKind, params.itemId, params.parentId, today, validRoute]);
+  }, [
+    parentKind,
+    params.itemId,
+    params.parentId,
+    today,
+    validRoute,
+    reloadToken,
+  ]);
 
   async function save() {
+    const sessionAtStart = sessionStore.getSnapshot();
+    const isCurrentSession = () => {
+      const latest = sessionStore.getSnapshot();
+      return (
+        latest.epoch === sessionAtStart.epoch &&
+        latest.userId === sessionAtStart.userId
+      );
+    };
     setError(null);
+    setReloadRequired(false);
+    if (!loaded) {
+      setError("Load the current schedule before saving changes.");
+      return;
+    }
     if (
       !params.parentId ||
       (parentKind !== "regimen" && parentKind !== "plan") ||
@@ -170,13 +203,18 @@ export default function ScheduleEditorScreen() {
           body,
         );
       }
+      if (!isCurrentSession()) return;
       router.back();
     } catch (requestError) {
+      if (!isCurrentSession()) return;
+      setReloadRequired(
+        requestError instanceof ApiError && requestError.status === 409,
+      );
       setError(
         `${planningErrorMessage(requestError)} Reload the schedule before trying again.`,
       );
     } finally {
-      setBusy(false);
+      if (isCurrentSession()) setBusy(false);
     }
   }
 
@@ -193,6 +231,22 @@ export default function ScheduleEditorScreen() {
     );
   }
   if (loading) return <LoadingMessage label="Loading schedule" />;
+  if (!loaded) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusMessage
+          title="Schedule not loaded"
+          message={error ?? "Load the current schedule before editing it."}
+          tone="error"
+        />
+        <ActionButton
+          label="Retry loading schedule"
+          onPress={() => setReloadToken((value) => value + 1)}
+        />
+        <ActionButton label="Back" secondary onPress={() => router.back()} />
+      </SafeAreaView>
+    );
+  }
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -209,6 +263,17 @@ export default function ScheduleEditorScreen() {
             title="Could not save schedule"
             message={error}
             tone="error"
+          />
+        ) : null}
+        {!loaded || reloadRequired ? (
+          <ActionButton
+            label={
+              reloadRequired
+                ? "Reload latest schedule; keep this draft"
+                : "Retry loading schedule"
+            }
+            secondary
+            onPress={() => setReloadToken((value) => value + 1)}
           />
         ) : null}
         <Input

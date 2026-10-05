@@ -10,33 +10,12 @@ import {
 } from "../../profile/components/Ui";
 import { planningApi, planningErrorMessage } from "../api";
 
-type Kind = "goal" | "regimen" | "plan" | "context" | "tracker_definition";
-type Entry = components["schemas"]["PlanningHistoryEntry"];
+type Entry = components["schemas"]["OccurrenceHistoryEntry"];
 const PAGE_SIZE = 50;
 
-async function historyPage(kind: Kind, id: string, afterRevision: number) {
-  const query = { after_revision: afterRevision, limit: PAGE_SIZE };
-  if (kind === "goal")
-    return planningApi.listGoalHistory({ goal_id: id }, query);
-  if (kind === "regimen")
-    return planningApi.listRegimenHistory({ regimen_id: id }, query);
-  if (kind === "plan")
-    return planningApi.listPlanHistory({ plan_id: id }, query);
-  if (kind === "context")
-    return planningApi.listContextHistory({ context_id: id }, query);
-  return planningApi.listTrackerHistory({ tracker_id: id }, query);
-}
-
-export default function PlanningHistoryScreen() {
-  const params = useLocalSearchParams<{ kind?: string; id?: string }>();
+export default function OccurrenceHistoryScreen() {
+  const params = useLocalSearchParams<{ key?: string }>();
   const router = useRouter();
-  const kind = params.kind as Kind;
-  const validRoute = Boolean(
-    params.id &&
-      ["goal", "regimen", "plan", "context", "tracker_definition"].includes(
-        kind,
-      ),
-  );
   const [items, setItems] = useState<Entry[]>([]);
   const [nextAfter, setNextAfter] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,9 +23,13 @@ export default function PlanningHistoryScreen() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!validRoute || !params.id) return;
+    if (!params.key) return;
     let active = true;
-    historyPage(kind, params.id, 0)
+    planningApi
+      .listPlanOccurrenceHistory(
+        { occurrence_key: params.key },
+        { limit: PAGE_SIZE },
+      )
       .then((page) => {
         if (!active) return;
         setItems(page.items);
@@ -61,14 +44,17 @@ export default function PlanningHistoryScreen() {
     return () => {
       active = false;
     };
-  }, [kind, params.id, validRoute]);
+  }, [params.key]);
 
   async function loadMore() {
-    if (!params.id || nextAfter === null) return;
+    if (!params.key || nextAfter === null) return;
     setBusy(true);
     setError(null);
     try {
-      const page = await historyPage(kind, params.id, nextAfter);
+      const page = await planningApi.listPlanOccurrenceHistory(
+        { occurrence_key: params.key },
+        { after_revision: nextAfter, limit: PAGE_SIZE },
+      );
       setItems((current) => [...current, ...page.items]);
       setNextAfter(page.next_after_revision);
     } catch (requestError) {
@@ -78,27 +64,27 @@ export default function PlanningHistoryScreen() {
     }
   }
 
-  if (!validRoute) {
+  if (!params.key) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <StatusMessage
-          title="History link is incomplete"
-          message="Return to Plan and reopen the item."
+          title="Occurrence key is missing"
+          message="Return to Today and open action history again."
           tone="error"
         />
         <ActionButton label="Back" onPress={() => router.back()} />
       </SafeAreaView>
     );
   }
-  if (loading) return <LoadingMessage label="Loading planning history" />;
+  if (loading) return <LoadingMessage label="Loading occurrence history" />;
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text accessibilityRole="header" style={styles.title}>
-          Planning history
+          Occurrence action history
         </Text>
-        <Text style={styles.subtitle}>
-          {kind?.replaceAll("_", " ") ?? "Planning item"} · {params.id}
+        <Text selectable style={styles.key}>
+          {params.key}
         </Text>
         {error ? (
           <StatusMessage
@@ -108,40 +94,37 @@ export default function PlanningHistoryScreen() {
           />
         ) : null}
         {items.length === 0 && !error ? (
-          <Text style={styles.meta}>No revisions are available.</Text>
+          <Text style={styles.meta}>No recorded changes are available.</Text>
         ) : null}
         {items.map((entry) => (
           <View key={entry.revision} style={styles.card}>
             <Text style={styles.cardTitle}>
-              Revision {entry.revision} · {entry.reason}
+              Change {entry.revision} · {entry.action}
             </Text>
-            <Text style={styles.meta}>{entry.recorded_at}</Text>
-            <Text style={styles.body}>
-              Lifecycle: {String(entry.snapshot.lifecycle ?? "unknown")}
+            <Text style={styles.meta}>
+              Recorded {entry.acted_at} · schedule revision{" "}
+              {entry.schedule_revision}
             </Text>
-            <Text style={styles.body}>Payload</Text>
-            <Text selectable style={styles.payload}>
-              {JSON.stringify(
-                entry.snapshot.payload ?? entry.snapshot,
-                null,
-                2,
-              )}
-            </Text>
-            {entry.snapshot.schedule ? (
-              <View style={styles.scheduleHistory}>
-                <Text style={styles.body}>
-                  Schedule change · recorded {entry.recorded_at}
-                </Text>
-                <Text selectable style={styles.payload}>
-                  {JSON.stringify(entry.snapshot.schedule, null, 2)}
-                </Text>
-              </View>
+            {entry.rescheduled_at ? (
+              <Text style={styles.meta}>
+                Moved due time: {entry.rescheduled_at}
+              </Text>
+            ) : null}
+            {entry.linked_event_id ? (
+              <Text style={styles.meta}>
+                Linked Event: {entry.linked_event_id}
+              </Text>
+            ) : null}
+            {entry.linked_observation_id ? (
+              <Text style={styles.meta}>
+                Linked Observation: {entry.linked_observation_id}
+              </Text>
             ) : null}
           </View>
         ))}
         {nextAfter !== null ? (
           <ActionButton
-            label="Load older revisions"
+            label="Load older changes"
             secondary
             busy={busy}
             onPress={() => void loadMore()}
@@ -157,7 +140,7 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#f7f9f7" },
   content: { gap: 16, padding: 20, paddingBottom: 36 },
   title: { color: "#17201c", fontSize: 28, fontWeight: "700" },
-  subtitle: { color: "#46534d", fontSize: 14, lineHeight: 20 },
+  key: { color: "#596860", fontSize: 12, lineHeight: 18 },
   card: {
     backgroundColor: "#fff",
     borderColor: "#c8d2cb",
@@ -167,18 +150,5 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   cardTitle: { color: "#17201c", fontSize: 18, fontWeight: "700" },
-  body: { color: "#46534d", fontSize: 14, fontWeight: "600" },
   meta: { color: "#596860", fontSize: 13 },
-  payload: {
-    color: "#24342b",
-    fontFamily: "monospace",
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  scheduleHistory: {
-    borderTopColor: "#e0e6e2",
-    borderTopWidth: 1,
-    gap: 8,
-    paddingTop: 10,
-  },
 });

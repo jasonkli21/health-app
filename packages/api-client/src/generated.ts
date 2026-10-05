@@ -8,7 +8,9 @@ export interface components {
     };
     ConfirmationStatus: "unconfirmed" | "user_confirmed";
     ContextCreateRequest: {
+      ai_use_allowed?: boolean;
       context: components["schemas"]["ContextPayloadV1"];
+      cross_domain_use_allowed?: boolean;
       id: string;
       notes?: string | null;
     };
@@ -28,9 +30,11 @@ export interface components {
       relevance?: string;
     };
     ContextResponse: {
+      ai_use_allowed: boolean;
       confirmation_status: components["schemas"]["ConfirmationStatus"];
       context: components["schemas"]["ContextPayloadV1"];
       created_at: string;
+      cross_domain_use_allowed: boolean;
       domain: string;
       id: string;
       lifecycle: string;
@@ -53,7 +57,9 @@ export interface components {
       | "schedule_change"
       | "other";
     ContextUpdateRequest: {
+      ai_use_allowed?: boolean | null;
       context: components["schemas"]["ContextPayloadV1"];
+      cross_domain_use_allowed?: boolean | null;
       expected_revision: number;
     };
     CoverageV1: {
@@ -220,6 +226,8 @@ export interface components {
     FiniteProfileNumber: number;
     GoalComparator: "at_least" | "at_most" | "equal";
     GoalCreateRequest: {
+      ai_use_allowed?: boolean;
+      cross_domain_use_allowed?: boolean;
       goal: components["schemas"]["GoalPayloadV1"];
       id: string;
       notes?: string | null;
@@ -241,8 +249,10 @@ export interface components {
       target_period?: "day" | "week" | "month" | "year" | "once" | null;
     };
     GoalResponse: {
+      ai_use_allowed: boolean;
       confirmation_status: components["schemas"]["ConfirmationStatus"];
       created_at: string;
+      cross_domain_use_allowed: boolean;
       domain: string;
       goal: components["schemas"]["GoalPayloadV1"];
       id: string;
@@ -260,6 +270,8 @@ export interface components {
       valid_to: string | null;
     };
     GoalUpdateRequest: {
+      ai_use_allowed?: boolean | null;
+      cross_domain_use_allowed?: boolean | null;
       expected_revision: number;
       goal: components["schemas"]["GoalPayloadV1"];
     };
@@ -269,6 +281,8 @@ export interface components {
       timezone: string;
     };
     LifecycleUpdateRequest: {
+      ai_use_allowed?: boolean | null;
+      cross_domain_use_allowed?: boolean | null;
       expected_revision: number;
       lifecycle:
         | components["schemas"]["GoalLifecycle"]
@@ -359,17 +373,32 @@ export interface components {
       expected_override_revision?: number | null;
       expected_schedule_revision: number;
       linked_event_id?: string | null;
+      linked_observation_id?: string | null;
       rescheduled_at?: string | null;
       state: "completed" | "skipped" | "rescheduled";
     };
     OccurrenceActionResponse: {
       key: string;
       linked_event_id: string | null;
+      linked_observation_id?: string | null;
       override_revision: number;
       rescheduled_at: string | null;
       schedule_revision: number;
       state: "completed" | "skipped" | "rescheduled";
       updated_at: string;
+    };
+    OccurrenceHistoryEntry: {
+      acted_at: string;
+      action: "completed" | "skipped" | "rescheduled";
+      linked_event_id: string | null;
+      linked_observation_id: string | null;
+      rescheduled_at: string | null;
+      revision: number;
+      schedule_revision: number;
+    };
+    OccurrenceHistoryResponse: {
+      items: Array<components["schemas"]["OccurrenceHistoryEntry"]>;
+      next_after_revision: number | null;
     };
     OccurrenceListResponse: {
       items: Array<components["schemas"]["OccurrenceResponse"]>;
@@ -381,6 +410,7 @@ export interface components {
       key: string;
       label: string;
       linked_event_id: string | null;
+      linked_observation_id?: string | null;
       original_local_date: string;
       original_local_time: string;
       override_revision: number | null;
@@ -391,6 +421,8 @@ export interface components {
       timezone: string;
     };
     PlanCreateRequest: {
+      ai_use_allowed?: boolean;
+      cross_domain_use_allowed?: boolean;
       id: string;
       notes?: string | null;
       plan: components["schemas"]["PlanPayloadV1"];
@@ -427,6 +459,8 @@ export interface components {
       next_cursor: string | null;
     };
     PlanOrderRequest: {
+      ai_use_allowed?: boolean | null;
+      cross_domain_use_allowed?: boolean | null;
       expected_revision: number;
       item_ids: Array<string>;
     };
@@ -437,8 +471,10 @@ export interface components {
       start_date?: string | null;
     };
     PlanResponse: {
+      ai_use_allowed: boolean;
       confirmation_status: components["schemas"]["ConfirmationStatus"];
       created_at: string;
+      cross_domain_use_allowed: boolean;
       domain: string;
       id: string;
       lifecycle: string;
@@ -456,6 +492,8 @@ export interface components {
       valid_to: string | null;
     };
     PlanUpdateRequest: {
+      ai_use_allowed?: boolean | null;
+      cross_domain_use_allowed?: boolean | null;
       expected_revision: number;
       plan: components["schemas"]["PlanPayloadV1"];
     };
@@ -570,6 +608,8 @@ export interface components {
       value: components["schemas"]["FiniteProfileNumber"];
     };
     RegimenCreateRequest: {
+      ai_use_allowed?: boolean;
+      cross_domain_use_allowed?: boolean;
       id: string;
       notes?: string | null;
       regimen: components["schemas"]["RegimenPayloadV1"];
@@ -586,8 +626,10 @@ export interface components {
       start_date?: string | null;
     };
     RegimenResponse: {
+      ai_use_allowed: boolean;
       confirmation_status: components["schemas"]["ConfirmationStatus"];
       created_at: string;
+      cross_domain_use_allowed: boolean;
       domain: string;
       id: string;
       lifecycle: string;
@@ -605,6 +647,8 @@ export interface components {
       valid_to: string | null;
     };
     RegimenUpdateRequest: {
+      ai_use_allowed?: boolean | null;
+      cross_domain_use_allowed?: boolean | null;
       expected_revision: number;
       regimen: components["schemas"]["RegimenPayloadV1"];
     };
@@ -678,6 +722,8 @@ export interface components {
       timezone: string;
     };
     TrackerCreateRequest: {
+      ai_use_allowed?: boolean;
+      cross_domain_use_allowed?: boolean;
       definition: components["schemas"]["TrackerDefinitionV1"];
       id: string;
       notes?: string | null;
@@ -703,8 +749,10 @@ export interface components {
       unit?: components["schemas"]["ProfileUnit"] | null;
     };
     TrackerResponse: {
+      ai_use_allowed: boolean;
       confirmation_status: components["schemas"]["ConfirmationStatus"];
       created_at: string;
+      cross_domain_use_allowed: boolean;
       current_schema_version: number;
       definition: components["schemas"]["TrackerDefinitionV1"];
       domain: string;
@@ -732,6 +780,8 @@ export interface components {
       version: number;
     };
     TrackerUpdateRequest: {
+      ai_use_allowed?: boolean | null;
+      cross_domain_use_allowed?: boolean | null;
       definition: components["schemas"]["TrackerDefinitionV1"];
       expected_revision: number;
     };
@@ -1164,6 +1214,7 @@ export interface operations {
       limit?: number;
       lifecycle?: components["schemas"]["ContextLifecycle"] | null;
       cursor?: string | null;
+      archived?: boolean;
     };
     responses: {
       "200": components["schemas"]["PlanningListResponse"];
@@ -1227,6 +1278,7 @@ export interface operations {
       limit?: number;
       lifecycle?: components["schemas"]["GoalLifecycle"] | null;
       cursor?: string | null;
+      archived?: boolean;
     };
     responses: {
       "200": components["schemas"]["PlanningListResponse"];
@@ -1285,6 +1337,22 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  listPlanOccurrenceHistory: {
+    path: {
+      occurrence_key: string;
+    };
+    query?: {
+      after_revision?: number;
+      limit?: number;
+    };
+    responses: {
+      "200": components["schemas"]["OccurrenceHistoryResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   listPlanOccurrences: {
     path: {
       plan_id: string;
@@ -1307,6 +1375,7 @@ export interface operations {
       limit?: number;
       lifecycle?: components["schemas"]["PlanLifecycle"] | null;
       cursor?: string | null;
+      archived?: boolean;
     };
     responses: {
       "200": components["schemas"]["PlanningListResponse"];
@@ -1386,6 +1455,7 @@ export interface operations {
       limit?: number;
       lifecycle?: components["schemas"]["RegimenLifecycle"] | null;
       cursor?: string | null;
+      archived?: boolean;
     };
     responses: {
       "200": components["schemas"]["PlanningListResponse"];
@@ -1415,6 +1485,7 @@ export interface operations {
     query?: {
       limit?: number;
       cursor?: string | null;
+      archived?: boolean;
     };
     responses: {
       "200": components["schemas"]["PlanningListResponse"];
@@ -2109,6 +2180,18 @@ export class HealthApiClient {
     return this.request<components["schemas"]["PlanningHistoryResponse"]>(
       "GET",
       `/plans/${encodeURIComponent(path.plan_id)}/history`,
+      query,
+      undefined,
+    );
+  }
+
+  async listPlanOccurrenceHistory(
+    path: operations["listPlanOccurrenceHistory"]["path"],
+    query?: operations["listPlanOccurrenceHistory"]["query"],
+  ): Promise<components["schemas"]["OccurrenceHistoryResponse"]> {
+    return this.request<components["schemas"]["OccurrenceHistoryResponse"]>(
+      "GET",
+      `/plan-occurrences/${encodeURIComponent(path.occurrence_key)}/history`,
       query,
       undefined,
     );

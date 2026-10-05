@@ -10,19 +10,25 @@ import {
   View,
 } from "react-native";
 import type { components } from "@personal-health/api-client";
+import { sessionStore } from "../../../auth/sessionStore";
 
 import {
   activeTrackerCreateRecovery,
   planningApi,
   planningErrorMessage,
 } from "../api";
-import { dailyApi } from "../../daily/api";
+import { collectTrackerValues, setTrackerInput } from "../trackerEntry";
+import type { TrackerField, TrackerInputMap } from "../trackerEntry";
+import {
+  dailyApi,
+  isDailyCreateAttemptCurrent,
+  type DailyCreateAttempt,
+} from "../../daily/api";
 import {
   DEVICE_TIMEZONE,
   emptyDailyDraft,
   newDailyId,
 } from "../../daily/model";
-import type { DailyCreateAttempt } from "../../daily/api";
 import {
   ActionButton,
   LoadingMessage,
@@ -30,8 +36,7 @@ import {
 } from "../../profile/components/Ui";
 
 type Tracker = components["schemas"]["TrackerResponse"];
-type TrackerField = components["schemas"]["TrackerFieldV1"];
-type ValueMap = Record<string, string | boolean>;
+type ValueMap = TrackerInputMap;
 
 export default function TrackerEntryScreen() {
   const router = useRouter();
@@ -41,6 +46,10 @@ export default function TrackerEntryScreen() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nextTrackerCursor, setNextTrackerCursor] = useState<string | null>(
+    null,
+  );
+  const [loadingMoreTrackers, setLoadingMoreTrackers] = useState(false);
   const [recoveryAttempt, setRecoveryAttempt] =
     useState<DailyCreateAttempt | null>(null);
   const selected =
@@ -61,6 +70,7 @@ export default function TrackerEntryScreen() {
             item.status === "active",
         );
         setTrackers(active);
+        setNextTrackerCursor(page.next_cursor);
         const attempt = activeTrackerCreateRecovery.retryOriginal();
         const observation = attempt?.request.observations?.[0]?.observation;
         const custom = observation?.payload.value;
@@ -82,14 +92,44 @@ export default function TrackerEntryScreen() {
     };
   }, []);
 
+  async function loadMoreTrackers() {
+    if (!nextTrackerCursor || loadingMoreTrackers) return;
+    setLoadingMoreTrackers(true);
+    setError(null);
+    try {
+      const page = await planningApi.listTrackers({
+        limit: 100,
+        cursor: nextTrackerCursor,
+      });
+      const active = page.items.filter(
+        (item): item is Tracker =>
+          item.object_type === "tracker_definition" && item.status === "active",
+      );
+      setTrackers((current) => [...current, ...active]);
+      setNextTrackerCursor(page.next_cursor);
+    } catch (requestError) {
+      setError(planningErrorMessage(requestError));
+    } finally {
+      setLoadingMoreTrackers(false);
+    }
+  }
+
   const fields = useMemo(() => selected?.definition.fields ?? [], [selected]);
 
-  function update(id: string, value: string | boolean) {
-    setValues((current) => ({ ...current, [id]: value }));
+  function update(id: string, value: string | boolean | undefined) {
+    setValues((current) => setTrackerInput(current, id, value));
   }
 
   async function submit() {
     setError(null);
+    const sessionAtStart = sessionStore.getSnapshot();
+    const isCurrentSession = () => {
+      const latest = sessionStore.getSnapshot();
+      return (
+        latest.epoch === sessionAtStart.epoch &&
+        latest.userId === sessionAtStart.userId
+      );
+    };
     if (!selected && !recoveryAttempt) {
       setError("Create a custom tracker before logging an entry.");
       return;
@@ -97,45 +137,7 @@ export default function TrackerEntryScreen() {
     let attempt = recoveryAttempt;
     if (!attempt) {
       try {
-        const customValues: Record<
-          string,
-          string | boolean | number | { value: number; unit: string }
-        > = {};
-        for (const field of fields) {
-          const raw = values[field.id];
-          if (raw === undefined || raw === "") {
-            if (field.required) throw new Error(`${field.label} is required.`);
-            continue;
-          }
-          if (field.kind === "boolean") {
-            if (typeof raw !== "boolean")
-              throw new Error(`${field.label} needs a yes or no value.`);
-            customValues[field.id] = raw;
-          } else if (field.kind === "number" || field.kind === "quantity") {
-            if (typeof raw !== "string")
-              throw new Error(`${field.label} needs a number.`);
-            const number = Number(raw.trim());
-            if (!Number.isFinite(number) || Math.abs(number) > 1e300)
-              throw new Error(`${field.label} needs a finite number.`);
-            customValues[field.id] =
-              field.kind === "quantity"
-                ? { value: number, unit: field.unit ?? "dose" }
-                : number;
-          } else {
-            if (typeof raw !== "string")
-              throw new Error(`${field.label} needs text.`);
-            const value = raw.trim();
-            if (field.kind === "enum" && !(field.choices ?? []).includes(value))
-              throw new Error(`Choose a value for ${field.label}.`);
-            if (field.kind === "date" && !/^\d{4}-\d{2}-\d{2}$/.test(value))
-              throw new Error(`${field.label} must use YYYY-MM-DD.`);
-            if (field.kind === "text" && value.length > 2000)
-              throw new Error(
-                `${field.label} can be at most 2,000 characters.`,
-              );
-            customValues[field.id] = value;
-          }
-        }
+        const customValues = collectTrackerValues(fields, values);
         const id = newDailyId();
         const request: components["schemas"]["DailyEntryCreateRequest"] = {
           events: [],
@@ -170,6 +172,8 @@ export default function TrackerEntryScreen() {
           primaryId: id,
           domain: selected!.definition.domain,
           draft: emptyDailyDraft(),
+          sessionEpoch: sessionAtStart.epoch,
+          sessionUserId: sessionAtStart.userId,
         };
         attempt = activeTrackerCreateRecovery.prepare(attempt);
       } catch (validationError) {
@@ -187,9 +191,17 @@ export default function TrackerEntryScreen() {
       );
       return;
     }
+    if (
+      attempt.sessionEpoch !== undefined &&
+      !isDailyCreateAttemptCurrent(attempt, sessionAtStart)
+    ) {
+      setError("This save belongs to a different session. Start a new entry.");
+      return;
+    }
     setBusy(true);
     try {
       const result = await dailyApi.createDailyEntry(attempt.request);
+      if (!isCurrentSession()) return;
       activeTrackerCreateRecovery.resolve();
       setRecoveryAttempt(null);
       const entry = result.observations.find(
@@ -204,6 +216,7 @@ export default function TrackerEntryScreen() {
         router.replace("/today");
       }
     } catch (requestError) {
+      if (!isCurrentSession()) return;
       const uncertain = activeTrackerCreateRecovery.markFailure(
         attempt,
         requestError,
@@ -215,7 +228,7 @@ export default function TrackerEntryScreen() {
           : planningErrorMessage(requestError),
       );
     } finally {
-      setBusy(false);
+      if (isCurrentSession()) setBusy(false);
     }
   }
 
@@ -282,6 +295,14 @@ export default function TrackerEntryScreen() {
             </View>
           </View>
         ) : null}
+        {nextTrackerCursor && !recoveryAttempt ? (
+          <ActionButton
+            label="Load more trackers"
+            secondary
+            busy={loadingMoreTrackers}
+            onPress={() => void loadMoreTrackers()}
+          />
+        ) : null}
         {recoveryAttempt ? (
           <View style={styles.note}>
             <Text style={styles.noteText}>
@@ -296,6 +317,7 @@ export default function TrackerEntryScreen() {
               field={field}
               value={values[field.id]}
               onChange={(value) => update(field.id, value)}
+              onClear={() => update(field.id, undefined)}
             />
           ))
         )}
@@ -326,10 +348,12 @@ function TrackerInput({
   field,
   value,
   onChange,
+  onClear,
 }: {
   field: TrackerField;
   value: string | boolean | undefined;
-  onChange: (value: string | boolean) => void;
+  onChange: (value: string | boolean | undefined) => void;
+  onClear: () => void;
 }) {
   if (field.kind === "boolean") {
     const current = typeof value === "boolean" ? value : undefined;
@@ -361,6 +385,16 @@ function TrackerInput({
               </Text>
             </Pressable>
           ))}
+          {!field.required && current !== undefined ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Clear ${field.label}`}
+              onPress={onClear}
+              style={styles.choice}
+            >
+              <Text style={styles.choiceText}>Clear</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
     );
@@ -395,6 +429,16 @@ function TrackerInput({
               </Text>
             </Pressable>
           ))}
+          {!field.required && current ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Clear ${field.label}`}
+              onPress={onClear}
+              style={styles.choice}
+            >
+              <Text style={styles.choiceText}>Clear</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
     );

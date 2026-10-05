@@ -27,6 +27,8 @@ from health_api.api.schemas import (
     LifecycleUpdateRequest,
     OccurrenceActionRequest,
     OccurrenceActionResponse,
+    OccurrenceHistoryEntry,
+    OccurrenceHistoryResponse,
     OccurrenceListResponse,
     OccurrenceResponse,
     PlanCreateRequest,
@@ -55,6 +57,7 @@ from health_api.application.planning_service import (
     create_planning_resource,
     get_planning_resource,
     get_planning_schedule,
+    list_occurrence_history,
     list_planning_history,
     list_planning_occurrences,
     list_planning_resources,
@@ -93,13 +96,16 @@ def _owner_binding(owner_id: UUID) -> str:
     return hashlib.sha256(owner_id.bytes).hexdigest()
 
 
-def _encode_cursor(owner_id: UUID, kind: str, lifecycle: str | None, row: PlanningAggregate) -> str:
+def _encode_cursor(
+    owner_id: UUID, kind: str, lifecycle: str | None, row: PlanningAggregate, archived: bool = False
+) -> str:
     obj = row[0]
     payload = {
         "v": 1,
         "owner": _owner_binding(owner_id),
         "kind": kind,
         "lifecycle": lifecycle,
+        "archived": archived,
         "created_at": obj.created_at.isoformat(),
         "id": str(obj.id),
     }
@@ -108,19 +114,20 @@ def _encode_cursor(owner_id: UUID, kind: str, lifecycle: str | None, row: Planni
 
 
 def _decode_cursor(
-    value: str, owner_id: UUID, kind: str, lifecycle: str | None
+    value: str, owner_id: UUID, kind: str, lifecycle: str | None, archived: bool = False
 ) -> tuple[datetime, UUID]:
     try:
         if len(value) > 2048:
             raise ValueError
         payload = json.loads(base64.urlsafe_b64decode(value + "=" * (-len(value) % 4)))
-        if set(payload) != {"v", "owner", "kind", "lifecycle", "created_at", "id"}:
+        if set(payload) != {"v", "owner", "kind", "lifecycle", "archived", "created_at", "id"}:
             raise ValueError
         if (
             payload["v"] != 1
             or payload["owner"] != _owner_binding(owner_id)
             or payload["kind"] != kind
             or payload["lifecycle"] != lifecycle
+            or payload["archived"] is not archived
         ):
             raise ValueError
         created_at = datetime.fromisoformat(payload["created_at"])
@@ -151,6 +158,8 @@ def resource_response(aggregate: PlanningAggregate) -> dict[str, Any]:
         "schema_version": obj.schema_version,
         "revision": obj.revision,
         "notes": obj.notes,
+        "ai_use_allowed": obj.ai_use_allowed,
+        "cross_domain_use_allowed": obj.cross_domain_use_allowed,
         "lifecycle": resource.lifecycle if obj.status == "active" else "archived",
     }
     if resource.resource_kind == "tracker_definition":
@@ -176,9 +185,10 @@ def _list(
     lifecycle: str | None,
     cursor: str | None,
     response_type: type[BaseModel],
+    archived: bool = False,
 ) -> PlanningListResponse:
-    after = _decode_cursor(cursor, owner_id, kind, lifecycle) if cursor else None
-    rows = list_planning_resources(session, owner_id, kind, limit + 1, lifecycle, after)
+    after = _decode_cursor(cursor, owner_id, kind, lifecycle, archived) if cursor else None
+    rows = list_planning_resources(session, owner_id, kind, limit + 1, lifecycle, after, archived)
     has_more = len(rows) > limit
     rows = rows[:limit]
     return PlanningListResponse(
@@ -186,7 +196,7 @@ def _list(
             list[PlanningItemResponse],
             [_typed_response(row, response_type) for row in rows],
         ),
-        next_cursor=_encode_cursor(owner_id, kind, lifecycle, rows[-1])
+        next_cursor=_encode_cursor(owner_id, kind, lifecycle, rows[-1], archived)
         if has_more and rows
         else None,
     )
@@ -201,9 +211,18 @@ def _create[T: BaseModel](
     notes: str | None,
     response_type: type[T],
     response: Response,
+    ai_use_allowed: bool = False,
+    cross_domain_use_allowed: bool = False,
 ) -> T:
     aggregate, created = create_planning_resource(
-        session, owner_id, object_id, kind, payload, notes
+        session,
+        owner_id,
+        object_id,
+        kind,
+        payload,
+        notes,
+        ai_use_allowed,
+        cross_domain_use_allowed,
     )
     response.status_code = 201 if created else 200
     return _typed_response(aggregate, response_type)
@@ -253,9 +272,17 @@ def list_goals(
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     lifecycle: GoalLifecycle | None = None,
     cursor: Annotated[str | None, Query(max_length=2048)] = None,
+    archived: bool = False,
 ) -> PlanningListResponse:
     return _list(
-        session, owner, "goal", limit, lifecycle.value if lifecycle else None, cursor, GoalResponse
+        session,
+        owner,
+        "goal",
+        limit,
+        None if archived else lifecycle.value if lifecycle else None,
+        cursor,
+        GoalResponse,
+        archived,
     )
 
 
@@ -272,7 +299,18 @@ def create_goal(
     owner: Annotated[UUID, Depends(get_current_owner)],
     session: Annotated[Session, Depends(get_session)],
 ) -> GoalResponse:
-    return _create(session, owner, body.id, "goal", body.goal, body.notes, GoalResponse, response)
+    return _create(
+        session,
+        owner,
+        body.id,
+        "goal",
+        body.goal,
+        body.notes,
+        GoalResponse,
+        response,
+        body.ai_use_allowed,
+        body.cross_domain_use_allowed,
+    )
 
 
 @router.get(
@@ -300,7 +338,14 @@ def update_goal(
 ) -> GoalResponse:
     return _typed_response(
         update_planning_resource(
-            session, owner, goal_id, "goal", body.expected_revision, body.goal
+            session,
+            owner,
+            goal_id,
+            "goal",
+            body.expected_revision,
+            body.goal,
+            body.ai_use_allowed,
+            body.cross_domain_use_allowed,
         ),
         GoalResponse,
     )
@@ -366,15 +411,17 @@ def list_regimens(
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     lifecycle: RegimenLifecycle | None = None,
     cursor: Annotated[str | None, Query(max_length=2048)] = None,
+    archived: bool = False,
 ) -> PlanningListResponse:
     return _list(
         session,
         owner,
         "regimen",
         limit,
-        lifecycle.value if lifecycle else None,
+        None if archived else lifecycle.value if lifecycle else None,
         cursor,
         RegimenResponse,
+        archived,
     )
 
 
@@ -392,7 +439,16 @@ def create_regimen(
     session: Annotated[Session, Depends(get_session)],
 ) -> RegimenResponse:
     return _create(
-        session, owner, body.id, "regimen", body.regimen, body.notes, RegimenResponse, response
+        session,
+        owner,
+        body.id,
+        "regimen",
+        body.regimen,
+        body.notes,
+        RegimenResponse,
+        response,
+        body.ai_use_allowed,
+        body.cross_domain_use_allowed,
     )
 
 
@@ -426,7 +482,14 @@ def update_regimen(
 ) -> RegimenResponse:
     return _typed_response(
         update_planning_resource(
-            session, owner, regimen_id, "regimen", body.expected_revision, body.regimen
+            session,
+            owner,
+            regimen_id,
+            "regimen",
+            body.expected_revision,
+            body.regimen,
+            body.ai_use_allowed,
+            body.cross_domain_use_allowed,
         ),
         RegimenResponse,
     )
@@ -490,9 +553,17 @@ def list_plans(
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     lifecycle: PlanLifecycle | None = None,
     cursor: Annotated[str | None, Query(max_length=2048)] = None,
+    archived: bool = False,
 ) -> PlanningListResponse:
     return _list(
-        session, owner, "plan", limit, lifecycle.value if lifecycle else None, cursor, PlanResponse
+        session,
+        owner,
+        "plan",
+        limit,
+        None if archived else lifecycle.value if lifecycle else None,
+        cursor,
+        PlanResponse,
+        archived,
     )
 
 
@@ -509,7 +580,18 @@ def create_plan(
     owner: Annotated[UUID, Depends(get_current_owner)],
     session: Annotated[Session, Depends(get_session)],
 ) -> PlanResponse:
-    return _create(session, owner, body.id, "plan", body.plan, body.notes, PlanResponse, response)
+    return _create(
+        session,
+        owner,
+        body.id,
+        "plan",
+        body.plan,
+        body.notes,
+        PlanResponse,
+        response,
+        body.ai_use_allowed,
+        body.cross_domain_use_allowed,
+    )
 
 
 @router.get(
@@ -537,7 +619,14 @@ def update_plan(
 ) -> PlanResponse:
     return _typed_response(
         update_planning_resource(
-            session, owner, plan_id, "plan", body.expected_revision, body.plan
+            session,
+            owner,
+            plan_id,
+            "plan",
+            body.expected_revision,
+            body.plan,
+            body.ai_use_allowed,
+            body.cross_domain_use_allowed,
         ),
         PlanResponse,
     )
@@ -621,15 +710,17 @@ def list_contexts(
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     lifecycle: ContextLifecycle | None = None,
     cursor: Annotated[str | None, Query(max_length=2048)] = None,
+    archived: bool = False,
 ) -> PlanningListResponse:
     return _list(
         session,
         owner,
         "context",
         limit,
-        lifecycle.value if lifecycle else None,
+        None if archived else lifecycle.value if lifecycle else None,
         cursor,
         ContextResponse,
+        archived,
     )
 
 
@@ -647,7 +738,16 @@ def create_context(
     session: Annotated[Session, Depends(get_session)],
 ) -> ContextResponse:
     return _create(
-        session, owner, body.id, "context", body.context, body.notes, ContextResponse, response
+        session,
+        owner,
+        body.id,
+        "context",
+        body.context,
+        body.notes,
+        ContextResponse,
+        response,
+        body.ai_use_allowed,
+        body.cross_domain_use_allowed,
     )
 
 
@@ -681,7 +781,14 @@ def update_context(
 ) -> ContextResponse:
     return _typed_response(
         update_planning_resource(
-            session, owner, context_id, "context", body.expected_revision, body.context
+            session,
+            owner,
+            context_id,
+            "context",
+            body.expected_revision,
+            body.context,
+            body.ai_use_allowed,
+            body.cross_domain_use_allowed,
         ),
         ContextResponse,
     )
@@ -747,8 +854,18 @@ def list_trackers(
     session: Annotated[Session, Depends(get_session)],
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     cursor: Annotated[str | None, Query(max_length=2048)] = None,
+    archived: bool = False,
 ) -> PlanningListResponse:
-    return _list(session, owner, "tracker_definition", limit, "active", cursor, TrackerResponse)
+    return _list(
+        session,
+        owner,
+        "tracker_definition",
+        limit,
+        None if archived else "active",
+        cursor,
+        TrackerResponse,
+        archived,
+    )
 
 
 @router.post(
@@ -773,6 +890,8 @@ def create_tracker(
         body.notes,
         TrackerResponse,
         response,
+        body.ai_use_allowed,
+        body.cross_domain_use_allowed,
     )
 
 
@@ -812,6 +931,8 @@ def update_tracker(
             "tracker_definition",
             body.expected_revision,
             body.definition,
+            body.ai_use_allowed,
+            body.cross_domain_use_allowed,
         ),
         TrackerResponse,
     )
@@ -1046,5 +1167,39 @@ def update_occurrence(
             body.state,
             body.rescheduled_at,
             body.linked_event_id,
+            body.linked_observation_id,
         )
+    )
+
+
+@router.get(
+    "/plan-occurrences/{occurrence_key}/history",
+    response_model=OccurrenceHistoryResponse,
+    operation_id="listPlanOccurrenceHistory",
+    responses=COMMON_ERRORS,
+)
+def occurrence_history(
+    occurrence_key: str,
+    owner: Annotated[UUID, Depends(get_current_owner)],
+    session: Annotated[Session, Depends(get_session)],
+    after_revision: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> OccurrenceHistoryResponse:
+    rows = list_occurrence_history(session, owner, occurrence_key, after_revision, limit + 1)
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    return OccurrenceHistoryResponse(
+        items=[
+            OccurrenceHistoryEntry(
+                revision=row.revision,
+                action=cast(Literal["completed", "skipped", "rescheduled"], row.action),
+                schedule_revision=row.schedule_revision,
+                acted_at=row.acted_at,
+                rescheduled_at=row.rescheduled_at,
+                linked_event_id=row.linked_event_id,
+                linked_observation_id=row.linked_observation_id,
+            )
+            for row in rows
+        ],
+        next_after_revision=rows[-1].revision if has_more and rows else None,
     )

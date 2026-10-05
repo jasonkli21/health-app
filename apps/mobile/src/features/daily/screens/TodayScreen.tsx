@@ -70,6 +70,10 @@ export default function TodayScreen() {
   const [error, setError] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
   const [refresh, setRefresh] = useState(0);
+  const [occurrenceLinks, setOccurrenceLinks] = useState<
+    Record<string, string>
+  >({});
+  const [linkPickerKey, setLinkPickerKey] = useState<string | null>(null);
   const [visibleResultScopeKey, setVisibleResultScopeKey] = useState<
     string | null
   >(null);
@@ -172,6 +176,8 @@ export default function TodayScreen() {
                   profile_context_refs: current.profile_context_refs,
                   profile_context_truncated: current.profile_context_truncated,
                   includes_profile_context: current.includes_profile_context,
+                  plan_items: current.plan_items,
+                  active_contexts: current.active_contexts,
                 }
               : page,
           );
@@ -190,6 +196,7 @@ export default function TodayScreen() {
     scheduleRevision: number,
     overrideRevision: number | null,
     state: "completed" | "skipped",
+    linkedRecord?: DailyItem,
   ) {
     try {
       await planningApi.updatePlanOccurrence(
@@ -198,6 +205,12 @@ export default function TodayScreen() {
           expected_schedule_revision: scheduleRevision,
           expected_override_revision: overrideRevision,
           state,
+          linked_event_id:
+            linkedRecord?.object_type === "event" ? linkedRecord.id : null,
+          linked_observation_id:
+            linkedRecord?.object_type === "observation"
+              ? linkedRecord.id
+              : null,
         },
       );
       setRefresh((value) => value + 1);
@@ -424,6 +437,82 @@ export default function TodayScreen() {
                         New due time: {occurrence.due_at}
                       </Text>
                     ) : null}
+                    {occurrence.linked_event_id ||
+                    occurrence.linked_observation_id ? (
+                      <Text style={styles.cardMeta}>
+                        Linked record:{" "}
+                        {occurrence.linked_event_id ??
+                          occurrence.linked_observation_id}
+                      </Text>
+                    ) : null}
+                    <ActionButton
+                      label={
+                        occurrenceLinks[occurrence.key]
+                          ? "Change linked record"
+                          : "Associate existing record"
+                      }
+                      secondary
+                      onPress={() =>
+                        setLinkPickerKey((current) =>
+                          current === occurrence.key ? null : occurrence.key,
+                        )
+                      }
+                    />
+                    {linkPickerKey === occurrence.key ? (
+                      <View style={styles.linkChoices}>
+                        <Text style={styles.cardMeta}>
+                          Optional link to an Event or Observation already shown
+                          in Today
+                        </Text>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityState={{
+                            selected: !occurrenceLinks[occurrence.key],
+                          }}
+                          onPress={() =>
+                            setOccurrenceLinks((current) => {
+                              const next = { ...current };
+                              delete next[occurrence.key];
+                              return next;
+                            })
+                          }
+                          style={styles.profileRef}
+                        >
+                          <Text style={styles.cardMeta}>No linked record</Text>
+                        </Pressable>
+                        {items.map((record) => (
+                          <Pressable
+                            key={record.id}
+                            accessibilityRole="button"
+                            accessibilityState={{
+                              selected:
+                                occurrenceLinks[occurrence.key] === record.id,
+                            }}
+                            onPress={() => {
+                              setOccurrenceLinks((current) => ({
+                                ...current,
+                                [occurrence.key]: record.id,
+                              }));
+                              setLinkPickerKey(null);
+                            }}
+                            style={styles.profileRef}
+                          >
+                            <Text style={styles.cardTitle}>
+                              {itemTitle(record)}
+                            </Text>
+                            <Text style={styles.cardMeta}>
+                              {record.object_type} ·{" "}
+                              {itemTimeLabel(record, timezone)}
+                            </Text>
+                          </Pressable>
+                        ))}
+                        {items.length === 0 ? (
+                          <Text style={styles.cardMeta}>
+                            No existing records are loaded for this day.
+                          </Text>
+                        ) : null}
+                      </View>
+                    ) : null}
                     <View style={styles.nav}>
                       <ActionButton
                         label="Mark complete"
@@ -434,6 +523,10 @@ export default function TodayScreen() {
                             occurrence.schedule_revision,
                             occurrence.override_revision,
                             "completed",
+                            items.find(
+                              (record) =>
+                                record.id === occurrenceLinks[occurrence.key],
+                            ),
                           )
                         }
                       />
@@ -446,9 +539,25 @@ export default function TodayScreen() {
                             occurrence.schedule_revision,
                             occurrence.override_revision,
                             "skipped",
+                            items.find(
+                              (record) =>
+                                record.id === occurrenceLinks[occurrence.key],
+                            ),
                           )
                         }
                       />
+                      {occurrence.state !== "unknown" ? (
+                        <ActionButton
+                          label="View action history"
+                          secondary
+                          onPress={() =>
+                            router.push({
+                              pathname: "/planning/occurrence-history",
+                              params: { key: occurrence.key },
+                            })
+                          }
+                        />
+                      ) : null}
                       <ActionButton
                         label="Reschedule"
                         secondary
@@ -646,6 +755,7 @@ const styles = StyleSheet.create({
     minHeight: 66,
     padding: 14,
   },
+  linkChoices: { gap: 8, paddingLeft: 8 },
   empty: {
     alignItems: "flex-start",
     backgroundColor: "#fff",

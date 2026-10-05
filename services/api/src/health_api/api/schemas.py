@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -163,6 +163,8 @@ class ProfileHistoryResponse(StrictModel):
 class PlanningCreateRequestBase(StrictModel):
     id: UUID
     notes: DailyNotes | None = None
+    ai_use_allowed: bool = False
+    cross_domain_use_allowed: bool = False
 
 
 class GoalCreateRequest(PlanningCreateRequestBase):
@@ -187,6 +189,8 @@ class TrackerCreateRequest(PlanningCreateRequestBase):
 
 class PlanningUpdateBase(StrictModel):
     expected_revision: Annotated[StrictInt, Field(ge=1)]
+    ai_use_allowed: bool | None = None
+    cross_domain_use_allowed: bool | None = None
 
 
 class GoalUpdateRequest(PlanningUpdateBase):
@@ -211,9 +215,11 @@ class ScheduleEditRequest(StrictModel):
     schedule: ScheduleDefinitionV1
 
     @model_validator(mode="after")
-    def schedule_starts_after_boundary(self) -> ScheduleEditRequest:
-        if self.schedule.start_date < self.effective_from:
-            raise ValueError("schedule start_date must be on or after its effective date")
+    def effective_date_is_representable(self) -> ScheduleEditRequest:
+        if self.effective_from < date.min + timedelta(
+            days=1
+        ) or self.effective_from > date.max - timedelta(days=2):
+            raise ValueError("effective_from is outside the supported calendar range")
         return self
 
 
@@ -230,11 +236,14 @@ class OccurrenceActionRequest(StrictModel):
     state: Literal["completed", "skipped", "rescheduled"]
     rescheduled_at: AwareDatetime | None = None
     linked_event_id: UUID | None = None
+    linked_observation_id: UUID | None = None
 
     @model_validator(mode="after")
     def reschedule_requires_new_due_time(self) -> OccurrenceActionRequest:
         if (self.state == "rescheduled") != (self.rescheduled_at is not None):
             raise ValueError("rescheduled_at is required only for a rescheduled occurrence")
+        if self.linked_event_id is not None and self.linked_observation_id is not None:
+            raise ValueError("link at most one existing Event or Observation")
         return self
 
 
@@ -253,6 +262,7 @@ class OccurrenceResponse(StrictModel):
     state: Literal["unknown", "completed", "skipped", "rescheduled"]
     override_revision: Annotated[StrictInt, Field(ge=1)] | None
     linked_event_id: UUID | None
+    linked_observation_id: UUID | None = None
 
 
 class OccurrenceListResponse(StrictModel):
@@ -266,7 +276,23 @@ class OccurrenceActionResponse(StrictModel):
     schedule_revision: Annotated[StrictInt, Field(ge=1)]
     rescheduled_at: datetime | None
     linked_event_id: UUID | None
+    linked_observation_id: UUID | None = None
     updated_at: datetime
+
+
+class OccurrenceHistoryEntry(StrictModel):
+    revision: Annotated[StrictInt, Field(ge=1)]
+    action: Literal["completed", "skipped", "rescheduled"]
+    schedule_revision: Annotated[StrictInt, Field(ge=1)]
+    acted_at: datetime
+    rescheduled_at: datetime | None
+    linked_event_id: UUID | None
+    linked_observation_id: UUID | None
+
+
+class OccurrenceHistoryResponse(StrictModel):
+    items: list[OccurrenceHistoryEntry]
+    next_after_revision: Annotated[StrictInt, Field(ge=1)] | None
 
 
 class ContextUpdateRequest(PlanningUpdateBase):
@@ -296,6 +322,8 @@ class PlanningResourceResponseBase(StrictModel):
     schema_version: Literal[1]
     revision: Annotated[int, Field(ge=1)]
     notes: DailyNotes | None
+    ai_use_allowed: bool
+    cross_domain_use_allowed: bool
     lifecycle: str
 
 

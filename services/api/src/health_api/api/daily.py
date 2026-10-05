@@ -872,8 +872,10 @@ def get_today(
         )
 
     summaries = summarize_today_snapshot(snapshot.revisions, effective_date, effective_timezone)
-    plan_items, active_contexts = load_today_planning(
-        session, owner_id, effective_date, effective_timezone
+    plan_items, active_contexts = (
+        load_today_planning(session, owner_id, effective_date, effective_timezone)
+        if cursor is None
+        else ([], [])
     )
     return TodayResponse(
         date=effective_date,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date, time
+from datetime import date, time, timedelta
 from enum import StrEnum
 from math import isfinite
 from typing import Annotated, Literal
@@ -296,6 +296,14 @@ class ScheduleDefinitionV1(StrictModel):
         validate_iana_timezone(self.timezone)
         if self.local_time.tzinfo is not None:
             raise ValueError("schedule local_time must not include a timezone offset")
+        # Leave room for week anchoring, DST resolution and UTC offsets at the
+        # calendar boundaries so valid transport values cannot overflow later.
+        if self.start_date < date.min + timedelta(days=7) or self.start_date > date.max - timedelta(
+            days=2
+        ):
+            raise ValueError("schedule start_date is outside the supported calendar range")
+        if self.end_date and self.end_date > date.max - timedelta(days=2):
+            raise ValueError("schedule end_date is outside the supported calendar range")
         if self.end_date and self.end_date < self.start_date:
             raise ValueError("end_date must not precede start_date")
         if self.recurrence == ScheduleRecurrence.WEEKLY and not self.weekdays:
@@ -333,8 +341,8 @@ def validate_tracker_values(
             if (
                 isinstance(value, bool)
                 or not isinstance(value, (int, float))
-                or not isfinite(value)
                 or abs(value) > 1e300
+                or (isinstance(value, float) and not isfinite(value))
             ):
                 raise ValueError("tracker number value is invalid")
         elif field.kind == TrackerFieldKind.ENUM:
@@ -351,8 +359,8 @@ def validate_tracker_values(
             if (
                 isinstance(numeric, bool)
                 or not isinstance(numeric, (int, float))
-                or not isfinite(numeric)
                 or abs(numeric) > 1e300
+                or (isinstance(numeric, float) and not isfinite(numeric))
             ):
                 raise ValueError("tracker quantity value is invalid")
             if value["unit"] != field.unit:

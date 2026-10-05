@@ -6,7 +6,10 @@ import { startFirebaseSession } from "../src/auth/firebaseSession";
 import { sessionStore } from "../src/auth/sessionStore";
 import { activeDailyCreateRecovery } from "../src/features/daily/api";
 import { activeProfileCreateRecovery } from "../src/features/profile/createRecovery";
-import { activeTrackerCreateRecovery } from "../src/features/planning/api";
+import {
+  activePlanningCreateRecovery,
+  activeTrackerCreateRecovery,
+} from "../src/features/planning/api";
 
 export default function RootLayout() {
   const session = useSyncExternalStore(
@@ -21,6 +24,7 @@ export default function RootLayout() {
       () => activeProfileCreateRecovery.resolve(),
       () => activeDailyCreateRecovery.resolve(),
       () => activeTrackerCreateRecovery.resolve(),
+      () => activePlanningCreateRecovery.resolve(),
     ]);
   }, [session.mode]);
 
@@ -42,6 +46,7 @@ export default function RootLayout() {
         <Stack.Screen name="planning/reschedule" />
         <Stack.Screen name="planning/schedule" />
         <Stack.Screen name="planning/history" />
+        <Stack.Screen name="planning/occurrence-history" />
         <Stack.Screen name="profile/new" />
         <Stack.Screen name="profile/[itemId]" />
         <Stack.Screen name="profile/[itemId]/edit" />

@@ -162,7 +162,10 @@ class HealthObject(Base):
         back_populates="health_object", uselist=False, cascade="all, delete-orphan"
     )
     observation_item: Mapped[ObservationItem | None] = relationship(
-        back_populates="health_object", uselist=False, cascade="all, delete-orphan"
+        back_populates="health_object",
+        uselist=False,
+        cascade="all, delete-orphan",
+        foreign_keys="[ObservationItem.owner_id, ObservationItem.object_id]",
     )
     planning_resource: Mapped[PlanningResource | None] = relationship(
         back_populates="health_object", uselist=False, cascade="all, delete-orphan"
@@ -388,9 +391,14 @@ class ObservationItem(Base):
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     tracker_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
     tracker_schema_version: Mapped[int | None] = mapped_column(SmallInteger)
-    tracker_values: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    # `None` means no custom tracker payload. Bind it as SQL NULL so ordinary
+    # observations satisfy the tracker-shape constraint instead of storing JSON null.
+    tracker_values: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
 
-    health_object: Mapped[HealthObject] = relationship(back_populates="observation_item")
+    health_object: Mapped[HealthObject] = relationship(
+        back_populates="observation_item",
+        foreign_keys=[owner_id, object_id],
+    )
 
     __table_args__ = (
         ForeignKeyConstraint(
@@ -588,7 +596,7 @@ class PlanningLink(Base):
             name="fk_planning_links_owner_target",
         ),
         CheckConstraint(
-            "link_kind IN ('plan_goal', 'plan_regimen', 'plan_task', "
+            "link_kind IN ('plan_goal', 'plan_regimen', 'plan_task', 'plan_retired', "
             "'context_goal', 'context_regimen', 'context_profile', 'context_relation')",
             name="ck_planning_links_kind",
         ),
@@ -613,6 +621,7 @@ class PlanningScheduleIdentity(Base):
     schedule_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
     parent_object_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     item_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
+    retired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
         ForeignKeyConstraint(
@@ -640,13 +649,6 @@ class PlanningScheduleIdentity(Base):
             "parent_object_id",
             unique=True,
             postgresql_where=item_id.is_(None),
-        ),
-        UniqueConstraint(
-            "owner_id",
-            "schedule_id",
-            "parent_object_id",
-            "item_id",
-            name="uq_planning_schedule_identity_context",
         ),
         UniqueConstraint(
             "owner_id",
@@ -720,7 +722,11 @@ class PlanningOccurrenceOverride(Base):
     override_revision: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="1")
     state: Mapped[str] = mapped_column(String(16), nullable=False)
     rescheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    original_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    original_timezone: Mapped[str | None] = mapped_column(String(64))
+    dst_resolution: Mapped[str | None] = mapped_column(String(24))
     linked_event_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
+    linked_observation_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
@@ -738,8 +744,18 @@ class PlanningOccurrenceOverride(Base):
             ondelete="RESTRICT",
             name="fk_occurrence_overrides_owner_event",
         ),
+        ForeignKeyConstraint(
+            ["owner_id", "linked_observation_id"],
+            ["observations.owner_id", "observations.object_id"],
+            ondelete="RESTRICT",
+            name="fk_occurrence_overrides_owner_observation",
+        ),
         CheckConstraint(
             "state IN ('completed', 'skipped', 'rescheduled')", name="ck_occurrence_overrides_state"
+        ),
+        CheckConstraint(
+            "linked_event_id IS NULL OR linked_observation_id IS NULL",
+            name="ck_occurrence_overrides_single_link",
         ),
         CheckConstraint(
             "override_revision > 0 AND expected_schedule_revision > 0",
@@ -747,7 +763,7 @@ class PlanningOccurrenceOverride(Base):
         ),
         CheckConstraint(
             "(state = 'rescheduled' AND rescheduled_at IS NOT NULL) OR "
-            "(state <> 'rescheduled' AND rescheduled_at IS NULL)",
+            "(state IN ('completed', 'skipped'))",
             name="ck_occurrence_overrides_rescheduled",
         ),
         Index("ix_occurrence_overrides_owner_schedule", "owner_id", "schedule_id"),
@@ -768,6 +784,7 @@ class PlanningOccurrenceAction(Base):
     )
     rescheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     linked_event_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
+    linked_observation_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
 
     __table_args__ = (
         ForeignKeyConstraint(
@@ -788,12 +805,22 @@ class PlanningOccurrenceAction(Base):
             ondelete="RESTRICT",
             name="fk_occurrence_actions_owner_event",
         ),
+        ForeignKeyConstraint(
+            ["owner_id", "linked_observation_id"],
+            ["observations.owner_id", "observations.object_id"],
+            ondelete="RESTRICT",
+            name="fk_occurrence_actions_owner_observation",
+        ),
         CheckConstraint(
             "revision > 0 AND schedule_revision > 0", name="ck_occurrence_actions_revision"
         ),
         CheckConstraint("actor_id = owner_id", name="ck_occurrence_actions_owner_actor"),
         CheckConstraint(
             "action IN ('completed', 'skipped', 'rescheduled')", name="ck_occurrence_actions_state"
+        ),
+        CheckConstraint(
+            "linked_event_id IS NULL OR linked_observation_id IS NULL",
+            name="ck_occurrence_actions_single_link",
         ),
     )
 
