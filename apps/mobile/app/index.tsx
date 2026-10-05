@@ -55,6 +55,13 @@ export default function HomeScreen() {
         >
           Open your Profile
         </Link>
+        <Link
+          accessibilityRole="button"
+          style={styles.secondaryLink}
+          href="/planning"
+        >
+          Open Plan
+        </Link>
       </View>
     </SafeAreaView>
   );

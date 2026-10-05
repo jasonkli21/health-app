@@ -9,6 +9,7 @@ import {
   ActionButton,
 } from "../../profile/components/Ui";
 import { dailyApi, dailyErrorMessage } from "../api";
+import { customTrackerValue } from "../model";
 import { DailyEntryForm } from "../components/DailyEntryForm";
 import type { EventRecord, ObservationRecord } from "../model";
 import {
@@ -114,7 +115,13 @@ export default function DailyEditScreen() {
             />
           </View>
         ) : null}
-        {item && draft ? (
+        {item && customTrackerValue(item) ? (
+          <StatusMessage
+            title="Custom tracker entry is read-only"
+            message="This entry keeps the tracker schema version it was created with. Edit the tracker definition from Plan to make a new version for future entries."
+          />
+        ) : null}
+        {item && draft && !customTrackerValue(item) ? (
           <DailyEntryForm
             key={`${item.id}:${editState.formGeneration}`}
             domain={item.domain}

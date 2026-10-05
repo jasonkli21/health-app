@@ -11,6 +11,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { dailyApi, dailyErrorMessage } from "../api";
+import { planningApi, planningErrorMessage } from "../../planning/api";
 import {
   DAILY_DOMAINS,
   DEVICE_TIMEZONE,
@@ -51,7 +52,9 @@ function itemKindLabel(item: DailyItem): string {
         return "Symptom";
     }
   }
-  return "Observation";
+  return item.observation.payload.value.metric === "custom"
+    ? "Custom tracker"
+    : "Observation";
 }
 
 export default function TodayScreen() {
@@ -182,6 +185,28 @@ export default function TodayScreen() {
     );
   }
 
+  async function updateOccurrence(
+    key: string,
+    scheduleRevision: number,
+    overrideRevision: number | null,
+    state: "completed" | "skipped",
+  ) {
+    try {
+      await planningApi.updatePlanOccurrence(
+        { occurrence_key: key },
+        {
+          expected_schedule_revision: scheduleRevision,
+          expected_override_revision: overrideRevision,
+          state,
+        },
+      );
+      setRefresh((value) => value + 1);
+    } catch (requestError) {
+      setError(planningErrorMessage(requestError));
+      setRefresh((value) => value + 1);
+    }
+  }
+
   const summariesByDomain = new Map<
     string,
     components["schemas"]["MetricSummaryV1"][]
@@ -210,6 +235,11 @@ export default function TodayScreen() {
               label="Open Profile"
               secondary
               onPress={() => router.push("/profile")}
+            />
+            <ActionButton
+              label="Open Plan"
+              secondary
+              onPress={() => router.push("/planning")}
             />
           </View>
         </View>
@@ -340,6 +370,110 @@ export default function TodayScreen() {
                 ) : null}
               </View>
             ) : null}
+
+            {(data.active_contexts ?? []).length > 0 ? (
+              <View style={styles.section}>
+                <Text accessibilityRole="header" style={styles.sectionTitle}>
+                  Active contexts
+                </Text>
+                <Text style={styles.explainer}>
+                  Temporary context is shown for relevance. It does not replace
+                  Profile or change a regimen.
+                </Text>
+                {(data.active_contexts ?? []).map((context) => (
+                  <View key={context.id} style={styles.profileRef}>
+                    <Text style={styles.cardTitle}>{context.label}</Text>
+                    <Text style={styles.cardMeta}>
+                      {context.context_type.replaceAll("_", " ")} · priority{" "}
+                      {context.priority}
+                    </Text>
+                    {context.notes ? (
+                      <Text style={styles.cardBody}>{context.notes}</Text>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            <View style={styles.section}>
+              <Text accessibilityRole="header" style={styles.sectionTitle}>
+                Planned items
+              </Text>
+              <Text style={styles.explainer}>
+                These are intended schedule slots. An unmarked slot is unknown,
+                not a missed activity.
+              </Text>
+              {(data.plan_items ?? []).length === 0 ? (
+                <Text style={styles.cardMeta}>
+                  No scheduled plan items for this day.
+                </Text>
+              ) : (
+                (data.plan_items ?? []).map((occurrence) => (
+                  <View key={occurrence.key} style={styles.timelineItem}>
+                    <Text style={styles.kind}>{occurrence.state}</Text>
+                    <Text style={styles.cardTitle}>{occurrence.label}</Text>
+                    <Text style={styles.cardMeta}>
+                      {occurrence.original_local_date}{" "}
+                      {occurrence.original_local_time} · {occurrence.timezone}
+                      {occurrence.dst_resolution === "exact"
+                        ? ""
+                        : ` · ${occurrence.dst_resolution.replaceAll("_", " ")}`}
+                    </Text>
+                    {occurrence.state === "rescheduled" ? (
+                      <Text style={styles.cardMeta}>
+                        New due time: {occurrence.due_at}
+                      </Text>
+                    ) : null}
+                    <View style={styles.nav}>
+                      <ActionButton
+                        label="Mark complete"
+                        secondary
+                        onPress={() =>
+                          void updateOccurrence(
+                            occurrence.key,
+                            occurrence.schedule_revision,
+                            occurrence.override_revision,
+                            "completed",
+                          )
+                        }
+                      />
+                      <ActionButton
+                        label="Mark skipped"
+                        secondary
+                        onPress={() =>
+                          void updateOccurrence(
+                            occurrence.key,
+                            occurrence.schedule_revision,
+                            occurrence.override_revision,
+                            "skipped",
+                          )
+                        }
+                      />
+                      <ActionButton
+                        label="Reschedule"
+                        secondary
+                        onPress={() =>
+                          router.push({
+                            pathname: "/planning/reschedule",
+                            params: {
+                              key: occurrence.key,
+                              scheduleRevision: String(
+                                occurrence.schedule_revision,
+                              ),
+                              overrideRevision: occurrence.override_revision
+                                ? String(occurrence.override_revision)
+                                : "",
+                              timezone: occurrence.timezone,
+                              dueAt: occurrence.due_at,
+                            },
+                          })
+                        }
+                      />
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
 
             <View style={styles.section}>
               <Text accessibilityRole="header" style={styles.sectionTitle}>

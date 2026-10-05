@@ -119,6 +119,14 @@ export default function DailyAddScreen() {
           >
             <Text style={styles.navText}>Today</Text>
           </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Log a custom tracker entry"
+            onPress={() => router.push("/planning/log-tracker")}
+            style={styles.navButton}
+          >
+            <Text style={styles.navText}>Log a custom tracker</Text>
+          </Pressable>
         </View>
 
         <View

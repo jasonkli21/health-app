@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -16,7 +16,10 @@ import {
   StatusMessage,
 } from "../../profile/components/Ui";
 import { dailyApi, dailyErrorMessage } from "../api";
+import { planningApi } from "../../planning/api";
+import type { components } from "@personal-health/api-client";
 import {
+  customTrackerValue,
   itemTimeLabel,
   itemTitle,
   itemValue,
@@ -40,6 +43,49 @@ export default function DailyItemScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
+  const customValue = item ? customTrackerValue(item) : null;
+  const customTrackerId = customValue?.tracker_id;
+  const customSchemaVersion = customValue?.schema_version;
+  const [loadedCustomSchema, setLoadedCustomSchema] = useState<{
+    trackerId: string;
+    version: number;
+    definition: components["schemas"]["TrackerDefinitionV1"];
+  } | null>(null);
+  const customDefinition =
+    loadedCustomSchema &&
+    loadedCustomSchema.trackerId === customTrackerId &&
+    loadedCustomSchema.version === customSchemaVersion
+      ? loadedCustomSchema.definition
+      : null;
+
+  useEffect(() => {
+    if (!customTrackerId || !customSchemaVersion) return;
+    let active = true;
+    planningApi
+      .listTrackerVersions(
+        { tracker_id: customTrackerId },
+        { after_version: customSchemaVersion - 1, limit: 1 },
+      )
+      .then((page) => {
+        if (!active) return;
+        const version = page.items.find(
+          (candidate) => candidate.version === customSchemaVersion,
+        );
+        if (version) {
+          setLoadedCustomSchema({
+            trackerId: customTrackerId,
+            version: customSchemaVersion,
+            definition: version.definition,
+          });
+        }
+      })
+      .catch(() => {
+        if (active) setLoadedCustomSchema(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [customSchemaVersion, customTrackerId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -153,7 +199,17 @@ export default function DailyItemScreen() {
             <Text style={styles.kind}>
               {item.domain} · {item.object_type}
             </Text>
-            <Text style={styles.value}>{itemValue(item)}</Text>
+            <Text style={styles.value}>
+              {itemValue(
+                item,
+                Object.fromEntries(
+                  (customDefinition?.fields ?? []).map((field) => [
+                    field.id,
+                    field.label,
+                  ]),
+                ),
+              )}
+            </Text>
             <Text style={styles.meta}>
               {itemTimeLabel(
                 item,
@@ -169,6 +225,17 @@ export default function DailyItemScreen() {
             <Text style={styles.meta}>
               Revision {item.revision} · {item.status}
             </Text>
+            {customTrackerValue(item) ? (
+              <Text style={styles.meta}>
+                Tracker {customTrackerValue(item)!.tracker_id} · schema version{" "}
+                {customTrackerValue(item)!.schema_version}
+              </Text>
+            ) : null}
+            {customDefinition ? (
+              <Text style={styles.meta}>
+                {customDefinition.name} · historical schema loaded
+              </Text>
+            ) : null}
             {item.notes ? <Text style={styles.notes}>{item.notes}</Text> : null}
             {item.object_type === "event" &&
             item.event.payload.kind === "meal" &&
@@ -205,15 +272,17 @@ export default function DailyItemScreen() {
             ))}
             {item.status === "active" ? (
               <View style={styles.actions}>
-                <ActionButton
-                  label="Edit entry"
-                  onPress={() =>
-                    router.push({
-                      pathname: "/daily/item/[itemId]/edit",
-                      params: { itemId: item.id, type: item.object_type },
-                    })
-                  }
-                />
+                {!customTrackerValue(item) ? (
+                  <ActionButton
+                    label="Edit entry"
+                    onPress={() =>
+                      router.push({
+                        pathname: "/daily/item/[itemId]/edit",
+                        params: { itemId: item.id, type: item.object_type },
+                      })
+                    }
+                  />
+                ) : null}
                 <ActionButton
                   label="Archive entry"
                   secondary

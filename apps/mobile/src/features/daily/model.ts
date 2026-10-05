@@ -7,6 +7,7 @@ export type DailyObservation =
 export type DailyItem = DailyEvent | DailyObservation;
 export type EventRecord = components["schemas"]["EventSchemaV1"];
 export type ObservationRecord = components["schemas"]["ObservationSchemaV1"];
+export type CustomTrackerValue = components["schemas"]["CustomTrackerValueV1"];
 export type DailyCreateRequest =
   components["schemas"]["DailyEntryCreateRequest"];
 
@@ -452,6 +453,13 @@ export function buildDailyUpdateRecord(
       return { ok: true, value: buildEvent(item.domain, draft) };
     }
     const metric = item.observation.payload.value.metric;
+    if (metric === "custom") {
+      return {
+        ok: false,
+        error:
+          "Custom tracker entries use their saved schema and cannot be edited with the standard daily form.",
+      };
+    }
     if (metric === "symptom_severity") {
       return {
         ok: true,
@@ -535,7 +543,9 @@ export function draftFromDailyItem(item: DailyItem): DailyDraft {
     draftTime(draft, item.observation.time);
     draft.endedAt = item.observation.interval_end ?? "";
     const value = item.observation.payload.value;
-    if (value.metric === "symptom_severity") {
+    if (value.metric === "custom") {
+      draft.label = "Custom tracker entry";
+    } else if (value.metric === "symptom_severity") {
       draft.severity = String(value.value);
     } else {
       draft.measurementMetric = value.metric;
@@ -585,7 +595,10 @@ export function summaryPresentation(
 
 export function itemTitle(item: DailyItem): string {
   if (item.object_type === "event") return item.event.payload.label ?? "Sleep";
-  return metricLabel(item.observation.payload.value.metric);
+  const value = item.observation.payload.value;
+  return value.metric === "custom"
+    ? "Custom tracker entry"
+    : metricLabel(value.metric);
 }
 
 export function itemTimeLabel(item: DailyItem, timezone: string): string {
@@ -599,7 +612,10 @@ export function itemTimeLabel(item: DailyItem, timezone: string): string {
   }).format(new Date(record.time.occurred_at));
 }
 
-export function itemValue(item: DailyItem): string {
+export function itemValue(
+  item: DailyItem,
+  customFieldLabels: Record<string, string> = {},
+): string {
   if (item.object_type === "event") {
     const payload = item.event.payload;
     if (payload.kind === "meal") {
@@ -622,5 +638,34 @@ export function itemValue(item: DailyItem): string {
       : "Symptom episode";
   }
   const value = item.observation.payload.value;
+  if (value.metric === "custom") {
+    const entries = Object.entries(value.values).map(
+      ([fieldId, fieldValue]) =>
+        `${customFieldLabels[fieldId] ?? fieldId}: ${formatTrackerValue(fieldValue)}`,
+    );
+    return entries.length ? entries.join(" · ") : "No tracker values recorded";
+  }
   return `${value.value} ${value.unit}`;
+}
+
+function formatTrackerValue(value: unknown): string {
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "string" || typeof value === "number")
+    return String(value);
+  if (
+    value &&
+    typeof value === "object" &&
+    "value" in value &&
+    "unit" in value
+  ) {
+    const quantity = value as { value: unknown; unit: unknown };
+    return `${String(quantity.value)} ${String(quantity.unit)}`;
+  }
+  return "Unknown";
+}
+
+export function customTrackerValue(item: DailyItem): CustomTrackerValue | null {
+  if (item.object_type !== "observation") return null;
+  const value = item.observation.payload.value;
+  return value.metric === "custom" ? value : null;
 }
