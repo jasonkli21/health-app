@@ -17,7 +17,7 @@ from health_api.api.errors import APIError
 from health_api.api.schemas import ErrorResponse
 from health_api.application.action_proposal_service import (
     action_proposal_history,
-    action_proposal_state,
+    action_proposal_summaries,
     apply_action_proposal,
     create_action_proposal,
     edit_action_proposal,
@@ -142,6 +142,7 @@ def _decode_history_cursor(cursor: str, owner_id: UUID, proposal_id: UUID) -> tu
 @router.get(
     "",
     response_model=ProposalListResponse,
+    response_model_exclude_unset=True,
     operation_id="listActionProposals",
     responses=COMMON_ERRORS,
 )
@@ -159,7 +160,7 @@ def list_proposals(
     more = len(rows) > limit
     page = rows[:limit]
     return ProposalListResponse(
-        items=[action_proposal_state(session, owner_id, row) for row in page],
+        items=action_proposal_summaries(session, owner_id, page),
         next_cursor=(
             _encode_cursor(owner_id, state, (page[-1].created_at, page[-1].id))
             if more and page
@@ -171,6 +172,7 @@ def list_proposals(
 @router.post(
     "",
     response_model=ProposalState,
+    response_model_exclude_unset=True,
     status_code=201,
     operation_id="createActionProposal",
     responses={
@@ -185,6 +187,12 @@ def create_proposal(
     session: Annotated[Session, Depends(get_session)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> ProposalState:
+    if not settings.action_proposal_generation_enabled:
+        raise APIError(
+            503,
+            "proposal_generation_disabled",
+            "New action proposals are temporarily unavailable.",
+        )
     state, created = create_action_proposal(
         session,
         owner_id,
@@ -201,6 +209,7 @@ def create_proposal(
 @router.get(
     "/{proposal_id}",
     response_model=ProposalState,
+    response_model_exclude_unset=True,
     operation_id="getActionProposal",
     responses=COMMON_ERRORS,
 )
@@ -253,6 +262,7 @@ def get_proposal_history(
 @router.patch(
     "/{proposal_id}",
     response_model=ProposalState,
+    response_model_exclude_unset=True,
     operation_id="editActionProposal",
     responses=COMMON_ERRORS,
 )
@@ -268,6 +278,7 @@ def edit_proposal(
 @router.post(
     "/{proposal_id}/apply",
     response_model=ProposalApplyResponse,
+    response_model_exclude_unset=True,
     operation_id="applyActionProposal",
     responses=COMMON_ERRORS,
 )
@@ -299,6 +310,7 @@ def apply_proposal(
 @router.post(
     "/{proposal_id}/reject",
     response_model=ProposalState,
+    response_model_exclude_unset=True,
     operation_id="rejectActionProposal",
     responses=COMMON_ERRORS,
 )

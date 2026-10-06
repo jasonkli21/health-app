@@ -63,9 +63,10 @@ versioned typed command/evidence snapshots. `action_proposal_events` records
 created, edited, applied, rejected, and expiry transitions. All are
 owner-scoped with owner-consistent foreign keys.
 
-`action_command_receipts` records the canonical content hash and committed
-result. It is unique by `(owner_id, idempotency_key)` and by
-`(owner_id, proposal_id, proposal_revision)`. Target object revisions carry an
+`action_command_receipts` records each accepted idempotency key, canonical
+content hash, and committed result. It is unique by `(owner_id,
+idempotency_key)`; multiple keys may point to one committed proposal revision.
+Target object revisions carry an
 optional `proposal_id`, so provenance can be inspected without rewriting the
 canonical target history actor: the verified owner remains the actor, source
 origin is retained, and confirmation status is `user_confirmed`.

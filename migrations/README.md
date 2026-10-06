@@ -7,8 +7,12 @@ store at `d4e5f607a8b9` with planning, schedules, occurrence actions, tracker
 schema versions, and custom Observation columns. Review corrections follow at
 `a7f014edc620`; `b8a125fec731` allows retired scheduled manual tasks to retain
 their NULL reference target. Phase 5 adds full-text retrieval indexes at
-`f5c0a1e2d3b4`, the current repository head. Its downgrade removes only those
-indexes.
+`f5c0a1e2d3b4`. The Phase 6 proposal store was added at `e7f6a5b4c3d2` on
+the planning migration branch. `20261006b1a2` merges both histories and drops
+the per-proposal-revision receipt uniqueness constraint so each accepted retry
+key can bind to the one canonical applied result. This is the current head.
+Its downgrade refuses when alternate receipt keys have already been accepted
+for one proposal revision.
 The API never calls `metadata.create_all()` and never runs migrations during a
 request or startup.
 

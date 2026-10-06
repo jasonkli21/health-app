@@ -642,6 +642,7 @@ export interface components {
       id: string;
       notes?: string | null;
       plan: components["schemas"]["PlanPayloadV1"];
+      reference_revisions?: Array<components["schemas"]["EvidenceReference"]>;
     };
     PlanCreateDraft: {
       action: "plan.create";
@@ -725,6 +726,7 @@ export interface components {
       expected_revision: number;
       object_id: string;
       plan: components["schemas"]["PlanPayloadV1"];
+      reference_revisions?: Array<components["schemas"]["EvidenceReference"]>;
     };
     PlanUpdateRequest: {
       ai_use_allowed?: boolean | null;
@@ -875,6 +877,24 @@ export interface components {
       proposal: components["schemas"]["ProposalState"];
       replayed?: boolean;
     };
+    ProposalChangeReview: {
+      after?: {
+        [key: string]: unknown;
+      };
+      before?: {
+        [key: string]: unknown;
+      };
+      cleared_fields?: Array<string>;
+      object_id: string;
+      object_type: string;
+      preserved_fields?: Array<string>;
+      removed_plan_items?: Array<{
+        [key: string]: unknown;
+      }>;
+      revision: number;
+      schedules_to_retire?: number;
+      title: string;
+    };
     ProposalCommand:
       | components["schemas"]["ProfileCreateCommand"]
       | components["schemas"]["ProfileUpdateCommand"]
@@ -919,7 +939,7 @@ export interface components {
       next_cursor?: string | null;
     };
     ProposalListResponse: {
-      items: Array<components["schemas"]["ProposalState"]>;
+      items: Array<components["schemas"]["ProposalSummary"]>;
       next_cursor: string | null;
     };
     ProposalRejectRequest: {
@@ -939,6 +959,7 @@ export interface components {
     };
     ProposalState: {
       applied_at?: string | null;
+      changes?: Array<components["schemas"]["ProposalChangeReview"]>;
       commands: Array<components["schemas"]["ProposalCommand"]>;
       confirmed_at?: string | null;
       confirmed_by?: string | null;
@@ -958,6 +979,17 @@ export interface components {
       results?: Array<components["schemas"]["ProposalResult"]>;
       revision: number;
       schema_version?: 1;
+      state: "pending" | "applied" | "rejected" | "expired" | "superseded";
+      updated_at: string;
+    };
+    ProposalSummary: {
+      content_hash: string;
+      created_at: string;
+      expires_at: string;
+      id: string;
+      origin: "user" | "ai";
+      rationale: string;
+      revision: number;
       state: "pending" | "applied" | "rejected" | "expired" | "superseded";
       updated_at: string;
     };

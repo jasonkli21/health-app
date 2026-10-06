@@ -226,12 +226,6 @@ class ActionCommandReceipt(Base):
         UniqueConstraint(
             "owner_id", "idempotency_key", name="uq_action_command_receipts_owner_key"
         ),
-        UniqueConstraint(
-            "owner_id",
-            "proposal_id",
-            "proposal_revision",
-            name="uq_action_command_receipts_proposal_revision",
-        ),
         CheckConstraint("proposal_revision > 0", name="ck_action_command_receipts_revision"),
         CheckConstraint(
             "length(idempotency_key) BETWEEN 1 AND 128", name="ck_action_command_receipts_key"

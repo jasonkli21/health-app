@@ -89,17 +89,25 @@ references are rejected.
 
 ## Mobile confirmation contract
 
-The Assistant includes an in-memory proposal inbox. Each card shows the source,
-expiry, rationale, target and expected revision, typed values including
-time/unit fields, and evidence title/type/revision. “Confirm and save” applies
-the card's displayed revision directly; there is no second dialog. Its
+The Assistant inbox requests a pending-only, paginated summary by default and
+offers separate filters for applied, rejected, expired, and superseded history.
+The list DTO omits command/evidence payloads; opening an item fetches its full
+immutable review detail. Details include the source, expiry, rationale, target
+and expected revision, typed values including time/unit fields, evidence
+title/type/revision, and revision-bound before/after updates. Profile review
+identifies preserved and cleared optional fields. Plan review identifies
+removed items and active schedules that will be retired. “Confirm and save”
+applies the displayed revision directly; there is no second dialog. Its
 idempotency key is deterministic from proposal ID and revision. After an
 uncertain network result the screen fetches the proposal and uses that same
-key for replay. Editing typed command JSON creates a new immutable proposal
-revision/hash and requires a fresh confirmation; the current editor is
-functional but less approachable than command-family-specific forms. Reject
-and applied/expired states are distinct. Session remount clears this in-memory
-state.
+key for replay. A known stale-reference conflict shows owner-scoped current
+record snapshots and revisions; the owner can edit evidence references or
+target baselines and save a new immutable proposal revision/hash. An open edit
+retains its original revision baseline across refresh and focus changes, so
+concurrent edits conflict without discarding the local draft. The JSON editor
+is a local compromise and may later be replaced with command-family forms.
+Reject and applied/expired states are distinct. Session remount clears this
+in-memory state.
 
 The explicit direct-save exception is not connected to AI-prefilled Profile,
 daily, or planning forms because the provider is unavailable. Existing manual
@@ -108,6 +116,11 @@ structured forms retain their existing save behavior.
 ## Configuration and generation
 
 - `ACTION_PROPOSAL_TTL_HOURS=24` is a server-only setting bounded to 1–168.
+- `ACTION_PROPOSAL_GENERATION_ENABLED=true` is an independent server-side
+  kill switch for new owner-authored proposal creation. Setting it false denies
+  POST creation while detail/list reads and rejection of existing proposals
+  remain available. AI-originated proposals remain rejected until the
+  current-context safety policy and external provider contract are configured.
 - `PERSONAL_AI_ENABLED=false` remains the Phase 5 default and cannot be set to
   true until the external contract is configured.
 - OpenAPI and the generated TypeScript client were regenerated together with
@@ -118,25 +131,40 @@ structured forms retain their existing save behavior.
   /Users/jasonkli/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node packages/api-client/scripts/generate-client.mjs
   ```
 
-## Local static checks
+## Local verification after independent review
 
-- Changed API/domain/persistence/migration Ruff check — passed.
-- `mypy services/api/src/health_api` — passed, 35 source files.
-- Mobile `tsc --noEmit -p apps/mobile/tsconfig.json` — passed.
-- ESLint on the changed Assistant feature files — passed.
-- Prettier on changed mobile, OpenAPI, and generated client artifacts — passed.
-- FastAPI OpenAPI export and TypeScript client generation — passed.
-- `alembic heads` reports a single head, `e7f6a5b4c3d2`.
-- Offline `alembic upgrade head --sql` generated the full migration chain.
-- API and mobile test suites were not run in this implementation session.
-- No PostgreSQL database was available to apply the migration, verify ORM
-  drift, exercise transaction rollback/receipt races, or inspect locks.
-- `git diff --check` is recorded after the final source/doc pass.
+- API: `.venv/bin/pytest -c services/api/pyproject.toml services/api/tests -q`
+  — **135 passed, 50 skipped**. The added PostgreSQL atomic rollback and
+  cross-owner detail tests are among the skips because `TEST_DATABASE_URL` is
+  not configured; existing DB-gated checks remain skipped as well.
+- Mobile: bundled Node running `apps/mobile/node_modules/vitest/vitest.mjs run
+--root apps/mobile` — **98 passed across 21 files**. Mobile TypeScript passes.
+- Full configured Ruff format check passes. The six proposal-review import
+  blocks and the settings import block pass the exact configured Ruff check.
+  Full configured Ruff check still reports **17 inherited I001 import-order
+  failures outside the changed review files**.
+- Configured mypy reports **6 inherited errors in unchanged
+  `application/ai_context_service.py`**; the proposal service has no mypy
+  errors.
+- OpenAPI export, TypeScript client generation, Prettier checks, and
+  `git diff --check` pass. `alembic heads` reports one merged head,
+  `20261006b1a2`.
+- PostgreSQL was not available. The migration was not applied; ORM drift,
+  database atomic rollback, real concurrent apply/daily lock races, and
+  receipt races remain unverified. Two newly added DB integration tests were
+  collected and skipped without `TEST_DATABASE_URL`.
+- Offline `alembic upgrade head --sql` generates the merged migration graph.
+  The receipt-key migration's downgrade refuses once more than one accepted
+  key exists for a proposal revision.
 
 ## Open gates before Phase 6 release acceptance
 
-- Run deterministic API/domain checks for each allowed and forbidden command,
-  owner isolation, evidence staleness, expiry, and proposal revision changes.
+- Extend deterministic API/domain checks for every allowed and forbidden
+  command family, owner isolation across all routes, evidence staleness, expiry,
+  and proposal revision changes. Local review regression tests now cover
+  serialization presence, stale-reference hints, archived Profile targets,
+  reference-revision hashing, receipt revision/key binding, and bounded list
+  summaries.
 - Apply the migration to disposable PostgreSQL; verify upgrade/downgrade
   refusal behavior and ORM drift.
 - Exercise same-key and different-key concurrent applies, same-proposal

@@ -10,7 +10,7 @@ from typing import Any, Literal
 from uuid import UUID, uuid5
 
 from pydantic import ValidationError
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select, tuple_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -69,10 +69,12 @@ from health_api.domain.proposals import (
     ProfileCreateCommand,
     ProfileCreateDraft,
     ProfileUpdateCommand,
+    ProposalChangeReview,
     ProposalCommand,
     ProposalContent,
     ProposalResult,
     ProposalState,
+    ProposalSummary,
     StoredProposalContent,
     TrackerCreateCommand,
     TrackerCreateDraft,
@@ -85,7 +87,9 @@ from health_api.persistence.models import (
     ActionProposalRevision,
     HealthObject,
     HealthObjectRevision,
+    PlanningScheduleIdentity,
     Source,
+    User,
 )
 
 type ProposalStatus = Literal["pending", "applied", "rejected", "expired", "superseded"]
@@ -102,7 +106,9 @@ def _json_canonical(value: object) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
-def _draft_snapshot(content: ProposalContent, proposal_id: UUID) -> dict[str, Any]:
+def _draft_snapshot(
+    content: ProposalContent, proposal_id: UUID, session: Session, owner_id: UUID
+) -> dict[str, Any]:
     commands: list[ProposalCommand] = []
     for index, command in enumerate(content.commands):
         # Keep the target UUID tied to the command slot across proposal edits.
@@ -127,15 +133,37 @@ def _draft_snapshot(content: ProposalContent, proposal_id: UUID) -> dict[str, An
                 **command.model_dump(mode="python", exclude_unset=True), id=identity
             )
         elif isinstance(command, PlanCreateDraft):
+            created_goal_ids = {
+                uuid5(proposal_id, f"proposal-command:{goal_index}:goal.create")
+                for goal_index, candidate in enumerate(content.commands)
+                if isinstance(candidate, GoalCreateDraft)
+            }
+            references = _reference_revisions(session, owner_id, command.plan, created_goal_ids)
             stored = PlanCreateCommand(
-                **command.model_dump(mode="python", exclude_unset=True), id=identity
+                **command.model_dump(mode="python", exclude_unset=True),
+                id=identity,
+                reference_revisions=references,
             )
         elif isinstance(command, TrackerCreateDraft):
             stored = TrackerCreateCommand(
                 **command.model_dump(mode="python", exclude_unset=True), id=identity
             )
         else:
-            stored = command
+            if isinstance(command, PlanUpdateCommand):
+                created_goal_ids = {
+                    uuid5(proposal_id, f"proposal-command:{goal_index}:goal.create")
+                    for goal_index, candidate in enumerate(content.commands)
+                    if isinstance(candidate, GoalCreateDraft)
+                }
+                stored = command.model_copy(
+                    update={
+                        "reference_revisions": _reference_revisions(
+                            session, owner_id, command.plan, created_goal_ids
+                        )
+                    }
+                )
+            else:
+                stored = command
         commands.append(stored)
 
     snapshot = {
@@ -147,6 +175,28 @@ def _draft_snapshot(content: ProposalContent, proposal_id: UUID) -> dict[str, An
     if len(encoded) > MAX_PROPOSAL_BYTES:
         raise ActionProposalValidationError("proposal exceeds its bounded content size")
     return snapshot
+
+
+def _reference_revisions(
+    session: Session, owner_id: UUID, plan: PlanPayloadV1, proposal_goal_ids: set[UUID]
+) -> list[EvidenceReference]:
+    reference_ids = {
+        item.reference_id
+        for item in plan.items
+        if item.reference_id is not None and item.reference_id not in proposal_goal_ids
+    }
+    objects = (
+        list(
+            session.scalars(
+                select(HealthObject)
+                .where(HealthObject.owner_id == owner_id, HealthObject.id.in_(reference_ids))
+                .order_by(HealthObject.id)
+            )
+        )
+        if reference_ids
+        else []
+    )
+    return [EvidenceReference(object_id=obj.id, revision=obj.revision) for obj in objects]
 
 
 def _content_hash(snapshot: dict[str, Any]) -> str:
@@ -222,6 +272,7 @@ def _state_from_row(
             )
         )
     state: ProposalStatus = proposal.state  # type: ignore[assignment]
+    changes = _proposal_changes(session, owner_id, content)
     current_time = now or datetime.now(UTC)
     if state == "pending" and proposal.expires_at <= current_time:
         state = "expired"
@@ -236,6 +287,7 @@ def _state_from_row(
         rationale=content.rationale,
         evidence_refs=evidence_details,
         commands=content.commands,
+        changes=changes,
         created_at=proposal.created_at,
         expires_at=proposal.expires_at,
         updated_at=proposal.updated_at,
@@ -250,6 +302,86 @@ def _state_from_row(
     )
 
 
+def _proposal_changes(
+    session: Session, owner_id: UUID, content: StoredProposalContent
+) -> list[ProposalChangeReview]:
+    """Build a revision-bound review summary from the canonical target snapshot."""
+    changes: list[ProposalChangeReview] = []
+    for command in content.commands:
+        if not isinstance(command, (ProfileUpdateCommand, GoalUpdateCommand, PlanUpdateCommand)):
+            continue
+        target = session.get(HealthObject, (owner_id, command.object_id))
+        baseline = session.get(
+            HealthObjectRevision, (owner_id, command.object_id, command.expected_revision)
+        )
+        before = baseline.snapshot if baseline is not None else {}
+        after = command.model_dump(mode="json", exclude_unset=True)
+        entry: dict[str, Any] = {
+            "object_id": command.object_id,
+            "object_type": target.object_type if target is not None else "unavailable",
+            "title": before.get("title")
+            or (target.title if target is not None else "Record unavailable"),
+            "revision": command.expected_revision,
+            "before": {},
+            "after": {},
+            "removed_plan_items": [],
+            "schedules_to_retire": 0,
+        }
+        old_profile = before.get("profile", {})
+        new_profile = after.get("profile", {})
+        fields = command.model_fields_set
+        if isinstance(command, ProfileUpdateCommand):
+            field_map = {
+                "profile": (old_profile, new_profile),
+                "valid_from": (before.get("valid_from"), after.get("valid_from")),
+                "valid_to": (before.get("valid_to"), after.get("valid_to")),
+                "notes": (before.get("notes"), after.get("notes")),
+                "metadata": (before.get("metadata"), after.get("metadata")),
+            }
+            changed = fields | {"profile"}
+            for name in changed:
+                old, new = field_map[name]
+                entry["before"][name] = old
+                entry["after"][name] = new
+            preserved = [
+                name
+                for name in ("valid_from", "valid_to", "notes", "metadata")
+                if name not in fields
+            ]
+            entry["preserved_fields"] = preserved
+            entry["cleared_fields"] = [
+                name for name in fields if name in field_map and getattr(command, name) is None
+            ]
+        elif isinstance(command, PlanUpdateCommand):
+            old_items = before.get("payload", {}).get("items", [])
+            new_items = after.get("plan", {}).get("items", [])
+            new_ids = {item.get("id") for item in new_items}
+            removed = [item for item in old_items if item.get("id") not in new_ids]
+            entry["before"] = {"items": old_items}
+            entry["after"] = {"items": new_items}
+            entry["removed_plan_items"] = removed
+            removed_ids = [item.get("id") for item in removed]
+            if removed_ids:
+                entry["schedules_to_retire"] = (
+                    session.scalar(
+                        select(func.count())
+                        .select_from(PlanningScheduleIdentity)
+                        .where(
+                            PlanningScheduleIdentity.owner_id == owner_id,
+                            PlanningScheduleIdentity.parent_object_id == command.object_id,
+                            PlanningScheduleIdentity.item_id.in_(removed_ids),
+                            PlanningScheduleIdentity.retired_at.is_(None),
+                        )
+                    )
+                    or 0
+                )
+        else:
+            entry["before"] = {"goal": before.get("payload")}
+            entry["after"] = {"goal": after.get("goal")}
+        changes.append(ProposalChangeReview.model_validate(entry))
+    return changes
+
+
 def _validate_evidence(session: Session, owner_id: UUID, evidence: list[EvidenceReference]) -> None:
     pairs = [(item.object_id, item.revision) for item in evidence]
     if len(set(pairs)) != len(pairs):
@@ -262,6 +394,88 @@ def _validate_evidence(session: Session, owner_id: UUID, evidence: list[Evidence
         )
         if obj is None or obj.revision != item.revision:
             raise ActionProposalValidationError("proposal evidence is unavailable or stale")
+
+
+def _changed_reference_hints(
+    session: Session, owner_id: UUID, content: StoredProposalContent
+) -> list[dict[str, Any]]:
+    expected: dict[UUID, tuple[int, str]] = {
+        item.object_id: (item.revision, "evidence") for item in content.evidence_refs
+    }
+    for command in content.commands:
+        if isinstance(command, (ProfileUpdateCommand, GoalUpdateCommand, PlanUpdateCommand)):
+            expected[command.object_id] = (command.expected_revision, "target")
+        if isinstance(command, (PlanCreateCommand, PlanUpdateCommand)):
+            for item in command.reference_revisions:
+                expected.setdefault(item.object_id, (item.revision, "plan_reference"))
+    if not expected:
+        return []
+    objects = list(
+        session.scalars(
+            select(HealthObject).where(
+                HealthObject.owner_id == owner_id, HealthObject.id.in_(expected)
+            )
+        )
+    )
+    by_id = {item.id: item for item in objects}
+    current_pairs = [(item.id, item.revision) for item in objects]
+    snapshots = (
+        list(
+            session.scalars(
+                select(HealthObjectRevision).where(
+                    HealthObjectRevision.owner_id == owner_id,
+                    tuple_(HealthObjectRevision.object_id, HealthObjectRevision.revision).in_(
+                        current_pairs
+                    ),
+                )
+            )
+        )
+        if objects
+        else []
+    )
+    latest = {(item.object_id, item.revision): item.snapshot for item in snapshots}
+    hints: list[dict[str, Any]] = []
+    for object_id, (expected_revision, reference_kind) in expected.items():
+        obj = by_id.get(object_id)
+        if obj is not None and obj.revision == expected_revision and obj.status == "active":
+            continue
+        hints.append(
+            {
+                "object_id": str(object_id),
+                "reference_kind": reference_kind,
+                "expected_revision": expected_revision,
+                "current_revision": obj.revision if obj is not None else None,
+                "current_status": obj.status if obj is not None else "unavailable",
+                "current_title": obj.title if obj is not None else "Record unavailable",
+                "current_snapshot": _bounded_review_snapshot(
+                    latest.get((object_id, obj.revision), {}) if obj else {}
+                ),
+            }
+        )
+    return hints
+
+
+def _bounded_review_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+    allowed = {
+        "object_type",
+        "domain",
+        "status",
+        "title",
+        "valid_from",
+        "valid_to",
+        "recorded_at",
+        "revision",
+        "notes",
+        "profile",
+        "payload",
+        "resource_kind",
+        "lifecycle",
+    }
+    candidate = {key: snapshot[key] for key in allowed if key in snapshot}
+    encoded = _json_canonical(candidate)
+    if len(encoded.encode("utf-8")) <= 4096:
+        return candidate
+    return {"truncated": True, "preview": encoded[:3500]}
 
 
 def _validate_commands(
@@ -308,6 +522,7 @@ def _validate_commands(
     def validate_plan_references(
         plan: PlanPayloadV1,
         command_index: int,
+        reference_revisions: list[EvidenceReference],
         allow_existing_inactive: set[tuple[UUID, str]] | None = None,
     ) -> None:
         proposal_goal_refs: set[UUID] = set()
@@ -330,6 +545,15 @@ def _validate_commands(
             plan.model_copy(update={"items": existing_items}),
             allow_existing_inactive,
         )
+        stored_revisions = {item.object_id: item.revision for item in reference_revisions}
+        for object_id in {
+            item.reference_id for item in plan.items if item.reference_id is not None
+        }:
+            if object_id in proposal_goal_refs:
+                continue
+            obj = session.get(HealthObject, (owner_id, object_id))
+            if obj is None or stored_revisions.get(object_id) != obj.revision:
+                raise ActionProposalValidationError("Plan reference revision is stale")
 
     for command_index, command in enumerate(content.commands):
         if isinstance(command, ProfileCreateCommand):
@@ -344,6 +568,8 @@ def _validate_commands(
             updated_targets.add(command.object_id)
             profile_aggregate = get_profile_item(session, owner_id, command.object_id)
             obj = profile_aggregate[0]
+            if obj.status != "active":
+                raise ActionProposalValidationError("Profile target is archived")
             if obj.revision != command.expected_revision:
                 raise ActionProposalValidationError("Profile target revision is stale")
             fields = command.model_fields_set
@@ -383,12 +609,14 @@ def _validate_commands(
                 raise ActionProposalValidationError("proposal updates one target more than once")
             updated_targets.add(command.object_id)
             planning_aggregate = get_planning_resource(session, owner_id, command.object_id, "goal")
+            if planning_aggregate[0].status != "active":
+                raise ActionProposalValidationError("Goal target is archived")
             if planning_aggregate[0].revision != command.expected_revision:
                 raise ActionProposalValidationError("Goal target revision is stale")
             continue
         if isinstance(command, PlanCreateCommand):
             try:
-                validate_plan_references(command.plan, command_index)
+                validate_plan_references(command.plan, command_index, command.reference_revisions)
             except (PlanningNotFound, PlanningValidationError) as exc:
                 raise ActionProposalValidationError("Plan references are invalid") from exc
             continue
@@ -397,6 +625,8 @@ def _validate_commands(
                 raise ActionProposalValidationError("proposal updates one target more than once")
             updated_targets.add(command.object_id)
             planning_aggregate = get_planning_resource(session, owner_id, command.object_id, "plan")
+            if planning_aggregate[0].status != "active":
+                raise ActionProposalValidationError("Plan target is archived")
             if planning_aggregate[0].revision != command.expected_revision:
                 raise ActionProposalValidationError("Plan target revision is stale")
             previous = _payload("plan", planning_aggregate[1].payload)
@@ -406,7 +636,12 @@ def _validate_commands(
                 if spec[2] is not None
             }
             try:
-                validate_plan_references(command.plan, command_index, previous_edges)
+                validate_plan_references(
+                    command.plan,
+                    command_index,
+                    command.reference_revisions,
+                    previous_edges,
+                )
             except (PlanningNotFound, PlanningValidationError) as exc:
                 raise ActionProposalValidationError("Plan references are invalid") from exc
             continue
@@ -427,7 +662,11 @@ def create_action_proposal(
 ) -> tuple[ProposalState, bool]:
     if not 1 <= expires_in_hours <= MAX_PROPOSAL_LIFETIME_HOURS:
         raise ActionProposalValidationError("proposal expiry is outside the supported server range")
-    snapshot = _draft_snapshot(content, proposal_id)
+    if origin_kind == "ai":
+        raise ActionProposalValidationError(
+            "AI-originated proposals are disabled until current-context safety policy is configured"
+        )
+    snapshot = _draft_snapshot(content, proposal_id, session, owner_id)
     content_hash = _content_hash(snapshot)
     try:
         with unit_of_work(session):
@@ -511,6 +750,46 @@ def action_proposal_state(
     return _state_from_row(session, proposal, owner_id)
 
 
+def action_proposal_summaries(
+    session: Session, owner_id: UUID, proposals: list[ActionProposal]
+) -> list[ProposalSummary]:
+    if not proposals:
+        return []
+    revision_rows = session.scalars(
+        select(ActionProposalRevision).where(
+            ActionProposalRevision.owner_id == owner_id,
+            tuple_(ActionProposalRevision.proposal_id, ActionProposalRevision.revision).in_(
+                [(item.id, item.current_revision) for item in proposals]
+            ),
+        )
+    )
+    by_key = {(item.proposal_id, item.revision): item for item in revision_rows}
+    now = datetime.now(UTC)
+    result: list[ProposalSummary] = []
+    for proposal in proposals:
+        revision = by_key.get((proposal.id, proposal.current_revision))
+        if revision is None:
+            raise RuntimeError("action proposal has no current revision")
+        state: ProposalStatus = proposal.state  # type: ignore[assignment]
+        if state == "pending" and proposal.expires_at <= now:
+            state = "expired"
+        content = _parse_snapshot(revision.snapshot)
+        result.append(
+            ProposalSummary(
+                id=proposal.id,
+                revision=proposal.current_revision,
+                content_hash=revision.content_hash,
+                state=state,
+                origin=proposal.origin_kind,  # type: ignore[arg-type]
+                rationale=content.rationale,
+                created_at=proposal.created_at,
+                expires_at=proposal.expires_at,
+                updated_at=proposal.updated_at,
+            )
+        )
+    return result
+
+
 def list_action_proposals(
     session: Session,
     owner_id: UUID,
@@ -574,7 +853,7 @@ def edit_action_proposal(
             if proposal.current_revision != expected_revision:
                 raise ActionProposalConflict("proposal changed; review the current revision")
             next_revision = proposal.current_revision + 1
-            snapshot = _draft_snapshot(content, proposal_id)
+            snapshot = _draft_snapshot(content, proposal_id, session, owner_id)
             _validate_commands(session, owner_id, snapshot)
             proposal.current_revision = next_revision
             proposal.content_hash = _content_hash(snapshot)
@@ -839,9 +1118,16 @@ def apply_action_proposal(
     idempotency_key: str,
 ) -> ApplyProposalOutcome:
     with session.begin():
+        owner = session.scalar(select(User).where(User.id == owner_id).with_for_update())
+        if owner is None or owner.lifecycle != "active":
+            raise ActionProposalNotFound
         prior_key = _find_receipt(session, owner_id, idempotency_key)
         if prior_key is not None:
-            if prior_key.proposal_id != proposal_id or prior_key.content_hash != content_hash:
+            if (
+                prior_key.proposal_id != proposal_id
+                or prior_key.proposal_revision != proposal_revision
+                or prior_key.content_hash != content_hash
+            ):
                 raise ActionProposalConflict(
                     "idempotency key was used for different proposal content"
                 )
@@ -874,6 +1160,17 @@ def apply_action_proposal(
             )
             if original is None or original.content_hash != content_hash:
                 raise ActionProposalConflict("applied proposal content does not match")
+            session.add(
+                ActionCommandReceipt(
+                    owner_id=owner_id,
+                    proposal_id=proposal_id,
+                    proposal_revision=proposal_revision,
+                    idempotency_key=idempotency_key,
+                    content_hash=content_hash,
+                    result_json=original.result_json,
+                )
+            )
+            session.flush()
             return ApplyProposalOutcome(_state_from_row(session, proposal, owner_id), True)
 
         if proposal.state != "pending":
@@ -902,7 +1199,11 @@ def apply_action_proposal(
         try:
             _validate_commands(session, owner_id, revision.snapshot, lock_references=True)
         except (ActionProposalValidationError, ProfileNotFound, PlanningNotFound, DailyNotFound):
-            proposal.last_validation_summary = {"valid": False, "code": "reference_changed"}
+            proposal.last_validation_summary = {
+                "valid": False,
+                "code": "reference_changed",
+                "changed_references": _changed_reference_hints(session, owner_id, content),
+            }
             proposal.updated_at = now
             session.flush()
             return ApplyProposalOutcome(
@@ -956,7 +1257,11 @@ def apply_action_proposal(
                     raise ActionProposalConflict(
                         "idempotency key was used for different proposal content"
                     ) from exc
-            proposal.last_validation_summary = {"valid": False, "code": "target_changed"}
+            proposal.last_validation_summary = {
+                "valid": False,
+                "code": "target_changed",
+                "changed_references": _changed_reference_hints(session, owner_id, content),
+            }
             proposal.updated_at = datetime.now(UTC)
             session.flush()
             return ApplyProposalOutcome(

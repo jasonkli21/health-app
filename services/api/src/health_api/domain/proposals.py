@@ -97,6 +97,7 @@ class PlanCreateDraft(StrictModel):
 
 class PlanCreateCommand(PlanCreateDraft):
     id: UUID
+    reference_revisions: list[EvidenceReference] = Field(default_factory=list, max_length=20)
 
 
 class PlanUpdateCommand(StrictModel):
@@ -104,6 +105,7 @@ class PlanUpdateCommand(StrictModel):
     object_id: UUID
     expected_revision: Annotated[StrictInt, Field(ge=1)]
     plan: PlanPayloadV1
+    reference_revisions: list[EvidenceReference] = Field(default_factory=list, max_length=20)
 
 
 class TrackerCreateDraft(StrictModel):
@@ -181,6 +183,19 @@ class ProposalResult(StrictModel):
     revision: Annotated[StrictInt, Field(ge=1)]
 
 
+class ProposalChangeReview(StrictModel):
+    object_id: UUID
+    object_type: str
+    title: str
+    revision: Annotated[StrictInt, Field(ge=1)]
+    before: dict[str, object] = Field(default_factory=dict)
+    after: dict[str, object] = Field(default_factory=dict)
+    preserved_fields: list[str] = Field(default_factory=list)
+    cleared_fields: list[str] = Field(default_factory=list)
+    removed_plan_items: list[dict[str, object]] = Field(default_factory=list)
+    schedules_to_retire: Annotated[StrictInt, Field(ge=0)] = 0
+
+
 class ProposalState(StrictModel):
     id: UUID
     revision: Annotated[StrictInt, Field(ge=1)]
@@ -191,6 +206,7 @@ class ProposalState(StrictModel):
     rationale: ProposalRationale
     evidence_refs: list[EvidenceDetail]
     commands: list[ProposalCommand]
+    changes: list[ProposalChangeReview] = Field(default_factory=list)
     created_at: datetime
     expires_at: datetime
     updated_at: datetime
@@ -204,8 +220,20 @@ class ProposalState(StrictModel):
     results: list[ProposalResult] = Field(default_factory=list)
 
 
+class ProposalSummary(StrictModel):
+    id: UUID
+    revision: Annotated[StrictInt, Field(ge=1)]
+    content_hash: Annotated[StrictStr, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
+    state: Literal["pending", "applied", "rejected", "expired", "superseded"]
+    origin: Literal["user", "ai"]
+    rationale: ProposalRationale
+    created_at: datetime
+    expires_at: datetime
+    updated_at: datetime
+
+
 class ProposalListResponse(StrictModel):
-    items: list[ProposalState]
+    items: list[ProposalSummary]
     next_cursor: str | None
 
 
