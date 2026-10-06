@@ -49,6 +49,7 @@ export type DailyDraft = {
   diastolicValue: string;
   measurementUnit: "kg" | "lb" | "C" | "F" | "mmHg" | "bpm";
   notes: string;
+  aiUseAllowed: boolean;
 };
 
 export type BuildResult<T> =
@@ -98,6 +99,7 @@ export function emptyDailyDraft(now = new Date()): DailyDraft {
     diastolicValue: "",
     measurementUnit: "kg",
     notes: "",
+    aiUseAllowed: false,
   };
 }
 
@@ -396,8 +398,16 @@ export function buildDailyCreateRequest(
           draft,
         );
         observations.push(
-          { id: ids.observation, observation: systolic },
-          { id: ids.secondObservation, observation: diastolic },
+          {
+            id: ids.observation,
+            observation: systolic,
+            ai_use_allowed: draft.aiUseAllowed,
+          },
+          {
+            id: ids.secondObservation,
+            observation: diastolic,
+            ai_use_allowed: draft.aiUseAllowed,
+          },
         );
       } else {
         const observation = buildObservation(
@@ -407,11 +417,15 @@ export function buildDailyCreateRequest(
           draft.measurementUnit,
           draft,
         );
-        observations.push({ id: ids.observation, observation });
+        observations.push({
+          id: ids.observation,
+          observation,
+          ai_use_allowed: draft.aiUseAllowed,
+        });
       }
     } else {
       const event = buildEvent(domain, draft);
-      events.push({ id: ids.event, event });
+      events.push({ id: ids.event, event, ai_use_allowed: draft.aiUseAllowed });
       if (domain === "symptoms" && draft.severity.trim()) {
         const severity = buildObservation(
           "symptoms",
@@ -421,7 +435,11 @@ export function buildDailyCreateRequest(
           { ...draft, notes: "" },
           false,
         );
-        observations.push({ id: ids.observation, observation: severity });
+        observations.push({
+          id: ids.observation,
+          observation: severity,
+          ai_use_allowed: draft.aiUseAllowed,
+        });
         links.push({
           event_id: ids.event,
           observation_id: ids.observation,
@@ -510,6 +528,7 @@ function draftTime(
 export function draftFromDailyItem(item: DailyItem): DailyDraft {
   const draft = emptyDailyDraft(new Date(item.recorded_at));
   draft.notes = item.notes ?? "";
+  draft.aiUseAllowed = item.permissions.ai_use_allowed;
   if (item.object_type === "event") {
     draftTime(draft, item.event.time);
     draft.endedAt = item.event.ended_at ?? "";

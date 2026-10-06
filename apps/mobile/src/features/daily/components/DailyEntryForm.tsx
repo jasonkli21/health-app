@@ -3,6 +3,7 @@ import {
   AccessibilityInfo,
   Pressable,
   ScrollView,
+  Switch,
   StyleSheet,
   Text,
   TextInput,
@@ -33,7 +34,10 @@ type Props = {
   submitLabel: string;
   onCancel: () => void;
   onCreate?: (request: DailyCreateRequest, draft: DailyDraft) => Promise<void>;
-  onUpdate?: (record: EventRecord | ObservationRecord) => Promise<void>;
+  onUpdate?: (
+    record: EventRecord | ObservationRecord,
+    aiUseAllowed: boolean,
+  ) => Promise<void>;
   onRetryUncertain?: () => Promise<void>;
   onConflictReload?: () => void;
 };
@@ -174,7 +178,7 @@ export function DailyEntryForm({
         showBuildError(result.error);
         return;
       }
-      await send(() => onUpdate(result.value));
+      await send(() => onUpdate(result.value, draft.aiUseAllowed));
       return;
     }
     if (!onCreate) return;
@@ -766,6 +770,23 @@ export function DailyEntryForm({
         </Text>
       ) : null}
 
+      <Text accessibilityRole="header" style={styles.fieldLabel}>
+        Permissions
+      </Text>
+      <Text style={styles.hint}>
+        Off by default. Allowing AI use makes this entry eligible for a future
+        Assistant request. The Assistant is currently unavailable.
+      </Text>
+      <View style={styles.permissionRow}>
+        <Text style={styles.permissionLabel}>Allow AI use of this entry</Text>
+        <Switch
+          accessibilityLabel="Allow AI use of this daily entry"
+          accessibilityHint="Off by default. This entry can be included only when you allow AI use and select its type in the context preview."
+          value={draft.aiUseAllowed}
+          onValueChange={(aiUseAllowed) => update({ aiUseAllowed })}
+        />
+      </View>
+
       {conflict && onConflictReload ? (
         <Pressable
           accessibilityRole="button"
@@ -887,6 +908,13 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: { color: "#24342b", fontSize: 16, fontWeight: "600" },
   recovery: { gap: 8 },
+  permissionRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 16,
+    justifyContent: "space-between",
+  },
+  permissionLabel: { color: "#24342b", flex: 1, fontSize: 16 },
   disabled: { opacity: 0.55 },
   error: { color: "#9b1c1c", fontSize: 16, lineHeight: 23 },
 });

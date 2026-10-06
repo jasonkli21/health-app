@@ -62,6 +62,13 @@ export default function HomeScreen() {
         >
           Open Plan
         </Link>
+        <Link
+          accessibilityRole="button"
+          style={styles.secondaryLink}
+          href="/assistant"
+        >
+          Open Assistant
+        </Link>
       </View>
     </SafeAreaView>
   );

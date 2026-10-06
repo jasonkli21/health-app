@@ -47,6 +47,7 @@ export default function RootLayout() {
         <Stack.Screen name="planning/schedule" />
         <Stack.Screen name="planning/history" />
         <Stack.Screen name="planning/occurrence-history" />
+        <Stack.Screen name="assistant" />
         <Stack.Screen name="profile/new" />
         <Stack.Screen name="profile/[itemId]" />
         <Stack.Screen name="profile/[itemId]/edit" />

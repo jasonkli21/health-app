@@ -72,14 +72,21 @@ export default function DailyEditScreen() {
     }, [params.itemId, refresh, type]),
   );
 
-  async function update(record: EventRecord | ObservationRecord) {
+  async function update(
+    record: EventRecord | ObservationRecord,
+    aiUseAllowed: boolean,
+  ) {
     if (!item) return;
     if (item.status !== "active")
       throw new Error("Archived entries cannot be edited.");
     if (item.object_type === "event") {
       const updated = await dailyApi.updateEvent(
         { event_id: item.id },
-        { expected_revision: item.revision, event: record as EventRecord },
+        {
+          expected_revision: item.revision,
+          event: record as EventRecord,
+          ai_use_allowed: aiUseAllowed,
+        },
       );
       setEditState((state) => acceptDailyRefresh(state, updated, true));
     } else {
@@ -88,6 +95,7 @@ export default function DailyEditScreen() {
         {
           expected_revision: item.revision,
           observation: record as ObservationRecord,
+          ai_use_allowed: aiUseAllowed,
         },
       );
       setEditState((state) => acceptDailyRefresh(state, updated, true));
