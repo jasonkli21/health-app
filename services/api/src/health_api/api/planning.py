@@ -241,6 +241,7 @@ def _history(
                 recorded_at=row.recorded_at,
                 actor_kind="user",
                 reason=cast(Literal["create", "update", "archive"], row.reason),
+                proposal_id=row.proposal_id,
                 snapshot=row.snapshot,
             )
             for row in rows

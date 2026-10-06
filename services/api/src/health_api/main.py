@@ -15,6 +15,7 @@ from health_api.api.errors import install_error_handlers
 from health_api.api.middleware import RequestBoundaryMiddleware
 from health_api.api.planning import router as planning_router
 from health_api.api.profile import router as profile_router
+from health_api.api.proposals import router as proposals_router
 from health_api.config.settings import Settings, get_settings
 from health_api.integrations.firebase_auth import FirebaseTokenVerifier, IdentityVerifier
 from health_api.integrations.object_storage import create_object_storage
@@ -77,6 +78,7 @@ def create_app(
     app.include_router(daily_router)
     app.include_router(planning_router)
     app.include_router(ai_router)
+    app.include_router(proposals_router)
 
     @app.get("/healthz", tags=["system"], operation_id="healthcheck")
     def healthcheck() -> dict[str, str]:

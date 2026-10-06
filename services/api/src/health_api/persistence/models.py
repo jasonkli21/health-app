@@ -50,6 +50,196 @@ class User(Base):
     )
 
 
+class ActionProposal(Base):
+    """Current lifecycle pointer for an immutable owner-scoped proposal stream."""
+
+    __tablename__ = "action_proposals"
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    owner_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    schema_version: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="1")
+    state: Mapped[str] = mapped_column(String(16), nullable=False, server_default="pending")
+    origin_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    origin_metadata: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    current_revision: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    confirmed_by: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    applied_revision: Mapped[int | None] = mapped_column(Integer)
+    rejected_by: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
+    rejected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reject_reason: Mapped[str | None] = mapped_column(String(500))
+    result_json: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
+    last_validation_summary: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+
+    __table_args__ = (
+        UniqueConstraint("owner_id", "id", name="uq_action_proposals_owner_id"),
+        ForeignKeyConstraint(
+            ["owner_id"], ["users.id"], ondelete="CASCADE", name="fk_action_proposals_owner"
+        ),
+        CheckConstraint("schema_version = 1", name="ck_action_proposals_schema_version"),
+        CheckConstraint(
+            "state IN ('pending', 'applied', 'rejected', 'expired', 'superseded')",
+            name="ck_action_proposals_state",
+        ),
+        CheckConstraint("origin_kind IN ('user', 'ai')", name="ck_action_proposals_origin"),
+        CheckConstraint("current_revision > 0", name="ck_action_proposals_revision"),
+        CheckConstraint("length(content_hash) = 64", name="ck_action_proposals_hash"),
+        CheckConstraint(
+            "expires_at > created_at AND expires_at <= created_at + interval '7 days'",
+            name="ck_action_proposals_expiry",
+        ),
+        CheckConstraint(
+            "(confirmed_by IS NULL) = (confirmed_at IS NULL)",
+            name="ck_action_proposals_confirmation_pair",
+        ),
+        CheckConstraint(
+            "(rejected_by IS NULL) = (rejected_at IS NULL)",
+            name="ck_action_proposals_rejection_pair",
+        ),
+        CheckConstraint(
+            "state <> 'applied' OR (confirmed_by = owner_id AND applied_at IS NOT NULL AND applied_revision IS NOT NULL AND result_json IS NOT NULL)",
+            name="ck_action_proposals_applied_result",
+        ),
+        Index("ix_action_proposals_owner_state_created", "owner_id", "state", "created_at", "id"),
+    )
+
+
+class ActionProposalRevision(Base):
+    """Immutable typed command and evidence snapshot for one proposal revision."""
+
+    __tablename__ = "action_proposal_revisions"
+
+    owner_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    proposal_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    revision: Mapped[int] = mapped_column(Integer, primary_key=True)
+    schema_version: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    actor_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["owner_id", "proposal_id"],
+            ["action_proposals.owner_id", "action_proposals.id"],
+            ondelete="CASCADE",
+            name="fk_action_proposal_revisions_owner_proposal",
+        ),
+        CheckConstraint("revision > 0", name="ck_action_proposal_revisions_revision"),
+        CheckConstraint("schema_version = 1", name="ck_action_proposal_revisions_schema_version"),
+        CheckConstraint("length(content_hash) = 64", name="ck_action_proposal_revisions_hash"),
+        CheckConstraint("actor_id = owner_id", name="ck_action_proposal_revisions_actor"),
+    )
+
+
+class ActionProposalEvent(Base):
+    """Append-only owner-visible lifecycle and confirmation audit entry."""
+
+    __tablename__ = "action_proposal_events"
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    owner_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    proposal_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    proposal_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    event: Mapped[str] = mapped_column(String(16), nullable=False)
+    actor_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    details: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["owner_id", "proposal_id", "proposal_revision"],
+            [
+                "action_proposal_revisions.owner_id",
+                "action_proposal_revisions.proposal_id",
+                "action_proposal_revisions.revision",
+            ],
+            ondelete="CASCADE",
+            name="fk_action_proposal_events_revision",
+        ),
+        CheckConstraint("proposal_revision > 0", name="ck_action_proposal_events_revision"),
+        CheckConstraint(
+            "event IN ('created', 'edited', 'applied', 'rejected', 'expired')",
+            name="ck_action_proposal_events_event",
+        ),
+        CheckConstraint("actor_id = owner_id", name="ck_action_proposal_events_actor"),
+        Index(
+            "ix_action_proposal_events_owner_proposal_recorded",
+            "owner_id",
+            "proposal_id",
+            "recorded_at",
+            "id",
+        ),
+    )
+
+
+class ActionCommandReceipt(Base):
+    """Durable replay protection committed with the approved health changes."""
+
+    __tablename__ = "action_command_receipts"
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    owner_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    proposal_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    proposal_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    result_json: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["owner_id", "proposal_id", "proposal_revision"],
+            [
+                "action_proposal_revisions.owner_id",
+                "action_proposal_revisions.proposal_id",
+                "action_proposal_revisions.revision",
+            ],
+            ondelete="RESTRICT",
+            name="fk_action_command_receipts_revision",
+        ),
+        UniqueConstraint(
+            "owner_id", "idempotency_key", name="uq_action_command_receipts_owner_key"
+        ),
+        UniqueConstraint(
+            "owner_id",
+            "proposal_id",
+            "proposal_revision",
+            name="uq_action_command_receipts_proposal_revision",
+        ),
+        CheckConstraint("proposal_revision > 0", name="ck_action_command_receipts_revision"),
+        CheckConstraint(
+            "length(idempotency_key) BETWEEN 1 AND 128", name="ck_action_command_receipts_key"
+        ),
+        CheckConstraint("length(content_hash) = 64", name="ck_action_command_receipts_hash"),
+    )
+
+
 class ProviderIdentity(Base):
     """A verified external subject mapped to one stable internal owner UUID."""
 
@@ -282,6 +472,7 @@ class HealthObjectRevision(Base):
     owner_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     object_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    proposal_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
     recorded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -309,6 +500,12 @@ class HealthObjectRevision(Base):
             ["health_objects.owner_id", "health_objects.id"],
             ondelete="CASCADE",
             name="fk_health_object_revisions_owner_object",
+        ),
+        ForeignKeyConstraint(
+            ["owner_id", "proposal_id"],
+            ["action_proposals.owner_id", "action_proposals.id"],
+            ondelete="RESTRICT",
+            name="fk_health_object_revisions_owner_proposal",
         ),
         CheckConstraint("actor_id = owner_id", name="ck_health_object_revisions_owner_actor"),
         CheckConstraint("revision > 0", name="ck_health_object_revisions_revision"),

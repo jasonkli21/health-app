@@ -12,6 +12,7 @@ from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
 
+from health_api.domain.proposals import MAX_PROPOSAL_LIFETIME_HOURS
 from health_api.domain.schemas import validate_iana_timezone
 
 
@@ -92,6 +93,7 @@ class Settings(BaseSettings):
     auth_http_timeout_seconds: int = Field(default=4, ge=1, le=15)
     auth_max_in_flight: int = Field(default=32, ge=1, le=128)
     personal_ai_enabled: bool = False
+    action_proposal_ttl_hours: int = Field(default=24, ge=1, le=MAX_PROPOSAL_LIFETIME_HOURS)
 
     @field_validator("local_principal_timezone")
     @classmethod

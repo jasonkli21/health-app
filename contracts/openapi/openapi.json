@@ -203,10 +203,7 @@
           },
           "sections": {
             "items": {
-              "enum": [
-                "entries",
-                "today_summaries"
-              ],
+              "enum": ["entries", "today_summaries"],
               "type": "string"
             },
             "title": "Sections",
@@ -351,10 +348,7 @@
           },
           "sections": {
             "items": {
-              "enum": [
-                "entries",
-                "today_summaries"
-              ],
+              "enum": ["entries", "today_summaries"],
               "type": "string"
             },
             "maxItems": 2,
@@ -393,10 +387,7 @@
             "title": "Timezone"
           }
         },
-        "required": [
-          "task",
-          "resource_types"
-        ],
+        "required": ["task", "resource_types"],
         "title": "AIContextRequest",
         "type": "object"
       },
@@ -447,10 +438,7 @@
             "title": "Title"
           }
         },
-        "required": [
-          "object_id",
-          "revision"
-        ],
+        "required": ["object_id", "revision"],
         "title": "AIEvidenceReference",
         "type": "object"
       },
@@ -477,10 +465,7 @@
             "title": "Next Cursor"
           }
         },
-        "required": [
-          "items",
-          "next_cursor"
-        ],
+        "required": ["items", "next_cursor"],
         "title": "AISearchResponse",
         "type": "object"
       },
@@ -575,10 +560,7 @@
           "time_precision": {
             "anyOf": [
               {
-                "enum": [
-                  "instant",
-                  "date_only"
-                ],
+                "enum": ["instant", "date_only"],
                 "type": "string"
               },
               {
@@ -657,10 +639,7 @@
             "$ref": "#/components/schemas/AIContextRequest"
           }
         },
-        "required": [
-          "message",
-          "scope"
-        ],
+        "required": ["message", "scope"],
         "title": "AssistantMessageRequest",
         "type": "object"
       },
@@ -725,10 +704,7 @@
         "additionalProperties": false,
         "properties": {
           "adapter_status": {
-            "enum": [
-              "disabled",
-              "ready"
-            ],
+            "enum": ["disabled", "ready"],
             "title": "Adapter Status",
             "type": "string"
           },
@@ -779,18 +755,12 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "type",
-          "value"
-        ],
+        "required": ["type", "value"],
         "title": "BooleanValue",
         "type": "object"
       },
       "ConfirmationStatus": {
-        "enum": [
-          "unconfirmed",
-          "user_confirmed"
-        ],
+        "enum": ["unconfirmed", "user_confirmed"],
         "title": "ConfirmationStatus",
         "type": "string"
       },
@@ -828,18 +798,12 @@
             "title": "Notes"
           }
         },
-        "required": [
-          "id",
-          "context"
-        ],
+        "required": ["id", "context"],
         "title": "ContextCreateRequest",
         "type": "object"
       },
       "ContextLifecycle": {
-        "enum": [
-          "active",
-          "ended"
-        ],
+        "enum": ["active", "ended"],
         "title": "ContextLifecycle",
         "type": "string"
       },
@@ -907,10 +871,7 @@
             "title": "Start At"
           }
         },
-        "required": [
-          "label",
-          "context_type"
-        ],
+        "required": ["label", "context_type"],
         "title": "ContextPayloadV1",
         "type": "object"
       },
@@ -937,9 +898,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "object_id"
-        ],
+        "required": ["object_id"],
         "title": "ContextRelation",
         "type": "object"
       },
@@ -1014,10 +973,7 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": [
-              "active",
-              "archived"
-            ],
+            "enum": ["active", "archived"],
             "title": "Status",
             "type": "string"
           },
@@ -1082,13 +1038,7 @@
         "type": "object"
       },
       "ContextType": {
-        "enum": [
-          "travel",
-          "illness",
-          "recovery",
-          "schedule_change",
-          "other"
-        ],
+        "enum": ["travel", "illness", "recovery", "schedule_change", "other"],
         "title": "ContextType",
         "type": "string"
       },
@@ -1126,10 +1076,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "expected_revision",
-          "context"
-        ],
+        "required": ["expected_revision", "context"],
         "title": "ContextUpdateRequest",
         "type": "object"
       },
@@ -1147,10 +1094,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "known_count",
-          "total_count"
-        ],
+        "required": ["known_count", "total_count"],
         "title": "CoverageV1",
         "type": "object"
       },
@@ -1185,23 +1129,12 @@
             "type": "object"
           }
         },
-        "required": [
-          "metric",
-          "tracker_id",
-          "schema_version",
-          "values"
-        ],
+        "required": ["metric", "tracker_id", "schema_version", "values"],
         "title": "CustomTrackerValueV1",
         "type": "object"
       },
       "DailyDomain": {
-        "enum": [
-          "nutrition",
-          "exercise",
-          "sleep",
-          "symptoms",
-          "measurements"
-        ],
+        "enum": ["nutrition", "exercise", "sleep", "symptoms", "measurements"],
         "title": "DailyDomain",
         "type": "string"
       },
@@ -1258,11 +1191,7 @@
             "type": "array"
           }
         },
-        "required": [
-          "events",
-          "observations",
-          "created"
-        ],
+        "required": ["events", "observations", "created"],
         "title": "DailyEntryCreateResponse",
         "type": "object"
       },
@@ -1283,10 +1212,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "event"
-        ],
+        "required": ["id", "event"],
         "title": "DailyEventCreateRequest",
         "type": "object"
       },
@@ -1312,10 +1238,7 @@
             "title": "Next Cursor"
           }
         },
-        "required": [
-          "items",
-          "next_cursor"
-        ],
+        "required": ["items", "next_cursor"],
         "title": "DailyEventListResponse",
         "type": "object"
       },
@@ -1391,10 +1314,7 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": [
-              "active",
-              "archived"
-            ],
+            "enum": ["active", "archived"],
             "title": "Status",
             "type": "string"
           },
@@ -1474,10 +1394,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "expected_revision",
-          "event"
-        ],
+        "required": ["expected_revision", "event"],
         "title": "DailyEventUpdateRequest",
         "type": "object"
       },
@@ -1489,12 +1406,20 @@
             "title": "Actor Kind",
             "type": "string"
           },
-          "reason": {
-            "enum": [
-              "create",
-              "update",
-              "archive"
+          "proposal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
+            "title": "Proposal Id"
+          },
+          "reason": {
+            "enum": ["create", "update", "archive"],
             "title": "Reason",
             "type": "string"
           },
@@ -1559,10 +1484,7 @@
             "title": "Next After Revision"
           }
         },
-        "required": [
-          "items",
-          "next_after_revision"
-        ],
+        "required": ["items", "next_after_revision"],
         "title": "DailyHistoryResponse",
         "type": "object"
       },
@@ -1586,10 +1508,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "event_id",
-          "observation_id"
-        ],
+        "required": ["event_id", "observation_id"],
         "title": "DailyLinkRequest",
         "type": "object"
       },
@@ -1610,10 +1529,7 @@
             "$ref": "#/components/schemas/ObservationSchemaV1"
           }
         },
-        "required": [
-          "id",
-          "observation"
-        ],
+        "required": ["id", "observation"],
         "title": "DailyObservationCreateRequest",
         "type": "object"
       },
@@ -1639,10 +1555,7 @@
             "title": "Next Cursor"
           }
         },
-        "required": [
-          "items",
-          "next_cursor"
-        ],
+        "required": ["items", "next_cursor"],
         "title": "DailyObservationListResponse",
         "type": "object"
       },
@@ -1710,10 +1623,7 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": [
-              "active",
-              "archived"
-            ],
+            "enum": ["active", "archived"],
             "title": "Status",
             "type": "string"
           },
@@ -1792,10 +1702,7 @@
             "$ref": "#/components/schemas/ObservationSchemaV1"
           }
         },
-        "required": [
-          "expected_revision",
-          "observation"
-        ],
+        "required": ["expected_revision", "observation"],
         "title": "DailyObservationUpdateRequest",
         "type": "object"
       },
@@ -1836,11 +1743,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "precision",
-          "local_date",
-          "timezone"
-        ],
+        "required": ["precision", "local_date", "timezone"],
         "title": "DateOnlyTimePoint",
         "type": "object"
       },
@@ -1848,11 +1751,7 @@
         "additionalProperties": false,
         "properties": {
           "unit": {
-            "enum": [
-              "m",
-              "km",
-              "mi"
-            ],
+            "enum": ["m", "km", "mi"],
             "title": "Unit",
             "type": "string"
           },
@@ -1860,10 +1759,7 @@
             "$ref": "#/components/schemas/FiniteDailyNumber"
           }
         },
-        "required": [
-          "value",
-          "unit"
-        ],
+        "required": ["value", "unit"],
         "title": "DistanceQuantity",
         "type": "object"
       },
@@ -1871,10 +1767,7 @@
         "additionalProperties": false,
         "properties": {
           "unit": {
-            "enum": [
-              "min",
-              "h"
-            ],
+            "enum": ["min", "h"],
             "title": "Unit",
             "type": "string"
           },
@@ -1882,10 +1775,7 @@
             "$ref": "#/components/schemas/FiniteDailyNumber"
           }
         },
-        "required": [
-          "value",
-          "unit"
-        ],
+        "required": ["value", "unit"],
         "title": "DurationQuantity",
         "type": "object"
       },
@@ -1893,10 +1783,7 @@
         "additionalProperties": false,
         "properties": {
           "unit": {
-            "enum": [
-              "kcal",
-              "kJ"
-            ],
+            "enum": ["kcal", "kJ"],
             "title": "Unit",
             "type": "string"
           },
@@ -1904,10 +1791,7 @@
             "$ref": "#/components/schemas/FiniteDailyNumber"
           }
         },
-        "required": [
-          "value",
-          "unit"
-        ],
+        "required": ["value", "unit"],
         "title": "EnergyQuantity",
         "type": "object"
       },
@@ -1921,10 +1805,7 @@
             "$ref": "#/components/schemas/FiniteDailyNumber"
           }
         },
-        "required": [
-          "value",
-          "unit"
-        ],
+        "required": ["value", "unit"],
         "title": "EnteredQuantity",
         "type": "object"
       },
@@ -1958,12 +1839,70 @@
             "type": "string"
           }
         },
-        "required": [
-          "code",
-          "message",
-          "request_id"
-        ],
+        "required": ["code", "message", "request_id"],
         "title": "ErrorResponse",
+        "type": "object"
+      },
+      "EventCreateCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "const": "event.create",
+            "title": "Action",
+            "type": "string"
+          },
+          "event": {
+            "$ref": "#/components/schemas/EventSchemaV1"
+          },
+          "event_id": {
+            "format": "uuid",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "linked_observations": {
+            "items": {
+              "$ref": "#/components/schemas/ObservationSchemaV1"
+            },
+            "maxItems": 10,
+            "title": "Linked Observations",
+            "type": "array"
+          },
+          "observation_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Observation Ids",
+            "type": "array"
+          }
+        },
+        "required": ["action", "event", "event_id"],
+        "title": "EventCreateCommand",
+        "type": "object"
+      },
+      "EventCreateDraft": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "const": "event.create",
+            "title": "Action",
+            "type": "string"
+          },
+          "event": {
+            "$ref": "#/components/schemas/EventSchemaV1"
+          },
+          "linked_observations": {
+            "items": {
+              "$ref": "#/components/schemas/ObservationSchemaV1"
+            },
+            "maxItems": 10,
+            "title": "Linked Observations",
+            "type": "array"
+          }
+        },
+        "required": ["action", "event"],
+        "title": "EventCreateDraft",
         "type": "object"
       },
       "EventPayloadV1": {
@@ -2026,12 +1965,54 @@
             "$ref": "#/components/schemas/DailyTimePoint"
           }
         },
-        "required": [
-          "domain",
-          "time",
-          "payload"
-        ],
+        "required": ["domain", "time", "payload"],
         "title": "EventSchemaV1",
+        "type": "object"
+      },
+      "EvidenceDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "object_id": {
+            "format": "uuid",
+            "title": "Object Id",
+            "type": "string"
+          },
+          "object_type": {
+            "title": "Object Type",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": ["object_id", "revision", "object_type", "title"],
+        "title": "EvidenceDetail",
+        "type": "object"
+      },
+      "EvidenceReference": {
+        "additionalProperties": false,
+        "properties": {
+          "object_id": {
+            "format": "uuid",
+            "title": "Object Id",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": ["object_id", "revision"],
+        "title": "EvidenceReference",
         "type": "object"
       },
       "FieldError": {
@@ -2046,10 +2027,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "field",
-          "message"
-        ],
+        "required": ["field", "message"],
         "title": "FieldError",
         "type": "object"
       },
@@ -2060,13 +2038,70 @@
         "type": "number"
       },
       "GoalComparator": {
-        "enum": [
-          "at_least",
-          "at_most",
-          "equal"
-        ],
+        "enum": ["at_least", "at_most", "equal"],
         "title": "GoalComparator",
         "type": "string"
+      },
+      "GoalCreateCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "const": "goal.create",
+            "title": "Action",
+            "type": "string"
+          },
+          "goal": {
+            "$ref": "#/components/schemas/GoalPayloadV1"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "required": ["action", "goal", "id"],
+        "title": "GoalCreateCommand",
+        "type": "object"
+      },
+      "GoalCreateDraft": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "const": "goal.create",
+            "title": "Action",
+            "type": "string"
+          },
+          "goal": {
+            "$ref": "#/components/schemas/GoalPayloadV1"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "required": ["action", "goal"],
+        "title": "GoalCreateDraft",
+        "type": "object"
       },
       "GoalCreateRequest": {
         "additionalProperties": false,
@@ -2102,10 +2137,7 @@
             "title": "Notes"
           }
         },
-        "required": [
-          "id",
-          "goal"
-        ],
+        "required": ["id", "goal"],
         "title": "GoalCreateRequest",
         "type": "object"
       },
@@ -2122,11 +2154,7 @@
         "type": "string"
       },
       "GoalLifecycle": {
-        "enum": [
-          "active",
-          "paused",
-          "completed"
-        ],
+        "enum": ["active", "paused", "completed"],
         "title": "GoalLifecycle",
         "type": "string"
       },
@@ -2179,13 +2207,7 @@
           "target_period": {
             "anyOf": [
               {
-                "enum": [
-                  "day",
-                  "week",
-                  "month",
-                  "year",
-                  "once"
-                ],
+                "enum": ["day", "week", "month", "year", "once"],
                 "type": "string"
               },
               {
@@ -2195,10 +2217,7 @@
             "title": "Target Period"
           }
         },
-        "required": [
-          "label",
-          "domain"
-        ],
+        "required": ["label", "domain"],
         "title": "GoalPayloadV1",
         "type": "object"
       },
@@ -2273,10 +2292,7 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": [
-              "active",
-              "archived"
-            ],
+            "enum": ["active", "archived"],
             "title": "Status",
             "type": "string"
           },
@@ -2340,6 +2356,32 @@
         "title": "GoalResponse",
         "type": "object"
       },
+      "GoalUpdateCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "const": "goal.update",
+            "title": "Action",
+            "type": "string"
+          },
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "goal": {
+            "$ref": "#/components/schemas/GoalPayloadV1"
+          },
+          "object_id": {
+            "format": "uuid",
+            "title": "Object Id",
+            "type": "string"
+          }
+        },
+        "required": ["action", "object_id", "expected_revision", "goal"],
+        "title": "GoalUpdateCommand",
+        "type": "object"
+      },
       "GoalUpdateRequest": {
         "additionalProperties": false,
         "properties": {
@@ -2374,10 +2416,7 @@
             "$ref": "#/components/schemas/GoalPayloadV1"
           }
         },
-        "required": [
-          "expected_revision",
-          "goal"
-        ],
+        "required": ["expected_revision", "goal"],
         "title": "GoalUpdateRequest",
         "type": "object"
       },
@@ -2399,11 +2438,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "precision",
-          "occurred_at",
-          "timezone"
-        ],
+        "required": ["precision", "occurred_at", "timezone"],
         "title": "InstantTimePoint",
         "type": "object"
       },
@@ -2455,10 +2490,7 @@
             "title": "Lifecycle"
           }
         },
-        "required": [
-          "expected_revision",
-          "lifecycle"
-        ],
+        "required": ["expected_revision", "lifecycle"],
         "title": "LifecycleUpdateRequest",
         "type": "object"
       },
@@ -2497,10 +2529,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "kind",
-          "label"
-        ],
+        "required": ["kind", "label"],
         "title": "MealEventV1",
         "type": "object"
       },
@@ -2546,11 +2575,7 @@
             "$ref": "#/components/schemas/FiniteDailyNumber"
           }
         },
-        "required": [
-          "metric",
-          "value",
-          "unit"
-        ],
+        "required": ["metric", "value", "unit"],
         "title": "MeasurementValueV1",
         "type": "object"
       },
@@ -2664,12 +2689,7 @@
             "$ref": "#/components/schemas/FiniteDailyNumber"
           }
         },
-        "required": [
-          "metric",
-          "comparator",
-          "value",
-          "unit"
-        ],
+        "required": ["metric", "comparator", "value", "unit"],
         "title": "MetricTarget",
         "type": "object"
       },
@@ -2685,10 +2705,7 @@
             "$ref": "#/components/schemas/FiniteProfileNumber"
           }
         },
-        "required": [
-          "type",
-          "value"
-        ],
+        "required": ["type", "value"],
         "title": "NumberValue",
         "type": "object"
       },
@@ -2699,9 +2716,7 @@
             "$ref": "#/components/schemas/ObservationValueV1"
           }
         },
-        "required": [
-          "value"
-        ],
+        "required": ["value"],
         "title": "ObservationPayloadV1",
         "type": "object"
       },
@@ -2740,11 +2755,7 @@
             "$ref": "#/components/schemas/DailyTimePoint"
           }
         },
-        "required": [
-          "domain",
-          "time",
-          "payload"
-        ],
+        "required": ["domain", "time", "payload"],
         "title": "ObservationSchemaV1",
         "type": "object"
       },
@@ -2830,19 +2841,12 @@
             "title": "Rescheduled At"
           },
           "state": {
-            "enum": [
-              "completed",
-              "skipped",
-              "rescheduled"
-            ],
+            "enum": ["completed", "skipped", "rescheduled"],
             "title": "State",
             "type": "string"
           }
         },
-        "required": [
-          "expected_schedule_revision",
-          "state"
-        ],
+        "required": ["expected_schedule_revision", "state"],
         "title": "OccurrenceActionRequest",
         "type": "object"
       },
@@ -2902,11 +2906,7 @@
             "type": "integer"
           },
           "state": {
-            "enum": [
-              "completed",
-              "skipped",
-              "rescheduled"
-            ],
+            "enum": ["completed", "skipped", "rescheduled"],
             "title": "State",
             "type": "string"
           },
@@ -2937,11 +2937,7 @@
             "type": "string"
           },
           "action": {
-            "enum": [
-              "completed",
-              "skipped",
-              "rescheduled"
-            ],
+            "enum": ["completed", "skipped", "rescheduled"],
             "title": "Action",
             "type": "string"
           },
@@ -3027,10 +3023,7 @@
             "title": "Next After Revision"
           }
         },
-        "required": [
-          "items",
-          "next_after_revision"
-        ],
+        "required": ["items", "next_after_revision"],
         "title": "OccurrenceHistoryResponse",
         "type": "object"
       },
@@ -3045,9 +3038,7 @@
             "type": "array"
           }
         },
-        "required": [
-          "items"
-        ],
+        "required": ["items"],
         "title": "OccurrenceListResponse",
         "type": "object"
       },
@@ -3060,11 +3051,7 @@
             "type": "boolean"
           },
           "dst_resolution": {
-            "enum": [
-              "exact",
-              "earlier_offset",
-              "next_valid_time"
-            ],
+            "enum": ["exact", "earlier_offset", "next_valid_time"],
             "title": "Dst Resolution",
             "type": "string"
           },
@@ -3158,12 +3145,7 @@
             "type": "integer"
           },
           "state": {
-            "enum": [
-              "unknown",
-              "completed",
-              "skipped",
-              "rescheduled"
-            ],
+            "enum": ["unknown", "completed", "skipped", "rescheduled"],
             "title": "State",
             "type": "string"
           },
@@ -3191,6 +3173,67 @@
           "linked_event_id"
         ],
         "title": "OccurrenceResponse",
+        "type": "object"
+      },
+      "PlanCreateCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "const": "plan.create",
+            "title": "Action",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/PlanPayloadV1"
+          }
+        },
+        "required": ["action", "plan", "id"],
+        "title": "PlanCreateCommand",
+        "type": "object"
+      },
+      "PlanCreateDraft": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "const": "plan.create",
+            "title": "Action",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/PlanPayloadV1"
+          }
+        },
+        "required": ["action", "plan"],
+        "title": "PlanCreateDraft",
         "type": "object"
       },
       "PlanCreateRequest": {
@@ -3227,10 +3270,7 @@
             "$ref": "#/components/schemas/PlanPayloadV1"
           }
         },
-        "required": [
-          "id",
-          "plan"
-        ],
+        "required": ["id", "plan"],
         "title": "PlanCreateRequest",
         "type": "object"
       },
@@ -3264,29 +3304,17 @@
             "title": "Reference Id"
           }
         },
-        "required": [
-          "id",
-          "kind",
-          "label"
-        ],
+        "required": ["id", "kind", "label"],
         "title": "PlanItemInput",
         "type": "object"
       },
       "PlanItemKind": {
-        "enum": [
-          "goal",
-          "regimen",
-          "task"
-        ],
+        "enum": ["goal", "regimen", "task"],
         "title": "PlanItemKind",
         "type": "string"
       },
       "PlanLifecycle": {
-        "enum": [
-          "active",
-          "paused",
-          "completed"
-        ],
+        "enum": ["active", "paused", "completed"],
         "title": "PlanLifecycle",
         "type": "string"
       },
@@ -3331,10 +3359,7 @@
             "type": "array"
           }
         },
-        "required": [
-          "expected_revision",
-          "item_ids"
-        ],
+        "required": ["expected_revision", "item_ids"],
         "title": "PlanOrderRequest",
         "type": "object"
       },
@@ -3380,9 +3405,7 @@
             "title": "Start Date"
           }
         },
-        "required": [
-          "label"
-        ],
+        "required": ["label"],
         "title": "PlanPayloadV1",
         "type": "object"
       },
@@ -3457,10 +3480,7 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": [
-              "active",
-              "archived"
-            ],
+            "enum": ["active", "archived"],
             "title": "Status",
             "type": "string"
           },
@@ -3524,6 +3544,32 @@
         "title": "PlanResponse",
         "type": "object"
       },
+      "PlanUpdateCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "const": "plan.update",
+            "title": "Action",
+            "type": "string"
+          },
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "object_id": {
+            "format": "uuid",
+            "title": "Object Id",
+            "type": "string"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/PlanPayloadV1"
+          }
+        },
+        "required": ["action", "object_id", "expected_revision", "plan"],
+        "title": "PlanUpdateCommand",
+        "type": "object"
+      },
       "PlanUpdateRequest": {
         "additionalProperties": false,
         "properties": {
@@ -3558,10 +3604,7 @@
             "$ref": "#/components/schemas/PlanPayloadV1"
           }
         },
-        "required": [
-          "expected_revision",
-          "plan"
-        ],
+        "required": ["expected_revision", "plan"],
         "title": "PlanUpdateRequest",
         "type": "object"
       },
@@ -3573,12 +3616,20 @@
             "title": "Actor Kind",
             "type": "string"
           },
-          "reason": {
-            "enum": [
-              "create",
-              "update",
-              "archive"
+          "proposal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
+            "title": "Proposal Id"
+          },
+          "reason": {
+            "enum": ["create", "update", "archive"],
             "title": "Reason",
             "type": "string"
           },
@@ -3630,10 +3681,7 @@
             "title": "Next After Revision"
           }
         },
-        "required": [
-          "items",
-          "next_after_revision"
-        ],
+        "required": ["items", "next_after_revision"],
         "title": "PlanningHistoryResponse",
         "type": "object"
       },
@@ -3675,19 +3723,12 @@
             "title": "Next Cursor"
           }
         },
-        "required": [
-          "items",
-          "next_cursor"
-        ],
+        "required": ["items", "next_cursor"],
         "title": "PlanningListResponse",
         "type": "object"
       },
       "ProfileCategory": {
-        "enum": [
-          "background",
-          "constraints",
-          "preferences"
-        ],
+        "enum": ["background", "constraints", "preferences"],
         "title": "ProfileCategory",
         "type": "string"
       },
@@ -3706,11 +3747,123 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "title"
-        ],
+        "required": ["id", "title"],
         "title": "ProfileContextReference",
+        "type": "object"
+      },
+      "ProfileCreateCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "const": "profile.create",
+            "title": "Action",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/ProfileMetadata"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ProfilePayloadV1"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          }
+        },
+        "required": ["action", "profile", "id"],
+        "title": "ProfileCreateCommand",
+        "type": "object"
+      },
+      "ProfileCreateDraft": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "const": "profile.create",
+            "title": "Action",
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/ProfileMetadata"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ProfilePayloadV1"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          }
+        },
+        "required": ["action", "profile"],
+        "title": "ProfileCreateDraft",
         "type": "object"
       },
       "ProfileCreateRequest": {
@@ -3770,10 +3923,7 @@
             ]
           }
         },
-        "required": [
-          "id",
-          "profile"
-        ],
+        "required": ["id", "profile"],
         "title": "ProfileCreateRequest",
         "type": "object"
       },
@@ -3785,12 +3935,20 @@
             "title": "Actor Kind",
             "type": "string"
           },
-          "reason": {
-            "enum": [
-              "create",
-              "update",
-              "archive"
+          "proposal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
+            "title": "Proposal Id"
+          },
+          "reason": {
+            "enum": ["create", "update", "archive"],
             "title": "Reason",
             "type": "string"
           },
@@ -3840,10 +3998,7 @@
             "title": "Next After Revision"
           }
         },
-        "required": [
-          "items",
-          "next_after_revision"
-        ],
+        "required": ["items", "next_after_revision"],
         "title": "ProfileHistoryResponse",
         "type": "object"
       },
@@ -3913,10 +4068,7 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": [
-              "active",
-              "archived"
-            ],
+            "enum": ["active", "archived"],
             "title": "Status",
             "type": "string"
           },
@@ -3980,11 +4132,7 @@
         "type": "object"
       },
       "ProfileKind": {
-        "enum": [
-          "fact",
-          "constraint",
-          "preference"
-        ],
+        "enum": ["fact", "constraint", "preference"],
         "title": "ProfileKind",
         "type": "string"
       },
@@ -4015,11 +4163,7 @@
             "title": "Next Cursor"
           }
         },
-        "required": [
-          "items",
-          "as_of",
-          "next_cursor"
-        ],
+        "required": ["items", "as_of", "next_cursor"],
         "title": "ProfileListResponse",
         "type": "object"
       },
@@ -4102,9 +4246,7 @@
             "title": "Valid To"
           }
         },
-        "required": [
-          "expected_revision"
-        ],
+        "required": ["expected_revision"],
         "title": "ProfilePatchRequest",
         "type": "object"
       },
@@ -4141,13 +4283,7 @@
             ]
           }
         },
-        "required": [
-          "kind",
-          "category",
-          "key",
-          "label",
-          "value"
-        ],
+        "required": ["kind", "category", "key", "label", "value"],
         "title": "ProfilePayloadV1",
         "type": "object"
       },
@@ -4163,10 +4299,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "ai_use_allowed",
-          "cross_domain_use_allowed"
-        ],
+        "required": ["ai_use_allowed", "cross_domain_use_allowed"],
         "title": "ProfilePermissions",
         "type": "object"
       },
@@ -4197,11 +4330,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "kind",
-          "name"
-        ],
+        "required": ["id", "kind", "name"],
         "title": "ProfileSource",
         "type": "object"
       },
@@ -4227,6 +4356,78 @@
         ],
         "title": "ProfileUnit",
         "type": "string"
+      },
+      "ProfileUpdateCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "const": "profile.update",
+            "title": "Action",
+            "type": "string"
+          },
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProfileMetadata"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "object_id": {
+            "format": "uuid",
+            "title": "Object Id",
+            "type": "string"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ProfilePayloadV1"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          }
+        },
+        "required": ["action", "object_id", "expected_revision", "profile"],
+        "title": "ProfileUpdateCommand",
+        "type": "object"
       },
       "ProfileValue": {
         "discriminator": {
@@ -4257,6 +4458,519 @@
           }
         ]
       },
+      "ProposalApplyRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmation": {
+            "const": "explicit_user_save",
+            "title": "Confirmation",
+            "type": "string"
+          },
+          "content_hash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "proposal_revision": {
+            "minimum": 1.0,
+            "title": "Proposal Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "proposal_revision",
+          "content_hash",
+          "idempotency_key",
+          "confirmation"
+        ],
+        "title": "ProposalApplyRequest",
+        "type": "object"
+      },
+      "ProposalApplyResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "proposal": {
+            "$ref": "#/components/schemas/ProposalState"
+          },
+          "replayed": {
+            "default": false,
+            "title": "Replayed",
+            "type": "boolean"
+          }
+        },
+        "required": ["proposal"],
+        "title": "ProposalApplyResponse",
+        "type": "object"
+      },
+      "ProposalCommand": {
+        "discriminator": {
+          "mapping": {
+            "event.create": "#/components/schemas/EventCreateCommand",
+            "goal.create": "#/components/schemas/GoalCreateCommand",
+            "goal.update": "#/components/schemas/GoalUpdateCommand",
+            "plan.create": "#/components/schemas/PlanCreateCommand",
+            "plan.update": "#/components/schemas/PlanUpdateCommand",
+            "profile.create": "#/components/schemas/ProfileCreateCommand",
+            "profile.update": "#/components/schemas/ProfileUpdateCommand",
+            "tracker.create": "#/components/schemas/TrackerCreateCommand"
+          },
+          "propertyName": "action"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ProfileCreateCommand"
+          },
+          {
+            "$ref": "#/components/schemas/ProfileUpdateCommand"
+          },
+          {
+            "$ref": "#/components/schemas/EventCreateCommand"
+          },
+          {
+            "$ref": "#/components/schemas/GoalCreateCommand"
+          },
+          {
+            "$ref": "#/components/schemas/GoalUpdateCommand"
+          },
+          {
+            "$ref": "#/components/schemas/PlanCreateCommand"
+          },
+          {
+            "$ref": "#/components/schemas/PlanUpdateCommand"
+          },
+          {
+            "$ref": "#/components/schemas/TrackerCreateCommand"
+          }
+        ]
+      },
+      "ProposalCreateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "commands": {
+            "items": {
+              "$ref": "#/components/schemas/ProposalDraftCommand"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Commands",
+            "type": "array"
+          },
+          "evidence_refs": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceReference"
+            },
+            "maxItems": 20,
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "rationale": {
+            "default": "",
+            "maxLength": 1000,
+            "title": "Rationale",
+            "type": "string"
+          }
+        },
+        "required": ["commands", "id"],
+        "title": "ProposalCreateRequest",
+        "type": "object"
+      },
+      "ProposalDraftCommand": {
+        "discriminator": {
+          "mapping": {
+            "event.create": "#/components/schemas/EventCreateDraft",
+            "goal.create": "#/components/schemas/GoalCreateDraft",
+            "goal.update": "#/components/schemas/GoalUpdateCommand",
+            "plan.create": "#/components/schemas/PlanCreateDraft",
+            "plan.update": "#/components/schemas/PlanUpdateCommand",
+            "profile.create": "#/components/schemas/ProfileCreateDraft",
+            "profile.update": "#/components/schemas/ProfileUpdateCommand",
+            "tracker.create": "#/components/schemas/TrackerCreateDraft"
+          },
+          "propertyName": "action"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ProfileCreateDraft"
+          },
+          {
+            "$ref": "#/components/schemas/ProfileUpdateCommand"
+          },
+          {
+            "$ref": "#/components/schemas/EventCreateDraft"
+          },
+          {
+            "$ref": "#/components/schemas/GoalCreateDraft"
+          },
+          {
+            "$ref": "#/components/schemas/GoalUpdateCommand"
+          },
+          {
+            "$ref": "#/components/schemas/PlanCreateDraft"
+          },
+          {
+            "$ref": "#/components/schemas/PlanUpdateCommand"
+          },
+          {
+            "$ref": "#/components/schemas/TrackerCreateDraft"
+          }
+        ]
+      },
+      "ProposalEditRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "commands": {
+            "items": {
+              "$ref": "#/components/schemas/ProposalDraftCommand"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Commands",
+            "type": "array"
+          },
+          "evidence_refs": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceReference"
+            },
+            "maxItems": 20,
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "rationale": {
+            "default": "",
+            "maxLength": 1000,
+            "title": "Rationale",
+            "type": "string"
+          }
+        },
+        "required": ["commands", "expected_revision"],
+        "title": "ProposalEditRequest",
+        "type": "object"
+      },
+      "ProposalHistoryEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "actor_id": {
+            "format": "uuid",
+            "title": "Actor Id",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "event": {
+            "enum": ["created", "edited", "applied", "rejected", "expired"],
+            "title": "Event",
+            "type": "string"
+          },
+          "proposal_revision": {
+            "minimum": 1.0,
+            "title": "Proposal Revision",
+            "type": "integer"
+          },
+          "recorded_at": {
+            "format": "date-time",
+            "title": "Recorded At",
+            "type": "string"
+          }
+        },
+        "required": ["event", "proposal_revision", "actor_id", "recorded_at"],
+        "title": "ProposalHistoryEntry",
+        "type": "object"
+      },
+      "ProposalHistoryResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProposalHistoryEntry"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": ["items"],
+        "title": "ProposalHistoryResponse",
+        "type": "object"
+      },
+      "ProposalListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProposalState"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": ["items", "next_cursor"],
+        "title": "ProposalListResponse",
+        "type": "object"
+      },
+      "ProposalRejectRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "proposal_revision": {
+            "minimum": 1.0,
+            "title": "Proposal Revision",
+            "type": "integer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": ["proposal_revision"],
+        "title": "ProposalRejectRequest",
+        "type": "object"
+      },
+      "ProposalResult": {
+        "additionalProperties": false,
+        "properties": {
+          "object_id": {
+            "format": "uuid",
+            "title": "Object Id",
+            "type": "string"
+          },
+          "object_type": {
+            "enum": [
+              "profile_item",
+              "event",
+              "observation",
+              "goal",
+              "plan",
+              "tracker_definition"
+            ],
+            "title": "Object Type",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": ["object_id", "object_type", "revision"],
+        "title": "ProposalResult",
+        "type": "object"
+      },
+      "ProposalState": {
+        "additionalProperties": false,
+        "properties": {
+          "applied_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applied At"
+          },
+          "commands": {
+            "items": {
+              "$ref": "#/components/schemas/ProposalCommand"
+            },
+            "title": "Commands",
+            "type": "array"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "confirmed_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed By"
+          },
+          "content_hash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "evidence_refs": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceDetail"
+            },
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_validation_summary": {
+            "additionalProperties": true,
+            "title": "Last Validation Summary",
+            "type": "object"
+          },
+          "origin": {
+            "enum": ["user", "ai"],
+            "title": "Origin",
+            "type": "string"
+          },
+          "rationale": {
+            "maxLength": 1000,
+            "title": "Rationale",
+            "type": "string"
+          },
+          "reject_reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reject Reason"
+          },
+          "rejected_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejected At"
+          },
+          "rejected_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejected By"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ProposalResult"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "state": {
+            "enum": ["pending", "applied", "rejected", "expired", "superseded"],
+            "title": "State",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "content_hash",
+          "state",
+          "origin",
+          "rationale",
+          "evidence_refs",
+          "commands",
+          "created_at",
+          "expires_at",
+          "updated_at"
+        ],
+        "title": "ProposalState",
+        "type": "object"
+      },
       "QuantityValue": {
         "additionalProperties": false,
         "properties": {
@@ -4272,11 +4986,7 @@
             "$ref": "#/components/schemas/FiniteProfileNumber"
           }
         },
-        "required": [
-          "type",
-          "value",
-          "unit"
-        ],
+        "required": ["type", "value", "unit"],
         "title": "QuantityValue",
         "type": "object"
       },
@@ -4314,29 +5024,17 @@
             "$ref": "#/components/schemas/RegimenPayloadV1"
           }
         },
-        "required": [
-          "id",
-          "regimen"
-        ],
+        "required": ["id", "regimen"],
         "title": "RegimenCreateRequest",
         "type": "object"
       },
       "RegimenKind": {
-        "enum": [
-          "habit",
-          "medication",
-          "supplement",
-          "activity"
-        ],
+        "enum": ["habit", "medication", "supplement", "activity"],
         "title": "RegimenKind",
         "type": "string"
       },
       "RegimenLifecycle": {
-        "enum": [
-          "active",
-          "paused",
-          "completed"
-        ],
+        "enum": ["active", "paused", "completed"],
         "title": "RegimenLifecycle",
         "type": "string"
       },
@@ -4403,10 +5101,7 @@
             "title": "Start Date"
           }
         },
-        "required": [
-          "label",
-          "kind"
-        ],
+        "required": ["label", "kind"],
         "title": "RegimenPayloadV1",
         "type": "object"
       },
@@ -4481,10 +5176,7 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": [
-              "active",
-              "archived"
-            ],
+            "enum": ["active", "archived"],
             "title": "Status",
             "type": "string"
           },
@@ -4582,10 +5274,7 @@
             "$ref": "#/components/schemas/RegimenPayloadV1"
           }
         },
-        "required": [
-          "expected_revision",
-          "regimen"
-        ],
+        "required": ["expected_revision", "regimen"],
         "title": "RegimenUpdateRequest",
         "type": "object"
       },
@@ -4641,12 +5330,7 @@
             "type": "array"
           }
         },
-        "required": [
-          "start_date",
-          "local_time",
-          "timezone",
-          "recurrence"
-        ],
+        "required": ["start_date", "local_time", "timezone", "recurrence"],
         "title": "ScheduleDefinitionV1",
         "type": "object"
       },
@@ -4674,18 +5358,12 @@
             "$ref": "#/components/schemas/ScheduleDefinitionV1"
           }
         },
-        "required": [
-          "effective_from",
-          "schedule"
-        ],
+        "required": ["effective_from", "schedule"],
         "title": "ScheduleEditRequest",
         "type": "object"
       },
       "ScheduleRecurrence": {
-        "enum": [
-          "daily",
-          "weekly"
-        ],
+        "enum": ["daily", "weekly"],
         "title": "ScheduleRecurrence",
         "type": "string"
       },
@@ -4749,9 +5427,7 @@
             "title": "Quality"
           }
         },
-        "required": [
-          "kind"
-        ],
+        "required": ["kind"],
         "title": "SleepEventV1",
         "type": "object"
       },
@@ -4770,10 +5446,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "kind",
-          "label"
-        ],
+        "required": ["kind", "label"],
         "title": "SymptomEventV1",
         "type": "object"
       },
@@ -4798,10 +5471,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "metric",
-          "value"
-        ],
+        "required": ["metric", "value"],
         "title": "SymptomSeverityV1",
         "type": "object"
       },
@@ -4823,10 +5493,7 @@
             "type": "array"
           }
         },
-        "required": [
-          "type",
-          "value"
-        ],
+        "required": ["type", "value"],
         "title": "TextListValue",
         "type": "object"
       },
@@ -4844,10 +5511,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "type",
-          "value"
-        ],
+        "required": ["type", "value"],
         "title": "TextValue",
         "type": "object"
       },
@@ -5007,6 +5671,67 @@
         "title": "TodayResponse",
         "type": "object"
       },
+      "TrackerCreateCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "const": "tracker.create",
+            "title": "Action",
+            "type": "string"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/TrackerDefinitionV1"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "required": ["action", "definition", "id"],
+        "title": "TrackerCreateCommand",
+        "type": "object"
+      },
+      "TrackerCreateDraft": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "const": "tracker.create",
+            "title": "Action",
+            "type": "string"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/TrackerDefinitionV1"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "required": ["action", "definition"],
+        "title": "TrackerCreateDraft",
+        "type": "object"
+      },
       "TrackerCreateRequest": {
         "additionalProperties": false,
         "properties": {
@@ -5041,10 +5766,7 @@
             "title": "Notes"
           }
         },
-        "required": [
-          "id",
-          "definition"
-        ],
+        "required": ["id", "definition"],
         "title": "TrackerCreateRequest",
         "type": "object"
       },
@@ -5070,23 +5792,12 @@
             "type": "string"
           }
         },
-        "required": [
-          "name",
-          "domain",
-          "fields"
-        ],
+        "required": ["name", "domain", "fields"],
         "title": "TrackerDefinitionV1",
         "type": "object"
       },
       "TrackerFieldKind": {
-        "enum": [
-          "text",
-          "number",
-          "boolean",
-          "enum",
-          "date",
-          "quantity"
-        ],
+        "enum": ["text", "number", "boolean", "enum", "date", "quantity"],
         "title": "TrackerFieldKind",
         "type": "string"
       },
@@ -5133,11 +5844,7 @@
             ]
           }
         },
-        "required": [
-          "id",
-          "label",
-          "kind"
-        ],
+        "required": ["id", "label", "kind"],
         "title": "TrackerFieldV1",
         "type": "object"
       },
@@ -5217,10 +5924,7 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": [
-              "active",
-              "archived"
-            ],
+            "enum": ["active", "archived"],
             "title": "Status",
             "type": "string"
           },
@@ -5307,10 +6011,7 @@
             "title": "Next After Version"
           }
         },
-        "required": [
-          "items",
-          "next_after_version"
-        ],
+        "required": ["items", "next_after_version"],
         "title": "TrackerSchemaVersionListResponse",
         "type": "object"
       },
@@ -5331,11 +6032,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "version",
-          "definition",
-          "created_at"
-        ],
+        "required": ["version", "definition", "created_at"],
         "title": "TrackerSchemaVersionResponse",
         "type": "object"
       },
@@ -5373,10 +6070,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "expected_revision",
-          "definition"
-        ],
+        "required": ["expected_revision", "definition"],
         "title": "TrackerUpdateRequest",
         "type": "object"
       },
@@ -5419,10 +6113,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "kind",
-          "label"
-        ],
+        "required": ["kind", "label"],
         "title": "WorkoutEventV1",
         "type": "object"
       }
@@ -5442,6 +6133,853 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/action-proposals": {
+      "get": {
+        "operationId": "listActionProposals",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "pending",
+                    "applied",
+                    "rejected",
+                    "expired",
+                    "superseded"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 2048,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Action proposal was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Proposal or target revision conflict."
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Action proposal has expired."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Proposal commands are invalid or unsafe."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Proposal storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "List Proposals",
+        "tags": ["action proposals"]
+      },
+      "post": {
+        "operationId": "createActionProposal",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalState"
+                }
+              }
+            },
+            "description": "Idempotent proposal retry."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Action proposal was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Proposal or target revision conflict."
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Action proposal has expired."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Proposal commands are invalid or unsafe."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Proposal storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Create Proposal",
+        "tags": ["action proposals"]
+      }
+    },
+    "/action-proposals/{proposal_id}": {
+      "get": {
+        "operationId": "getActionProposal",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Action proposal was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Proposal or target revision conflict."
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Action proposal has expired."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Proposal commands are invalid or unsafe."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Proposal storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Get Proposal",
+        "tags": ["action proposals"]
+      },
+      "patch": {
+        "operationId": "editActionProposal",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalEditRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Action proposal was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Proposal or target revision conflict."
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Action proposal has expired."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Proposal commands are invalid or unsafe."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Proposal storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Edit Proposal",
+        "tags": ["action proposals"]
+      }
+    },
+    "/action-proposals/{proposal_id}/apply": {
+      "post": {
+        "operationId": "applyActionProposal",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalApplyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalApplyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Action proposal was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Proposal or target revision conflict."
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Action proposal has expired."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Proposal commands are invalid or unsafe."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Proposal storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Apply Proposal",
+        "tags": ["action proposals"]
+      }
+    },
+    "/action-proposals/{proposal_id}/history": {
+      "get": {
+        "operationId": "listActionProposalHistory",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 2048,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalHistoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Action proposal was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Proposal or target revision conflict."
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Action proposal has expired."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Proposal commands are invalid or unsafe."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Proposal storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Get Proposal History",
+        "tags": ["action proposals"]
+      }
+    },
+    "/action-proposals/{proposal_id}/reject": {
+      "post": {
+        "operationId": "rejectActionProposal",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalRejectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Action proposal was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Proposal or target revision conflict."
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Action proposal has expired."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Proposal commands are invalid or unsafe."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Proposal storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Reject Proposal",
+        "tags": ["action proposals"]
+      }
+    },
     "/ai/context": {
       "post": {
         "operationId": "previewAIContext",
@@ -5513,9 +7051,7 @@
           }
         ],
         "summary": "Preview Ai Context",
-        "tags": [
-          "assistant"
-        ]
+        "tags": ["assistant"]
       }
     },
     "/assistant/messages": {
@@ -5589,9 +7125,7 @@
           }
         ],
         "summary": "Send Assistant Message",
-        "tags": [
-          "assistant"
-        ]
+        "tags": ["assistant"]
       }
     },
     "/assistant/status": {
@@ -5625,9 +7159,7 @@
           }
         ],
         "summary": "Assistant Status",
-        "tags": [
-          "assistant"
-        ]
+        "tags": ["assistant"]
       }
     },
     "/contexts": {
@@ -5748,9 +7280,7 @@
           }
         ],
         "summary": "List Contexts",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "post": {
         "operationId": "createContext",
@@ -5822,9 +7352,7 @@
           }
         ],
         "summary": "Create Context",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/contexts/{context_id}": {
@@ -5910,9 +7438,7 @@
           }
         ],
         "summary": "Archive Context",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "get": {
         "operationId": "getContext",
@@ -5986,9 +7512,7 @@
           }
         ],
         "summary": "Get Context",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "patch": {
         "operationId": "updateContext",
@@ -6072,9 +7596,7 @@
           }
         ],
         "summary": "Update Context",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/contexts/{context_id}/history": {
@@ -6173,9 +7695,7 @@
           }
         ],
         "summary": "Context History",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/contexts/{context_id}/lifecycle": {
@@ -6261,9 +7781,7 @@
           }
         ],
         "summary": "Transition Context",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/daily-entries": {
@@ -6357,9 +7875,7 @@
           }
         ],
         "summary": "Create Compound Daily Entry",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       }
     },
     "/events": {
@@ -6505,9 +8021,7 @@
           }
         ],
         "summary": "List Events",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       },
       "post": {
         "operationId": "createEvent",
@@ -6599,9 +8113,7 @@
           }
         ],
         "summary": "Create Event",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       }
     },
     "/events/{event_id}": {
@@ -6707,9 +8219,7 @@
           }
         ],
         "summary": "Delete Event",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       },
       "get": {
         "operationId": "getEvent",
@@ -6793,9 +8303,7 @@
           }
         ],
         "summary": "Get Event",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       },
       "patch": {
         "operationId": "updateEvent",
@@ -6899,9 +8407,7 @@
           }
         ],
         "summary": "Patch Event",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       }
     },
     "/events/{event_id}/history": {
@@ -7010,9 +8516,7 @@
           }
         ],
         "summary": "Get Event History",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       }
     },
     "/goals": {
@@ -7133,9 +8637,7 @@
           }
         ],
         "summary": "List Goals",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "post": {
         "operationId": "createGoal",
@@ -7207,9 +8709,7 @@
           }
         ],
         "summary": "Create Goal",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/goals/{goal_id}": {
@@ -7295,9 +8795,7 @@
           }
         ],
         "summary": "Archive Goal",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "get": {
         "operationId": "getGoal",
@@ -7371,9 +8869,7 @@
           }
         ],
         "summary": "Get Goal",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "patch": {
         "operationId": "updateGoal",
@@ -7457,9 +8953,7 @@
           }
         ],
         "summary": "Update Goal",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/goals/{goal_id}/history": {
@@ -7558,9 +9052,7 @@
           }
         ],
         "summary": "Goal History",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/goals/{goal_id}/lifecycle": {
@@ -7646,9 +9138,7 @@
           }
         ],
         "summary": "Transition Goal",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/healthz": {
@@ -7672,9 +9162,7 @@
           }
         },
         "summary": "Healthcheck",
-        "tags": [
-          "system"
-        ]
+        "tags": ["system"]
       }
     },
     "/observations": {
@@ -7820,9 +9308,7 @@
           }
         ],
         "summary": "List Observations",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       },
       "post": {
         "operationId": "createObservation",
@@ -7914,9 +9400,7 @@
           }
         ],
         "summary": "Create Observation",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       }
     },
     "/observations/{observation_id}": {
@@ -8022,9 +9506,7 @@
           }
         ],
         "summary": "Delete Observation",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       },
       "get": {
         "operationId": "getObservation",
@@ -8108,9 +9590,7 @@
           }
         ],
         "summary": "Get Observation",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       },
       "patch": {
         "operationId": "updateObservation",
@@ -8214,9 +9694,7 @@
           }
         ],
         "summary": "Patch Observation",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       }
     },
     "/observations/{observation_id}/history": {
@@ -8325,9 +9803,7 @@
           }
         ],
         "summary": "Get Observation History",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       }
     },
     "/plan-occurrences/{occurrence_key}": {
@@ -8412,9 +9888,7 @@
           }
         ],
         "summary": "Update Occurrence",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/plan-occurrences/{occurrence_key}/history": {
@@ -8512,9 +9986,7 @@
           }
         ],
         "summary": "Occurrence History",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/plans": {
@@ -8635,9 +10107,7 @@
           }
         ],
         "summary": "List Plans",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "post": {
         "operationId": "createPlan",
@@ -8709,9 +10179,7 @@
           }
         ],
         "summary": "Create Plan",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/plans/{plan_id}": {
@@ -8797,9 +10265,7 @@
           }
         ],
         "summary": "Archive Plan",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "get": {
         "operationId": "getPlan",
@@ -8873,9 +10339,7 @@
           }
         ],
         "summary": "Get Plan",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "patch": {
         "operationId": "updatePlan",
@@ -8959,9 +10423,7 @@
           }
         ],
         "summary": "Update Plan",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/plans/{plan_id}/history": {
@@ -9060,9 +10522,7 @@
           }
         ],
         "summary": "Plan History",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/plans/{plan_id}/items/order": {
@@ -9148,9 +10608,7 @@
           }
         ],
         "summary": "Reorder Plan",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/plans/{plan_id}/items/{item_id}/schedule": {
@@ -9244,9 +10702,7 @@
           }
         ],
         "summary": "Plan Item Schedule",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "put": {
         "operationId": "editPlanItemSchedule",
@@ -9340,9 +10796,7 @@
           }
         ],
         "summary": "Edit Plan Item Schedule",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/plans/{plan_id}/lifecycle": {
@@ -9428,9 +10882,7 @@
           }
         ],
         "summary": "Transition Plan",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/plans/{plan_id}/occurrences": {
@@ -9536,9 +10988,7 @@
           }
         ],
         "summary": "Plan Occurrences",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/profile": {
@@ -9666,9 +11116,7 @@
           }
         ],
         "summary": "List Profiles",
-        "tags": [
-          "profile"
-        ]
+        "tags": ["profile"]
       },
       "post": {
         "operationId": "createProfileItem",
@@ -9760,9 +11208,7 @@
           }
         ],
         "summary": "Create Profile",
-        "tags": [
-          "profile"
-        ]
+        "tags": ["profile"]
       }
     },
     "/profile/{item_id}": {
@@ -9868,9 +11314,7 @@
           }
         ],
         "summary": "Delete Profile",
-        "tags": [
-          "profile"
-        ]
+        "tags": ["profile"]
       },
       "get": {
         "operationId": "getProfileItem",
@@ -9954,9 +11398,7 @@
           }
         ],
         "summary": "Get Profile",
-        "tags": [
-          "profile"
-        ]
+        "tags": ["profile"]
       },
       "patch": {
         "operationId": "updateProfileItem",
@@ -10060,9 +11502,7 @@
           }
         ],
         "summary": "Patch Profile",
-        "tags": [
-          "profile"
-        ]
+        "tags": ["profile"]
       }
     },
     "/profile/{item_id}/history": {
@@ -10171,9 +11611,7 @@
           }
         ],
         "summary": "Get Profile History",
-        "tags": [
-          "profile"
-        ]
+        "tags": ["profile"]
       }
     },
     "/regimens": {
@@ -10294,9 +11732,7 @@
           }
         ],
         "summary": "List Regimens",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "post": {
         "operationId": "createRegimen",
@@ -10368,9 +11804,7 @@
           }
         ],
         "summary": "Create Regimen",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/regimens/{regimen_id}": {
@@ -10456,9 +11890,7 @@
           }
         ],
         "summary": "Archive Regimen",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "get": {
         "operationId": "getRegimen",
@@ -10532,9 +11964,7 @@
           }
         ],
         "summary": "Get Regimen",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "patch": {
         "operationId": "updateRegimen",
@@ -10618,9 +12048,7 @@
           }
         ],
         "summary": "Update Regimen",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/regimens/{regimen_id}/history": {
@@ -10719,9 +12147,7 @@
           }
         ],
         "summary": "Regimen History",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/regimens/{regimen_id}/lifecycle": {
@@ -10807,9 +12233,7 @@
           }
         ],
         "summary": "Transition Regimen",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/regimens/{regimen_id}/occurrences": {
@@ -10915,9 +12339,7 @@
           }
         ],
         "summary": "Regimen Occurrences",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/regimens/{regimen_id}/schedule": {
@@ -11001,9 +12423,7 @@
           }
         ],
         "summary": "Regimen Schedule",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "put": {
         "operationId": "editRegimenSchedule",
@@ -11087,9 +12507,7 @@
           }
         ],
         "summary": "Edit Regimen Schedule",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/search": {
@@ -11212,9 +12630,7 @@
           }
         ],
         "summary": "Search Ai Eligible Health Data",
-        "tags": [
-          "assistant"
-        ]
+        "tags": ["assistant"]
       }
     },
     "/today": {
@@ -11344,9 +12760,7 @@
           }
         ],
         "summary": "Get Today",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       }
     },
     "/trackers": {
@@ -11451,9 +12865,7 @@
           }
         ],
         "summary": "List Trackers",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "post": {
         "operationId": "createTracker",
@@ -11525,9 +12937,7 @@
           }
         ],
         "summary": "Create Tracker",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/trackers/{tracker_id}": {
@@ -11613,9 +13023,7 @@
           }
         ],
         "summary": "Archive Tracker",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "get": {
         "operationId": "getTracker",
@@ -11689,9 +13097,7 @@
           }
         ],
         "summary": "Get Tracker",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "patch": {
         "operationId": "updateTracker",
@@ -11775,9 +13181,7 @@
           }
         ],
         "summary": "Update Tracker",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/trackers/{tracker_id}/history": {
@@ -11876,9 +13280,7 @@
           }
         ],
         "summary": "Tracker History",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/trackers/{tracker_id}/versions": {
@@ -11977,9 +13379,7 @@
           }
         ],
         "summary": "Tracker Versions",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     }
   }

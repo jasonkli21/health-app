@@ -39,3 +39,19 @@ class PlanningConflict(Exception):
 
 class PlanningValidationError(Exception):
     pass
+
+
+class ActionProposalNotFound(Exception):
+    pass
+
+
+class ActionProposalConflict(Exception):
+    pass
+
+
+class ActionProposalExpired(Exception):
+    pass
+
+
+class ActionProposalValidationError(Exception):
+    pass

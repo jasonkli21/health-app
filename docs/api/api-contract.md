@@ -131,6 +131,61 @@ typed JSON payloads (migration `f5c0a1e2d3b4`). Cursors bind to owner, query and
 resource filters. Provider callbacks and service delegation are not available
 until an actual Personal AI protocol is supplied and reviewed.
 
+## Phase 6 typed action proposals
+
+Action proposals use dedicated owner-scoped tables and never appear as
+canonical health objects before apply. The owner-authenticated endpoint may
+create an owner-authored draft; it does not accept an AI source, service
+credential, actor ID, or owner ID from the request. The Phase 5 Personal AI
+adapter remains disabled, and no `health.propose.*` service tool is registered
+until a real service identity, delegated-user capability, callback, and
+retention contract are supplied.
+
+| Method and path                                  | Operation                   | Behavior                                                                                                                                                                                                                                                                              |
+| ------------------------------------------------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /action-proposals`                         | `createActionProposal`      | Create an idempotent pending proposal with 1–10 typed commands, at most 20 evidence refs, rationale up to 1,000 characters, and a 65,536-byte request/content bound. A server-configured lifetime defaults to 24 hours and is capped at 7 days. Target IDs are stable after creation. |
+| `GET /action-proposals?state=…&limit=…&cursor=…` | `listActionProposals`       | Owner-scoped keyset page (default 50, max 100); cursor binds to owner and state filter.                                                                                                                                                                                               |
+| `GET /action-proposals/{id}`                     | `getActionProposal`         | Return the current immutable proposal revision, hash, source, evidence labels/revisions, validation summary, state, and applied result IDs/revisions.                                                                                                                                 |
+| `GET /action-proposals/{id}/history`             | `listActionProposalHistory` | Return bounded append-only created/edited/applied/rejected/expired events.                                                                                                                                                                                                            |
+| `PATCH /action-proposals/{id}`                   | `editActionProposal`        | Replace the reviewed typed content only while pending and with the expected proposal revision. Appends a new immutable revision and hash.                                                                                                                                             |
+| `POST /action-proposals/{id}/apply`              | `applyActionProposal`       | Require `{proposal_revision, content_hash, idempotency_key, confirmation: "explicit_user_save"}` and a verified owner identity. Replays the saved result for the same proposal revision.                                                                                              |
+| `POST /action-proposals/{id}/reject`             | `rejectActionProposal`      | Reject the exact current pending revision, with an optional reason up to 500 characters.                                                                                                                                                                                              |
+
+The closed command union supports Profile create/update, Event create with
+explicitly linked supported Observations, goal create/update, plan
+create/update, and tracker-definition create. Commands reuse existing typed
+schemas and application commands. They cannot archive/delete, edit AI or
+cross-domain permissions, grant authorization, or use unrestricted patches.
+Updates include an expected target revision. Evidence must resolve to an
+owner object and its current revision on creation and apply. Foreign IDs remain
+indistinguishable from unknown IDs.
+
+Plan commands can reference existing owner Goals and Regimens. A Plan in the
+same proposal may reference a `goal.create` command only when that command
+appears earlier in the declared command order. Create IDs are stable across
+retries and edits that retain the command's position and action; the returned
+Goal ID can then be used when a Plan is added to a later revision. References
+to later commands and cycles are rejected.
+
+Apply locks the proposal row and runs all commands, source/history changes,
+proposal state/event, target `health_object_revisions`, and command receipt in
+one transaction. A target conflict rolls back every target write and leaves
+the proposal pending with a sanitized validation summary. Receipt uniqueness
+is `(owner_id, idempotency_key)` and
+`(owner_id, proposal_id, proposal_revision)`. Reusing a key with different
+content returns 409; a stale proposal revision/hash returns 409; expiry is
+checked at apply and returns 410. Validation errors return 422, missing or
+foreign proposals return 404, and database failures return sanitized 503.
+Target history includes `proposal_id`; applied objects preserve the proposal
+origin and `user_confirmed` status.
+
+The mobile Assistant shows command fields, time/units, evidence and expiry.
+Editing the typed command text creates a new revision; users must confirm that
+new revision. The deliberate `Confirm and save` action is the confirmation for
+that displayed revision; the executor does not open a redundant confirmation
+dialog. Current AI generation remains unavailable under the Phase 5 external
+integration gate.
+
 ## Generation
 
 Run from the repository root after activating the Python 3.12 virtual environment and installing the API development requirements:

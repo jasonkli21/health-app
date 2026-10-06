@@ -302,6 +302,7 @@ export interface components {
     };
     DailyHistoryEntry: {
       actor_kind: "user";
+      proposal_id?: string | null;
       reason: "create" | "update" | "archive";
       recorded_at: string;
       revision: number;
@@ -382,6 +383,18 @@ export interface components {
       message: string;
       request_id: string;
     };
+    EventCreateCommand: {
+      action: "event.create";
+      event: components["schemas"]["EventSchemaV1"];
+      event_id: string;
+      linked_observations?: Array<components["schemas"]["ObservationSchemaV1"]>;
+      observation_ids?: Array<string>;
+    };
+    EventCreateDraft: {
+      action: "event.create";
+      event: components["schemas"]["EventSchemaV1"];
+      linked_observations?: Array<components["schemas"]["ObservationSchemaV1"]>;
+    };
     EventPayloadV1:
       | components["schemas"]["MealEventV1"]
       | components["schemas"]["WorkoutEventV1"]
@@ -394,6 +407,16 @@ export interface components {
       payload: components["schemas"]["EventPayloadV1"];
       time: components["schemas"]["DailyTimePoint"];
     };
+    EvidenceDetail: {
+      object_id: string;
+      object_type: string;
+      revision: number;
+      title: string;
+    };
+    EvidenceReference: {
+      object_id: string;
+      revision: number;
+    };
     FieldError: {
       field: string;
       message: string;
@@ -401,6 +424,17 @@ export interface components {
     FiniteDailyNumber: number;
     FiniteProfileNumber: number;
     GoalComparator: "at_least" | "at_most" | "equal";
+    GoalCreateCommand: {
+      action: "goal.create";
+      goal: components["schemas"]["GoalPayloadV1"];
+      id: string;
+      notes?: string | null;
+    };
+    GoalCreateDraft: {
+      action: "goal.create";
+      goal: components["schemas"]["GoalPayloadV1"];
+      notes?: string | null;
+    };
     GoalCreateRequest: {
       ai_use_allowed?: boolean;
       cross_domain_use_allowed?: boolean;
@@ -444,6 +478,12 @@ export interface components {
       updated_at: string;
       valid_from: string | null;
       valid_to: string | null;
+    };
+    GoalUpdateCommand: {
+      action: "goal.update";
+      expected_revision: number;
+      goal: components["schemas"]["GoalPayloadV1"];
+      object_id: string;
     };
     GoalUpdateRequest: {
       ai_use_allowed?: boolean | null;
@@ -597,6 +637,17 @@ export interface components {
       state: "unknown" | "completed" | "skipped" | "rescheduled";
       timezone: string;
     };
+    PlanCreateCommand: {
+      action: "plan.create";
+      id: string;
+      notes?: string | null;
+      plan: components["schemas"]["PlanPayloadV1"];
+    };
+    PlanCreateDraft: {
+      action: "plan.create";
+      notes?: string | null;
+      plan: components["schemas"]["PlanPayloadV1"];
+    };
     PlanCreateRequest: {
       ai_use_allowed?: boolean;
       cross_domain_use_allowed?: boolean;
@@ -614,6 +665,7 @@ export interface components {
     PlanLifecycle: "active" | "paused" | "completed";
     PlanningHistoryEntry: {
       actor_kind: "user";
+      proposal_id?: string | null;
       reason: "create" | "update" | "archive";
       recorded_at: string;
       revision: number;
@@ -668,6 +720,12 @@ export interface components {
       valid_from: string | null;
       valid_to: string | null;
     };
+    PlanUpdateCommand: {
+      action: "plan.update";
+      expected_revision: number;
+      object_id: string;
+      plan: components["schemas"]["PlanPayloadV1"];
+    };
     PlanUpdateRequest: {
       ai_use_allowed?: boolean | null;
       cross_domain_use_allowed?: boolean | null;
@@ -678,6 +736,23 @@ export interface components {
     ProfileContextReference: {
       id: string;
       title: string;
+    };
+    ProfileCreateCommand: {
+      action: "profile.create";
+      id: string;
+      metadata?: components["schemas"]["ProfileMetadata"];
+      notes?: string | null;
+      profile: components["schemas"]["ProfilePayloadV1"];
+      valid_from?: string | null;
+      valid_to?: string | null;
+    };
+    ProfileCreateDraft: {
+      action: "profile.create";
+      metadata?: components["schemas"]["ProfileMetadata"];
+      notes?: string | null;
+      profile: components["schemas"]["ProfilePayloadV1"];
+      valid_from?: string | null;
+      valid_to?: string | null;
     };
     ProfileCreateRequest: {
       ai_use_allowed?: boolean;
@@ -691,6 +766,7 @@ export interface components {
     };
     ProfileHistoryEntry: {
       actor_kind: "user";
+      proposal_id?: string | null;
       reason: "create" | "update" | "archive";
       recorded_at: string;
       revision: number;
@@ -773,12 +849,118 @@ export interface components {
       | "week"
       | "year"
       | "dose";
+    ProfileUpdateCommand: {
+      action: "profile.update";
+      expected_revision: number;
+      metadata?: components["schemas"]["ProfileMetadata"] | null;
+      notes?: string | null;
+      object_id: string;
+      profile: components["schemas"]["ProfilePayloadV1"];
+      valid_from?: string | null;
+      valid_to?: string | null;
+    };
     ProfileValue:
       | components["schemas"]["TextValue"]
       | components["schemas"]["BooleanValue"]
       | components["schemas"]["NumberValue"]
       | components["schemas"]["QuantityValue"]
       | components["schemas"]["TextListValue"];
+    ProposalApplyRequest: {
+      confirmation: "explicit_user_save";
+      content_hash: string;
+      idempotency_key: string;
+      proposal_revision: number;
+    };
+    ProposalApplyResponse: {
+      proposal: components["schemas"]["ProposalState"];
+      replayed?: boolean;
+    };
+    ProposalCommand:
+      | components["schemas"]["ProfileCreateCommand"]
+      | components["schemas"]["ProfileUpdateCommand"]
+      | components["schemas"]["EventCreateCommand"]
+      | components["schemas"]["GoalCreateCommand"]
+      | components["schemas"]["GoalUpdateCommand"]
+      | components["schemas"]["PlanCreateCommand"]
+      | components["schemas"]["PlanUpdateCommand"]
+      | components["schemas"]["TrackerCreateCommand"];
+    ProposalCreateRequest: {
+      commands: Array<components["schemas"]["ProposalDraftCommand"]>;
+      evidence_refs?: Array<components["schemas"]["EvidenceReference"]>;
+      id: string;
+      rationale?: string;
+    };
+    ProposalDraftCommand:
+      | components["schemas"]["ProfileCreateDraft"]
+      | components["schemas"]["ProfileUpdateCommand"]
+      | components["schemas"]["EventCreateDraft"]
+      | components["schemas"]["GoalCreateDraft"]
+      | components["schemas"]["GoalUpdateCommand"]
+      | components["schemas"]["PlanCreateDraft"]
+      | components["schemas"]["PlanUpdateCommand"]
+      | components["schemas"]["TrackerCreateDraft"];
+    ProposalEditRequest: {
+      commands: Array<components["schemas"]["ProposalDraftCommand"]>;
+      evidence_refs?: Array<components["schemas"]["EvidenceReference"]>;
+      expected_revision: number;
+      rationale?: string;
+    };
+    ProposalHistoryEntry: {
+      actor_id: string;
+      details?: {
+        [key: string]: unknown;
+      };
+      event: "created" | "edited" | "applied" | "rejected" | "expired";
+      proposal_revision: number;
+      recorded_at: string;
+    };
+    ProposalHistoryResponse: {
+      items: Array<components["schemas"]["ProposalHistoryEntry"]>;
+      next_cursor?: string | null;
+    };
+    ProposalListResponse: {
+      items: Array<components["schemas"]["ProposalState"]>;
+      next_cursor: string | null;
+    };
+    ProposalRejectRequest: {
+      proposal_revision: number;
+      reason?: string | null;
+    };
+    ProposalResult: {
+      object_id: string;
+      object_type:
+        | "profile_item"
+        | "event"
+        | "observation"
+        | "goal"
+        | "plan"
+        | "tracker_definition";
+      revision: number;
+    };
+    ProposalState: {
+      applied_at?: string | null;
+      commands: Array<components["schemas"]["ProposalCommand"]>;
+      confirmed_at?: string | null;
+      confirmed_by?: string | null;
+      content_hash: string;
+      created_at: string;
+      evidence_refs: Array<components["schemas"]["EvidenceDetail"]>;
+      expires_at: string;
+      id: string;
+      last_validation_summary?: {
+        [key: string]: unknown;
+      };
+      origin: "user" | "ai";
+      rationale: string;
+      reject_reason?: string | null;
+      rejected_at?: string | null;
+      rejected_by?: string | null;
+      results?: Array<components["schemas"]["ProposalResult"]>;
+      revision: number;
+      schema_version?: 1;
+      state: "pending" | "applied" | "rejected" | "expired" | "superseded";
+      updated_at: string;
+    };
     QuantityValue: {
       type: "quantity";
       unit: components["schemas"]["ProfileUnit"];
@@ -898,6 +1080,17 @@ export interface components {
       summaries: Array<components["schemas"]["MetricSummaryV1"]>;
       timezone: string;
     };
+    TrackerCreateCommand: {
+      action: "tracker.create";
+      definition: components["schemas"]["TrackerDefinitionV1"];
+      id: string;
+      notes?: string | null;
+    };
+    TrackerCreateDraft: {
+      action: "tracker.create";
+      definition: components["schemas"]["TrackerDefinitionV1"];
+      notes?: string | null;
+    };
     TrackerCreateRequest: {
       ai_use_allowed?: boolean;
       cross_domain_use_allowed?: boolean;
@@ -973,6 +1166,22 @@ export interface components {
 }
 
 export interface operations {
+  applyActionProposal: {
+    path: {
+      proposal_id: string;
+    };
+    requestBody: components["schemas"]["ProposalApplyRequest"];
+    responses: {
+      "200": components["schemas"]["ProposalApplyResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "410": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   archiveContext: {
     path: {
       context_id: string;
@@ -1099,6 +1308,20 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  createActionProposal: {
+    requestBody: components["schemas"]["ProposalCreateRequest"];
+    responses: {
+      "200": components["schemas"]["ProposalState"];
+      "201": components["schemas"]["ProposalState"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "410": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   createContext: {
     requestBody: components["schemas"]["ContextCreateRequest"];
     responses: {
@@ -1197,6 +1420,22 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  editActionProposal: {
+    path: {
+      proposal_id: string;
+    };
+    requestBody: components["schemas"]["ProposalEditRequest"];
+    responses: {
+      "200": components["schemas"]["ProposalState"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "410": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   editPlanItemSchedule: {
     path: {
       plan_id: string;
@@ -1219,6 +1458,21 @@ export interface operations {
     responses: {
       "200": components["schemas"]["ScheduleResponse"];
       "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  getActionProposal: {
+    path: {
+      proposal_id: string;
+    };
+    responses: {
+      "200": components["schemas"]["ProposalState"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "410": components["schemas"]["ErrorResponse"];
       "413": components["schemas"]["ErrorResponse"];
       "422": components["schemas"]["ErrorResponse"];
       "503": components["schemas"]["ErrorResponse"];
@@ -1374,6 +1628,48 @@ export interface operations {
       "200": {
         [key: string]: string;
       };
+    };
+  };
+  listActionProposalHistory: {
+    path: {
+      proposal_id: string;
+    };
+    query?: {
+      limit?: number;
+      cursor?: string | null;
+    };
+    responses: {
+      "200": components["schemas"]["ProposalHistoryResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "410": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  listActionProposals: {
+    query?: {
+      state?:
+        | "pending"
+        | "applied"
+        | "rejected"
+        | "expired"
+        | "superseded"
+        | null;
+      limit?: number;
+      cursor?: string | null;
+    };
+    responses: {
+      "200": components["schemas"]["ProposalListResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "410": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
     };
   };
   listContextHistory: {
@@ -1704,6 +2000,22 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  rejectActionProposal: {
+    path: {
+      proposal_id: string;
+    };
+    requestBody: components["schemas"]["ProposalRejectRequest"];
+    responses: {
+      "200": components["schemas"]["ProposalState"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "410": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   reorderPlanItems: {
     path: {
       plan_id: string;
@@ -1951,6 +2263,18 @@ export class HealthApiClient {
     this.fetcher = fetcher;
   }
 
+  async applyActionProposal(
+    path: operations["applyActionProposal"]["path"],
+    requestBody: operations["applyActionProposal"]["requestBody"],
+  ): Promise<components["schemas"]["ProposalApplyResponse"]> {
+    return this.request<components["schemas"]["ProposalApplyResponse"]>(
+      "POST",
+      `/action-proposals/${encodeURIComponent(path.proposal_id)}/apply`,
+      undefined,
+      requestBody,
+    );
+  }
+
   async archiveContext(
     path: operations["archiveContext"]["path"],
     query: operations["archiveContext"]["query"],
@@ -2044,6 +2368,17 @@ export class HealthApiClient {
       `/trackers/${encodeURIComponent(path.tracker_id)}`,
       query,
       undefined,
+    );
+  }
+
+  async createActionProposal(
+    requestBody: operations["createActionProposal"]["requestBody"],
+  ): Promise<components["schemas"]["ProposalState"]> {
+    return this.request<components["schemas"]["ProposalState"]>(
+      "POST",
+      `/action-proposals`,
+      undefined,
+      requestBody,
     );
   }
 
@@ -2146,6 +2481,18 @@ export class HealthApiClient {
     );
   }
 
+  async editActionProposal(
+    path: operations["editActionProposal"]["path"],
+    requestBody: operations["editActionProposal"]["requestBody"],
+  ): Promise<components["schemas"]["ProposalState"]> {
+    return this.request<components["schemas"]["ProposalState"]>(
+      "PATCH",
+      `/action-proposals/${encodeURIComponent(path.proposal_id)}`,
+      undefined,
+      requestBody,
+    );
+  }
+
   async editPlanItemSchedule(
     path: operations["editPlanItemSchedule"]["path"],
     requestBody: operations["editPlanItemSchedule"]["requestBody"],
@@ -2167,6 +2514,17 @@ export class HealthApiClient {
       `/regimens/${encodeURIComponent(path.regimen_id)}/schedule`,
       undefined,
       requestBody,
+    );
+  }
+
+  async getActionProposal(
+    path: operations["getActionProposal"]["path"],
+  ): Promise<components["schemas"]["ProposalState"]> {
+    return this.request<components["schemas"]["ProposalState"]>(
+      "GET",
+      `/action-proposals/${encodeURIComponent(path.proposal_id)}`,
+      undefined,
+      undefined,
     );
   }
 
@@ -2308,6 +2666,29 @@ export class HealthApiClient {
     return this.request<{
       [key: string]: string;
     }>("GET", `/healthz`, undefined, undefined);
+  }
+
+  async listActionProposalHistory(
+    path: operations["listActionProposalHistory"]["path"],
+    query?: operations["listActionProposalHistory"]["query"],
+  ): Promise<components["schemas"]["ProposalHistoryResponse"]> {
+    return this.request<components["schemas"]["ProposalHistoryResponse"]>(
+      "GET",
+      `/action-proposals/${encodeURIComponent(path.proposal_id)}/history`,
+      query,
+      undefined,
+    );
+  }
+
+  async listActionProposals(
+    query?: operations["listActionProposals"]["query"],
+  ): Promise<components["schemas"]["ProposalListResponse"]> {
+    return this.request<components["schemas"]["ProposalListResponse"]>(
+      "GET",
+      `/action-proposals`,
+      query,
+      undefined,
+    );
   }
 
   async listContextHistory(
@@ -2550,6 +2931,18 @@ export class HealthApiClient {
     return this.request<components["schemas"]["AIContextPack"]>(
       "POST",
       `/ai/context`,
+      undefined,
+      requestBody,
+    );
+  }
+
+  async rejectActionProposal(
+    path: operations["rejectActionProposal"]["path"],
+    requestBody: operations["rejectActionProposal"]["requestBody"],
+  ): Promise<components["schemas"]["ProposalState"]> {
+    return this.request<components["schemas"]["ProposalState"]>(
+      "POST",
+      `/action-proposals/${encodeURIComponent(path.proposal_id)}/reject`,
       undefined,
       requestBody,
     );

@@ -14,7 +14,7 @@ from sqlalchemy import and_, exists, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from health_api.application.envelope_service import manual_source
+from health_api.application.envelope_service import manual_source, unit_of_work
 from health_api.application.errors import (
     PlanningConflict,
     PlanningNotFound,
@@ -300,7 +300,11 @@ def _snapshot(aggregate: PlanningAggregate) -> dict[str, Any]:
 
 
 def _append_revision(
-    session: Session, owner_id: UUID, aggregate: PlanningAggregate, reason: str
+    session: Session,
+    owner_id: UUID,
+    aggregate: PlanningAggregate,
+    reason: str,
+    proposal_id: UUID | None = None,
 ) -> None:
     obj, _, _ = aggregate
     session.add(
@@ -311,6 +315,7 @@ def _append_revision(
             actor_kind="user",
             actor_id=owner_id,
             reason=reason,
+            proposal_id=proposal_id,
             snapshot=_snapshot(aggregate),
         )
     )
@@ -325,6 +330,9 @@ def create_planning_resource(
     notes: str | None = None,
     ai_use_allowed: bool = False,
     cross_domain_use_allowed: bool = False,
+    *,
+    write_source: Source | None = None,
+    proposal_id: UUID | None = None,
 ) -> tuple[PlanningAggregate, bool]:
     payload = _payload(kind, input_payload)
     fingerprint_content: dict[str, Any] = {
@@ -339,7 +347,7 @@ def create_planning_resource(
         }
     fingerprint = hashlib.sha256(_canonical(fingerprint_content).encode()).hexdigest()
     try:
-        with session.begin():
+        with unit_of_work(session):
             existing = session.scalar(
                 select(HealthObject).where(
                     HealthObject.owner_id == owner_id, HealthObject.id == object_id
@@ -353,7 +361,7 @@ def create_planning_resource(
                     raise PlanningConflict("this ID belongs to another resource")
                 return aggregate, False
             _validate_references(session, owner_id, kind, payload)
-            source = manual_source(session, owner_id)
+            source = write_source or manual_source(session, owner_id)
             life = _ACTIVE_LIFECYCLES[kind]
             obj = HealthObject(
                 id=object_id,
@@ -396,11 +404,12 @@ def create_planning_resource(
             aggregate = _select_aggregate(session, owner_id, object_id)
             if aggregate is None:
                 raise RuntimeError("planning resource could not be reloaded")
-            _append_revision(session, owner_id, aggregate, "create")
+            _append_revision(session, owner_id, aggregate, "create", proposal_id)
             session.flush()
             return aggregate, True
     except IntegrityError as exc:
-        session.rollback()
+        if not session.in_transaction():
+            session.rollback()
         existing = session.scalar(
             select(HealthObject).where(
                 HealthObject.owner_id == owner_id, HealthObject.id == object_id
@@ -479,9 +488,12 @@ def update_planning_resource(
     input_payload: object,
     ai_use_allowed: bool | None = None,
     cross_domain_use_allowed: bool | None = None,
+    *,
+    write_source: Source | None = None,
+    proposal_id: UUID | None = None,
 ) -> PlanningAggregate:
     payload = _payload(kind, input_payload)
-    with session.begin():
+    with unit_of_work(session):
         obj = session.scalar(
             select(HealthObject)
             .where(HealthObject.owner_id == owner_id, HealthObject.id == object_id)
@@ -545,6 +557,9 @@ def update_planning_resource(
             obj.ai_use_allowed = ai_use_allowed
         if cross_domain_use_allowed is not None:
             obj.cross_domain_use_allowed = cross_domain_use_allowed
+        if write_source is not None:
+            obj.source_id = write_source.id
+            obj.confirmation_status = "user_confirmed"
         if kind == "tracker_definition":
             if resource.current_schema_version is None:
                 raise RuntimeError("tracker definition has no current schema version")
@@ -564,7 +579,7 @@ def update_planning_resource(
         aggregate = _select_aggregate(session, owner_id, object_id)
         if aggregate is None:
             raise RuntimeError("updated planning resource could not be reloaded")
-        _append_revision(session, owner_id, aggregate, "update")
+        _append_revision(session, owner_id, aggregate, "update", proposal_id)
         session.flush()
         return aggregate
 

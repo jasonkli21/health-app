@@ -332,6 +332,7 @@ def _entry_history(revision: HealthObjectRevision) -> DailyHistoryEntry:
         recorded_at=revision.recorded_at,
         actor_kind="user",
         reason=cast(Literal["create", "update", "archive"], revision.reason),
+        proposal_id=revision.proposal_id,
         snapshot=_revision_response(revision),
     )
 
@@ -475,9 +476,7 @@ def create_event(
     result = create_daily_entry(
         session,
         owner_id,
-        CreateDailyEntry(
-            events=(CreateDailyEvent(body.id, body.event, body.ai_use_allowed),)
-        ),
+        CreateDailyEntry(events=(CreateDailyEvent(body.id, body.event, body.ai_use_allowed),)),
     )
     response.status_code = 201 if result.created else 200
     return _event_response(result.events[0])
@@ -618,9 +617,7 @@ def create_observation(
         session,
         owner_id,
         CreateDailyEntry(
-            observations=(
-                CreateDailyObservation(body.id, body.observation, body.ai_use_allowed),
-            )
+            observations=(CreateDailyObservation(body.id, body.observation, body.ai_use_allowed),)
         ),
     )
     response.status_code = 201 if result.created else 200

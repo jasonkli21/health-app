@@ -14,7 +14,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from health_api.application.envelope_service import manual_source, next_daily_sequence
+from health_api.application.envelope_service import manual_source, next_daily_sequence, unit_of_work
 from health_api.application.errors import DailyConflict, DailyNotFound, DailyValidationError
 from health_api.domain.daily import local_day_bounds
 from health_api.domain.planning import TrackerDefinitionV1, validate_tracker_values
@@ -327,6 +327,7 @@ def _append_event_revision(
     linked_observation_ids: tuple[UUID, ...],
     daily_sequence: int,
     reason: str,
+    proposal_id: UUID | None = None,
 ) -> None:
     time_point: dict[str, Any] = {"precision": event.time_precision, "timezone": event.timezone}
     if event.time_precision == "instant":
@@ -348,6 +349,7 @@ def _append_event_revision(
             actor_kind="user",
             actor_id=owner_id,
             reason=reason,
+            proposal_id=proposal_id,
             snapshot=snapshot,
             daily_sequence=daily_sequence,
             daily_object_type="event",
@@ -369,6 +371,7 @@ def _append_observation_revision(
     source: Source,
     daily_sequence: int,
     reason: str,
+    proposal_id: UUID | None = None,
 ) -> None:
     time_point: dict[str, Any] = {
         "precision": observation.time_precision,
@@ -396,6 +399,7 @@ def _append_observation_revision(
             actor_kind="user",
             actor_id=owner_id,
             reason=reason,
+            proposal_id=proposal_id,
             snapshot=snapshot,
             daily_sequence=daily_sequence,
             daily_object_type="observation",
@@ -624,6 +628,9 @@ def create_daily_entry(
     session: Session,
     owner_id: UUID,
     command: CreateDailyEntry,
+    *,
+    write_source: Source | None = None,
+    proposal_id: UUID | None = None,
 ) -> CreateDailyEntryResult:
     _validate_compound(command)
     object_ids = _requested_ids(command)
@@ -645,7 +652,7 @@ def create_daily_entry(
         if not entry.ai_use_allowed
     }
     try:
-        with session.begin():
+        with unit_of_work(session):
             owner = session.scalar(select(User).where(User.id == owner_id).with_for_update())
             if owner is None or owner.lifecycle != "active":
                 raise DailyNotFound("owner does not exist")
@@ -700,7 +707,7 @@ def create_daily_entry(
                     created=False,
                 )
 
-            source = manual_source(session, owner_id)
+            source = write_source or manual_source(session, owner_id)
             # All objects in this command become visible at one commit boundary.
             sequence = next_daily_sequence(session, owner_id)
             event_objects: dict[UUID, tuple[HealthObject, EventItem, int]] = {}
@@ -796,11 +803,19 @@ def create_daily_entry(
                     tuple(sorted(links_by_event.get(event_entry.id, []))),
                     sequence,
                     "create",
+                    proposal_id,
                 )
             for observation_entry in command.observations:
                 obj, observation_subtype, sequence = observation_objects[observation_entry.id]
                 _append_observation_revision(
-                    session, owner_id, obj, observation_subtype, source, sequence, "create"
+                    session,
+                    owner_id,
+                    obj,
+                    observation_subtype,
+                    source,
+                    sequence,
+                    "create",
+                    proposal_id,
                 )
             session.flush()
             event_results = tuple(
@@ -818,7 +833,8 @@ def create_daily_entry(
                 created=True,
             )
     except IntegrityError as exc:
-        session.rollback()
+        if not session.in_transaction():
+            session.rollback()
         raise DailyConflict("one or more IDs are unavailable") from exc
 
 
@@ -829,9 +845,12 @@ def update_daily_item(
     expected_revision: int,
     record: DailyRecord,
     ai_use_allowed: bool | None = None,
+    *,
+    write_source: Source | None = None,
+    proposal_id: UUID | None = None,
 ) -> DailyAggregate:
     try:
-        with session.begin():
+        with unit_of_work(session):
             owner = session.scalar(select(User).where(User.id == owner_id).with_for_update())
             if owner is None or owner.lifecycle != "active":
                 raise DailyNotFound("owner does not exist")
@@ -850,7 +869,10 @@ def update_daily_item(
             if obj.revision != expected_revision:
                 raise DailyConflict("daily entry has changed; reload before saving")
             aggregate = _daily_aggregate(session, owner_id, object_id)
-            source = aggregate[2]
+            source = write_source or aggregate[2]
+            if write_source is not None:
+                obj.source_id = write_source.id
+                obj.confirmation_status = "user_confirmed"
             if isinstance(record, EventSchemaV1):
                 if not _is_event_aggregate(aggregate):
                     raise RuntimeError("Event aggregate is invalid")
@@ -887,7 +909,15 @@ def update_daily_item(
                 sequence = next_daily_sequence(session, owner_id)
                 session.flush()
                 _append_event_revision(
-                    session, owner_id, obj, event, source, links, sequence, "update"
+                    session,
+                    owner_id,
+                    obj,
+                    event,
+                    source,
+                    links,
+                    sequence,
+                    "update",
+                    proposal_id,
                 )
             else:
                 if not _is_observation_aggregate(aggregate):
@@ -937,7 +967,14 @@ def update_daily_item(
                 sequence = next_daily_sequence(session, owner_id)
                 session.flush()
                 _append_observation_revision(
-                    session, owner_id, obj, observation, source, sequence, "update"
+                    session,
+                    owner_id,
+                    obj,
+                    observation,
+                    source,
+                    sequence,
+                    "update",
+                    proposal_id,
                 )
             session.flush()
             return _daily_aggregate(session, owner_id, object_id)

@@ -152,6 +152,7 @@ class ProfileHistoryEntry(StrictModel):
     recorded_at: datetime
     actor_kind: Literal["user"]
     reason: Literal["create", "update", "archive"]
+    proposal_id: UUID | None = None
     snapshot: ProfileItemResponse
 
 
@@ -380,6 +381,7 @@ class PlanningHistoryEntry(StrictModel):
     recorded_at: datetime
     actor_kind: Literal["user"]
     reason: Literal["create", "update", "archive"]
+    proposal_id: UUID | None = None
     snapshot: dict[str, Any]
 
 
@@ -522,6 +524,7 @@ class DailyHistoryEntry(StrictModel):
     recorded_at: datetime
     actor_kind: Literal["user"]
     reason: Literal["create", "update", "archive"]
+    proposal_id: UUID | None = None
     snapshot: DailyItemResponse
 
 

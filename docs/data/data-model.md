@@ -53,6 +53,30 @@ values. Custom fields are limited to 20 per definition, 50 choices per enum,
 are text, number, boolean, enum, date, and quantity with a declared unit. No
 field executes code or derives clinical meaning.
 
+## Phase 6 action proposal storage
+
+Pending proposals are not `health_objects`: until confirmation they are
+candidate commands rather than health facts. `action_proposals` owns the
+proposal's lifecycle, origin kind, expiry, current revision/hash, and terminal
+confirmation/result fields. `action_proposal_revisions` stores immutable
+versioned typed command/evidence snapshots. `action_proposal_events` records
+created, edited, applied, rejected, and expiry transitions. All are
+owner-scoped with owner-consistent foreign keys.
+
+`action_command_receipts` records the canonical content hash and committed
+result. It is unique by `(owner_id, idempotency_key)` and by
+`(owner_id, proposal_id, proposal_revision)`. Target object revisions carry an
+optional `proposal_id`, so provenance can be inspected without rewriting the
+canonical target history actor: the verified owner remains the actor, source
+origin is retained, and confirmation status is `user_confirmed`.
+
+The Phase 6 command union is closed over Profile create/update, Event create
+with linked supported Observations, goal create/update, plan create/update,
+and tracker-definition create. It reuses the existing payload registries,
+revision validation, and owner-reference checks. There are no archive/delete,
+permission-grant, or arbitrary patch commands. The provider adapter remains
+disabled until its actual identity/delegation/tool contract is reviewed.
+
 ## Phase 1 Profile v1 contract
 
 Phase 1 registers only `profile_item` schema version 1. Its payload has `kind`, `category`, stable lower-case `key`, display `label`, and a required `value`. A JSON `null` value means unknown. Tagged values are `text`, `boolean`, finite `number`, finite `quantity` with a supported unit, and a bounded `text_list`. `false` and `0` remain known values. Extra payload fields and unregistered type/version pairs are rejected. Category and kind must agree: fact/background, constraint/constraints, preference/preferences.

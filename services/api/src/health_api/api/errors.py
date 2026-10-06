@@ -12,6 +12,10 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from health_api.api.schemas import ErrorResponse, FieldError
 from health_api.application.errors import (
+    ActionProposalConflict,
+    ActionProposalExpired,
+    ActionProposalNotFound,
+    ActionProposalValidationError,
     DailyConflict,
     DailyNotFound,
     DailySnapshotLimitExceeded,
@@ -128,6 +132,32 @@ def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(APIError)
     async def api_error_handler(request: Request, exc: APIError) -> JSONResponse:
         return _error_response(request, exc.status_code, exc.code, exc.message)
+
+    @app.exception_handler(ActionProposalNotFound)
+    async def proposal_not_found_handler(
+        request: Request, _exc: ActionProposalNotFound
+    ) -> JSONResponse:
+        return _error_response(request, 404, "not_found", "Action proposal was not found.")
+
+    @app.exception_handler(ActionProposalConflict)
+    async def proposal_conflict_handler(
+        request: Request, exc: ActionProposalConflict
+    ) -> JSONResponse:
+        return _error_response(request, 409, "proposal_conflict", str(exc))
+
+    @app.exception_handler(ActionProposalExpired)
+    async def proposal_expired_handler(
+        request: Request, _exc: ActionProposalExpired
+    ) -> JSONResponse:
+        return _error_response(request, 410, "proposal_expired", "Action proposal has expired.")
+
+    @app.exception_handler(ActionProposalValidationError)
+    async def proposal_validation_handler(
+        request: Request, _exc: ActionProposalValidationError
+    ) -> JSONResponse:
+        return _error_response(
+            request, 422, "proposal_invalid", "Action proposal contains invalid commands."
+        )
 
     @app.exception_handler(ProfileNotFound)
     async def not_found_handler(request: Request, _exc: ProfileNotFound) -> JSONResponse:

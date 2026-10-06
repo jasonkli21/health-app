@@ -28,3 +28,9 @@ logged with only a date or an exact start;
 without an end, duration remains unknown and coverage stays partial. Symptom
 severity coverage uses active, same-day symptom episodes and their active linked
 Observations only; unrated episodes stay in the denominator.
+
+`proposals.py` defines the closed Phase 6 command union and its size, command
+count, evidence, revision, expiry, and confirmation bounds. Proposal commands
+reuse the existing Profile, Event/Observation, goal, plan, and tracker schemas;
+they are never generic JSON patches. Permission changes and destructive
+commands are outside this registry.

@@ -9,7 +9,12 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from health_api.application.envelope_service import manual_source
+from pydantic import ValidationError
+from sqlalchemy import and_, delete, or_, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from health_api.application.envelope_service import manual_source, unit_of_work
 from health_api.application.errors import ProfileConflict, ProfileNotFound, ProfileValidationError
 from health_api.domain.schemas import (
     ProfileMetadata,
@@ -24,10 +29,6 @@ from health_api.persistence.models import (
     ProfileItem,
     Source,
 )
-from pydantic import ValidationError
-from sqlalchemy import and_, delete, or_, select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
 
 @dataclass(frozen=True)
@@ -130,6 +131,7 @@ def _append_revision(
     owner_id: UUID,
     aggregate: ProfileAggregate,
     reason: str,
+    proposal_id: UUID | None = None,
 ) -> None:
     health_object, profile_item, source = aggregate
     session.add(
@@ -140,17 +142,23 @@ def _append_revision(
             actor_kind="user",
             actor_id=owner_id,
             reason=reason,
+            proposal_id=proposal_id,
             snapshot=_snapshot(health_object, profile_item, source),
         )
     )
 
 
 def create_profile_item(
-    session: Session, owner_id: UUID, command: CreateProfile
+    session: Session,
+    owner_id: UUID,
+    command: CreateProfile,
+    *,
+    source: Source | None = None,
+    proposal_id: UUID | None = None,
 ) -> CreateProfileResult:
     fingerprint = _fingerprint(command)
     try:
-        with session.begin():
+        with unit_of_work(session):
             existing = session.scalar(
                 select(HealthObject).where(
                     HealthObject.owner_id == owner_id, HealthObject.id == command.id
@@ -164,7 +172,7 @@ def create_profile_item(
                     raise RuntimeError("profile envelope has no profile payload")
                 return CreateProfileResult(aggregate, False)
 
-            source = manual_source(session, owner_id)
+            source = source or manual_source(session, owner_id)
             payload = command.profile.model_dump(mode="json")
             health_object = HealthObject(
                 id=command.id,
@@ -196,11 +204,12 @@ def create_profile_item(
             session.add_all([health_object, profile_item])
             session.flush()
             aggregate = (health_object, profile_item, source)
-            _append_revision(session, owner_id, aggregate, "create")
+            _append_revision(session, owner_id, aggregate, "create", proposal_id)
             session.flush()
             return CreateProfileResult(aggregate, True)
     except IntegrityError as exc:
-        session.rollback()
+        if not session.in_transaction():
+            session.rollback()
         existing = session.scalar(
             select(HealthObject).where(
                 HealthObject.owner_id == owner_id, HealthObject.id == command.id
@@ -291,8 +300,11 @@ def update_profile_item(
     object_id: UUID,
     expected_revision: int,
     changes: dict[str, Any],
+    *,
+    source: Source | None = None,
+    proposal_id: UUID | None = None,
 ) -> ProfileAggregate:
-    with session.begin():
+    with unit_of_work(session):
         health_object = session.scalar(
             select(HealthObject)
             .where(HealthObject.owner_id == owner_id, HealthObject.id == object_id)
@@ -351,13 +363,16 @@ def update_profile_item(
             health_object.ai_use_allowed = changes["ai_use_allowed"]
         if "cross_domain_use_allowed" in changes:
             health_object.cross_domain_use_allowed = changes["cross_domain_use_allowed"]
+        if source is not None:
+            health_object.source_id = source.id
+            health_object.confirmation_status = "user_confirmed"
         health_object.revision += 1
         health_object.updated_at = datetime.now(UTC)
         session.flush()
         aggregate = _select_aggregate(session, owner_id, object_id)
         if aggregate is None:
             raise RuntimeError("updated Profile item could not be reloaded")
-        _append_revision(session, owner_id, aggregate, "update")
+        _append_revision(session, owner_id, aggregate, "update", proposal_id)
         session.flush()
         return aggregate
 
@@ -365,7 +380,7 @@ def update_profile_item(
 def archive_profile_item(
     session: Session, owner_id: UUID, object_id: UUID, expected_revision: int
 ) -> ProfileAggregate:
-    with session.begin():
+    with unit_of_work(session):
         health_object = session.scalar(
             select(HealthObject)
             .where(HealthObject.owner_id == owner_id, HealthObject.id == object_id)
@@ -403,7 +418,7 @@ def create_profile_relationship(
     if from_object_id == to_object_id:
         raise ProfileValidationError("a Profile item cannot relate to itself")
 
-    with session.begin():
+    with unit_of_work(session):
         endpoints = set(
             session.scalars(
                 select(HealthObject.id).where(
@@ -457,7 +472,7 @@ def list_profile_relationships(
 
 
 def remove_profile_relationship(session: Session, owner_id: UUID, relationship_id: UUID) -> None:
-    with session.begin():
+    with unit_of_work(session):
         deleted_id = session.execute(
             delete(HealthRelationship)
             .where(
