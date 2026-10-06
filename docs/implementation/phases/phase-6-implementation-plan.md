@@ -2,9 +2,42 @@
 
 ## Implementation-time reconciliation gate
 
-**Status: planned. Dependencies: accepted Phases 1–5, especially the real read-only AI/delegation boundary and manual commands.** Read [Phase 6 roadmap](../implementation-plan.md#phase-6--ai-action-proposals), ADR 0006, actual Phase 5 evidence, owner/source/revision/permission schemas, Profile/daily/planning command contracts and mobile form flows. Identify actual external proposal capability support; record drift and update material plan/ADR changes before code.
+**Status: implementation in progress. Dependencies: locally delivered Phases 1–5 and their actual release evidence.** Read [Phase 6 roadmap](../implementation-plan.md#phase-6--ai-action-proposals), ADR 0006, actual Phase 5 evidence, owner/source/revision/permission schemas, Profile/daily/planning command contracts and mobile form flows. Identify actual external proposal capability support; record drift and update material plan/ADR changes before code.
 
 Actual scaffold homes are API domain/application/api/persistence/integrations/config, API tests, root migrations/contracts, api-client and mobile app/src/tests. All proposed artifacts below are **planned/provisional**; previously completed product modules must be inspected rather than assumed by filename.
+
+### Reconciliation before implementation — October 5, 2026
+
+- Phases 1–5 have local release evidence. The actual owner-authenticated APIs
+  and application commands are in `services/api/src/health_api`; generated
+  client artifacts are in `contracts/openapi` and `packages/api-client`; the
+  mobile Assistant is under `apps/mobile/src/features/assistant`.
+- Phase 5 explicitly has no supplied Personal AI endpoint, service identity,
+  end-user delegation, callback/tool protocol, or retention contract. The
+  only adapter is disabled and `PERSONAL_AI_ENABLED=true` is rejected. There
+  is therefore no supportable live `health.propose.*` registration or AI
+  caller identity to implement. Proposal creation by a provider remains
+  disabled until that contract is supplied; no provider URL or credential is
+  guessed.
+- Existing source metadata can represent `ai` and user-confirmed state, but
+  `health_object_revisions` constrains actors to the owner and does not record
+  a proposal reference. Existing command services each own a transaction and
+  hard-code manual provenance. These are real reuse gaps for a one-transaction
+  proposal executor and will be changed before composing commands.
+- Proposal drafts are not canonical health facts. Persist them in dedicated,
+  owner-scoped proposal, immutable proposal-revision, event, and receipt
+  tables. This avoids putting pending state in `health_objects` or changing
+  its clinical resource allowlist. Applying a command will call existing
+  domain services in a shared outer unit of work, preserving their schema,
+  owner-reference, and history validation.
+- The plan's live-provider package is gated, not simulated. This delivery
+  implements the fail-closed proposal core and owner-confirmation path where
+  the repository can verify them. It must report provider submission,
+  provider role/delegation, and live confirmation walkthrough as unresolved
+  external gates.
+
+ADR 0006 and this plan were reconciled before code to record these actual
+service and persistence boundaries.
 
 ## Outcome / strict deliver and defer
 
