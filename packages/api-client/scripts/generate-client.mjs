@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { format } from "prettier";
 
 const packageRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -250,4 +251,8 @@ lines.push(
   "",
 );
 
-writeFileSync(outputPath, lines.join("\n"), "utf8");
+writeFileSync(
+  outputPath,
+  await format(lines.join("\n"), { filepath: outputPath }),
+  "utf8",
+);

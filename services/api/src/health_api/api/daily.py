@@ -338,9 +338,12 @@ def _entry_history(revision: HealthObjectRevision) -> DailyHistoryEntry:
 
 def _create_command(body: DailyEntryCreateRequest) -> CreateDailyEntry:
     return CreateDailyEntry(
-        events=tuple(CreateDailyEvent(item.id, item.event) for item in body.events),
+        events=tuple(
+            CreateDailyEvent(item.id, item.event, item.ai_use_allowed) for item in body.events
+        ),
         observations=tuple(
-            CreateDailyObservation(item.id, item.observation) for item in body.observations
+            CreateDailyObservation(item.id, item.observation, item.ai_use_allowed)
+            for item in body.observations
         ),
         links=tuple(
             CreateDailyLink(link.event_id, link.observation_id, link.role) for link in body.links
@@ -472,7 +475,9 @@ def create_event(
     result = create_daily_entry(
         session,
         owner_id,
-        CreateDailyEntry(events=(CreateDailyEvent(body.id, body.event),)),
+        CreateDailyEntry(
+            events=(CreateDailyEvent(body.id, body.event, body.ai_use_allowed),)
+        ),
     )
     response.status_code = 201 if result.created else 200
     return _event_response(result.events[0])
@@ -526,7 +531,14 @@ def patch_event(
     owner_id: Annotated[UUID, Depends(get_current_owner)],
     session: Annotated[Session, Depends(get_session)],
 ) -> DailyEventResponse:
-    aggregate = update_daily_item(session, owner_id, event_id, body.expected_revision, body.event)
+    aggregate = update_daily_item(
+        session,
+        owner_id,
+        event_id,
+        body.expected_revision,
+        body.event,
+        body.ai_use_allowed,
+    )
     if not isinstance(aggregate[1], EventItem):
         raise DailyNotFound
     return _event_response(aggregate)
@@ -605,7 +617,11 @@ def create_observation(
     result = create_daily_entry(
         session,
         owner_id,
-        CreateDailyEntry(observations=(CreateDailyObservation(body.id, body.observation),)),
+        CreateDailyEntry(
+            observations=(
+                CreateDailyObservation(body.id, body.observation, body.ai_use_allowed),
+            )
+        ),
     )
     response.status_code = 201 if result.created else 200
     return _observation_response(result.observations[0])
@@ -660,7 +676,12 @@ def patch_observation(
     session: Annotated[Session, Depends(get_session)],
 ) -> DailyObservationResponse:
     aggregate = update_daily_item(
-        session, owner_id, observation_id, body.expected_revision, body.observation
+        session,
+        owner_id,
+        observation_id,
+        body.expected_revision,
+        body.observation,
+        body.ai_use_allowed,
     )
     if not isinstance(aggregate[1], ObservationItem):
         raise DailyNotFound

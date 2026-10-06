@@ -2,6 +2,157 @@
 
 export interface components {
   schemas: {
+    AIContextEntry: {
+      confirmation_status: components["schemas"]["ConfirmationStatus"];
+      content: {
+        [key: string]: unknown;
+      };
+      content_is_user_data: true;
+      domain: string;
+      object_id: string;
+      object_type:
+        | "profile_item"
+        | "event"
+        | "observation"
+        | "goal"
+        | "regimen"
+        | "plan"
+        | "context";
+      relevance_reason: string;
+      revision: number;
+      source_kind:
+        | "manual"
+        | "device"
+        | "document"
+        | "provider"
+        | "ai"
+        | "system";
+      title: string;
+      valid_from: string | null;
+      valid_to: string | null;
+    };
+    AIContextPack: {
+      as_of: string;
+      budget_bytes: 65536;
+      built_at: string;
+      entries: Array<components["schemas"]["AIContextEntry"]>;
+      included_counts: {
+        [key: string]: number;
+      };
+      lookback_days: number;
+      omitted_by_budget: number;
+      omitted_by_user: number;
+      owner_scope: string;
+      request_id: string;
+      resource_types: Array<
+        | "profile_item"
+        | "event"
+        | "observation"
+        | "goal"
+        | "regimen"
+        | "plan"
+        | "context"
+      >;
+      schema_version: 1;
+      serialized_bytes: number;
+      task: string;
+      task_kind:
+        | "general_wellness"
+        | "education"
+        | "understand_health_data"
+        | "consequential_medical"
+        | "urgent_safety";
+      timezone: string;
+      today_summaries: Array<components["schemas"]["MetricSummaryV1"]>;
+      today_summary_date: string;
+      today_summary_scope: "included_opted_in_entries_only";
+      truncated: boolean;
+    };
+    AIContextRequest: {
+      as_of?: string | null;
+      excluded_object_ids?: Array<string>;
+      lookback_days?: number;
+      resource_types: Array<
+        | "profile_item"
+        | "event"
+        | "observation"
+        | "goal"
+        | "regimen"
+        | "plan"
+        | "context"
+      >;
+      task: string;
+      task_kind?:
+        | "general_wellness"
+        | "education"
+        | "understand_health_data"
+        | "consequential_medical"
+        | "urgent_safety";
+      timezone?: string | null;
+    };
+    AIEvidenceReference: {
+      object_id: string;
+      revision: number;
+    };
+    AISearchResponse: {
+      items: Array<components["schemas"]["AISearchResult"]>;
+      next_cursor: string | null;
+    };
+    AISearchResult: {
+      confirmation_status: components["schemas"]["ConfirmationStatus"];
+      domain: string;
+      excerpt: string;
+      object_id: string;
+      object_type:
+        | "profile_item"
+        | "event"
+        | "observation"
+        | "goal"
+        | "regimen"
+        | "plan"
+        | "context";
+      revision: number;
+      source_kind:
+        | "manual"
+        | "device"
+        | "document"
+        | "provider"
+        | "ai"
+        | "system";
+      title: string;
+    };
+    AssistantMessageRequest: {
+      message: string;
+      scope: components["schemas"]["AIContextRequest"];
+    };
+    AssistantMessageResponse: {
+      context_summary: {
+        [key: string]: number;
+      };
+      evidence_refs: Array<components["schemas"]["AIEvidenceReference"]>;
+      reply: string;
+      request_id: string;
+      risk_class:
+        | "general_wellness"
+        | "education"
+        | "understand_health_data"
+        | "consequential_medical"
+        | "urgent_safety";
+      service_status: "complete";
+    };
+    AssistantStatusResponse: {
+      adapter_status: "disabled" | "ready";
+      allowed_capabilities: Array<
+        | "health.context"
+        | "health.search"
+        | "health.today"
+        | "health.profile"
+        | "health.goals"
+        | "health.plans"
+      >;
+      enabled: boolean;
+      message: string;
+    };
     BooleanValue: {
       type: "boolean";
       value: boolean;
@@ -94,6 +245,7 @@ export interface components {
       observations: Array<components["schemas"]["DailyObservationResponse"]>;
     };
     DailyEventCreateRequest: {
+      ai_use_allowed?: boolean;
       event: components["schemas"]["EventSchemaV1"];
       id: string;
     };
@@ -123,6 +275,7 @@ export interface components {
       valid_to: string | null;
     };
     DailyEventUpdateRequest: {
+      ai_use_allowed?: boolean;
       event: components["schemas"]["EventSchemaV1"];
       expected_revision: number;
     };
@@ -145,6 +298,7 @@ export interface components {
       role?: "symptom_severity";
     };
     DailyObservationCreateRequest: {
+      ai_use_allowed?: boolean;
       id: string;
       observation: components["schemas"]["ObservationSchemaV1"];
     };
@@ -173,6 +327,7 @@ export interface components {
       valid_to: string | null;
     };
     DailyObservationUpdateRequest: {
+      ai_use_allowed?: boolean;
       expected_revision: number;
       observation: components["schemas"]["ObservationSchemaV1"];
     };
@@ -1048,6 +1203,12 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  getAssistantStatus: {
+    responses: {
+      "200": components["schemas"]["AssistantStatusResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+    };
+  };
   getContext: {
     path: {
       context_id: string;
@@ -1512,6 +1673,16 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  previewAIContext: {
+    requestBody: components["schemas"]["AIContextRequest"];
+    responses: {
+      "200": components["schemas"]["AIContextPack"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   reorderPlanItems: {
     path: {
       plan_id: string;
@@ -1519,6 +1690,31 @@ export interface operations {
     requestBody: components["schemas"]["PlanOrderRequest"];
     responses: {
       "200": components["schemas"]["PlanResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  searchAIEligibleHealthData: {
+    query: {
+      q: string;
+      types?: string | null;
+      limit?: number;
+      cursor?: string | null;
+    };
+    responses: {
+      "200": components["schemas"]["AISearchResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  sendAssistantMessage: {
+    requestBody: components["schemas"]["AssistantMessageRequest"];
+    responses: {
+      "200": components["schemas"]["AssistantMessageResponse"];
       "401": components["schemas"]["ErrorResponse"];
       "413": components["schemas"]["ErrorResponse"];
       "422": components["schemas"]["ErrorResponse"];
@@ -1953,6 +2149,17 @@ export class HealthApiClient {
     );
   }
 
+  async getAssistantStatus(): Promise<
+    components["schemas"]["AssistantStatusResponse"]
+  > {
+    return this.request<components["schemas"]["AssistantStatusResponse"]>(
+      "GET",
+      `/assistant/status`,
+      undefined,
+      undefined,
+    );
+  }
+
   async getContext(
     path: operations["getContext"]["path"],
   ): Promise<components["schemas"]["ContextResponse"]> {
@@ -2316,6 +2523,17 @@ export class HealthApiClient {
     );
   }
 
+  async previewAIContext(
+    requestBody: operations["previewAIContext"]["requestBody"],
+  ): Promise<components["schemas"]["AIContextPack"]> {
+    return this.request<components["schemas"]["AIContextPack"]>(
+      "POST",
+      `/ai/context`,
+      undefined,
+      requestBody,
+    );
+  }
+
   async reorderPlanItems(
     path: operations["reorderPlanItems"]["path"],
     requestBody: operations["reorderPlanItems"]["requestBody"],
@@ -2323,6 +2541,28 @@ export class HealthApiClient {
     return this.request<components["schemas"]["PlanResponse"]>(
       "PUT",
       `/plans/${encodeURIComponent(path.plan_id)}/items/order`,
+      undefined,
+      requestBody,
+    );
+  }
+
+  async searchAIEligibleHealthData(
+    query: operations["searchAIEligibleHealthData"]["query"],
+  ): Promise<components["schemas"]["AISearchResponse"]> {
+    return this.request<components["schemas"]["AISearchResponse"]>(
+      "GET",
+      `/search`,
+      query,
+      undefined,
+    );
+  }
+
+  async sendAssistantMessage(
+    requestBody: operations["sendAssistantMessage"]["requestBody"],
+  ): Promise<components["schemas"]["AssistantMessageResponse"]> {
+    return this.request<components["schemas"]["AssistantMessageResponse"]>(
+      "POST",
+      `/assistant/messages`,
       undefined,
       requestBody,
     );

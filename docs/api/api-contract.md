@@ -93,6 +93,44 @@ create a health Observation. Contexts are selected by validity date and sorted
 by explicit priority then stable ID; they do not change Profile or regimen
 state.
 
+## Phase 5 read-only Assistant contracts
+
+Daily Event and Observation create requests accept `ai_use_allowed` (default
+`false`); update requests may change it with the current expected revision.
+Permission changes are saved in the ordinary revision history. The compound
+daily create applies the explicit flag to each submitted object, including
+linked severity Observations. Old create retries with permission off retain
+their existing idempotency fingerprint behavior. Profile and planning items
+already expose the same opt-in; `cross_domain_use_allowed` remains separate
+and is not used by this Assistant.
+
+| Route                                      | Contract                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /assistant/status`                    | Reports whether a reviewed adapter is ready and which read capabilities are active. Disabled adapters report an empty capability list.                                                                                                                                                                            |
+| `POST /ai/context`                         | Builds a current preview for the authenticated owner from `task`, `task_kind`, selected `resource_types`, `lookback_days` (0–90), optional `as_of`/timezone, and optional excluded object UUIDs.                                                                                                                  |
+| `GET /search?q=…&types=…&limit=…&cursor=…` | PostgreSQL full-text search over current active resources. `types` is an optional comma-separated list; results require `ai_use_allowed=true`. Limit is 1–50 (default 20); `q` is at most 500 characters.                                                                                                         |
+| `POST /assistant/messages`                 | Accepts an 8,000-character message and the same scope request. Health checks adapter availability before building or sending context; the current disabled adapter returns sanitized 503. A configured adapter must receive a newly built Pack and return evidence references that resolve to included revisions. |
+
+The Pack v1 includes the task and selected types, random per-request opaque
+owner scope, timezone and `as_of`, revision-linked minimized entries,
+source/confirmation metadata, inclusion counts, user exclusions, deterministic
+truncation and a 65,536-byte serialized budget. Current-day rollups are
+calculated only from included, opted-in Event/Observation entries and explicitly
+label their coverage as that included subset. Profile constraints rank first;
+active contexts, goals/preferences, facts, and recent daily records follow.
+Eligible safety constraints that cannot fit cause 422 rather than silent
+omission. Text and notes are untrusted user data. Plan and context references
+remain only when the target also appears in the Pack; other history, trackers,
+trends, records, or arbitrary database results are excluded.
+
+Search and context filter by authenticated owner, active status, temporal
+validity, selected resource type, and per-object AI permission. Daily search
+uses a bounded 90-day local window; context uses the requested local-day
+window. Full-text search uses additive GIN indexes on envelope title/notes and
+typed JSON payloads (migration `f5c0a1e2d3b4`). Cursors bind to owner, query and
+resource filters. Provider callbacks and service delegation are not available
+until an actual Personal AI protocol is supplied and reviewed.
+
 ## Generation
 
 Run from the repository root after activating the Python 3.12 virtual environment and installing the API development requirements:

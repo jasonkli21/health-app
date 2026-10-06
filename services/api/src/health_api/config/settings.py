@@ -8,10 +8,11 @@ from pathlib import Path
 from typing import Literal
 from uuid import UUID
 
-from health_api.domain.schemas import validate_iana_timezone
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
+
+from health_api.domain.schemas import validate_iana_timezone
 
 
 def _postgres_url(value: str | SecretStr) -> URL:
@@ -90,6 +91,7 @@ class Settings(BaseSettings):
     database_connection_budget: int | None = Field(default=None, ge=1, le=5000)
     auth_http_timeout_seconds: int = Field(default=4, ge=1, le=15)
     auth_max_in_flight: int = Field(default=32, ge=1, le=128)
+    personal_ai_enabled: bool = False
 
     @field_validator("local_principal_timezone")
     @classmethod
@@ -125,6 +127,10 @@ class Settings(BaseSettings):
             raise ValueError("development authentication is allowed only in local or test mode")
         if self.auth_mode == "firebase" and not self.firebase_project_id:
             raise ValueError("FIREBASE_PROJECT_ID is required when AUTH_MODE=firebase")
+        if self.personal_ai_enabled:
+            raise ValueError(
+                "PERSONAL_AI_ENABLED cannot be true until the Personal AI service contract is configured"
+            )
 
         if self.app_env == "cloud":
             if self.auth_mode != "firebase":

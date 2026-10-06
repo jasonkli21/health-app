@@ -59,12 +59,14 @@ def _is_observation_aggregate(value: DailyAggregate) -> TypeGuard[ObservationAgg
 class CreateDailyEvent:
     id: UUID
     event: EventSchemaV1
+    ai_use_allowed: bool = False
 
 
 @dataclass(frozen=True)
 class CreateDailyObservation:
     id: UUID
     observation: ObservationSchemaV1
+    ai_use_allowed: bool = False
 
 
 @dataclass(frozen=True)
@@ -91,17 +93,34 @@ class CreateDailyEntryResult:
 type DailyRecord = EventSchemaV1 | ObservationSchemaV1
 
 
-def _canonical_content(record_type: str, record: DailyRecord) -> str:
+def _canonical_content(record_type: str, record: DailyRecord, ai_use_allowed: bool) -> str:
     return json.dumps(
-        {"object_type": record_type, "record": record.model_dump(mode="json")},
+        {
+            "object_type": record_type,
+            "record": record.model_dump(mode="json"),
+            "ai_use_allowed": ai_use_allowed,
+        },
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=False,
     )
 
 
-def _fingerprint(record_type: str, record: DailyRecord) -> str:
-    return hashlib.sha256(_canonical_content(record_type, record).encode("utf-8")).hexdigest()
+def _fingerprint(record_type: str, record: DailyRecord, ai_use_allowed: bool) -> str:
+    return hashlib.sha256(
+        _canonical_content(record_type, record, ai_use_allowed).encode("utf-8")
+    ).hexdigest()
+
+
+def _legacy_fingerprint(record_type: str, record: DailyRecord) -> str:
+    """Preserve uncertain retries created before daily AI permission was added."""
+    legacy_content = json.dumps(
+        {"object_type": record_type, "record": record.model_dump(mode="json")},
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    return hashlib.sha256(legacy_content.encode("utf-8")).hexdigest()
 
 
 def _event_fields(schema: EventSchemaV1) -> dict[str, Any]:
@@ -254,6 +273,7 @@ def _manual_create_object(
     notes: str | None,
     source: Source,
     fingerprint: str,
+    ai_use_allowed: bool = False,
 ) -> HealthObject:
     return HealthObject(
         id=object_id,
@@ -267,7 +287,7 @@ def _manual_create_object(
         schema_version=1,
         revision=1,
         notes=notes,
-        ai_use_allowed=False,
+        ai_use_allowed=ai_use_allowed,
         cross_domain_use_allowed=False,
         create_fingerprint=fingerprint,
     )
@@ -291,7 +311,10 @@ def _snapshot_common(obj: HealthObject, source: Source) -> dict[str, Any]:
         "revision": obj.revision,
         "notes": obj.notes,
         "metadata": obj.metadata_json,
-        "permissions": {"ai_use_allowed": False, "cross_domain_use_allowed": False},
+        "permissions": {
+            "ai_use_allowed": obj.ai_use_allowed,
+            "cross_domain_use_allowed": obj.cross_domain_use_allowed,
+        },
     }
 
 
@@ -606,8 +629,21 @@ def create_daily_entry(
     object_ids = _requested_ids(command)
     event_ids = {entry.id for entry in command.events}
     expected_fingerprints = {
-        entry.id: _fingerprint("event", entry.event) for entry in command.events
-    } | {entry.id: _fingerprint("observation", entry.observation) for entry in command.observations}
+        entry.id: _fingerprint("event", entry.event, entry.ai_use_allowed)
+        for entry in command.events
+    } | {
+        entry.id: _fingerprint("observation", entry.observation, entry.ai_use_allowed)
+        for entry in command.observations
+    }
+    legacy_fingerprints = {
+        entry.id: _legacy_fingerprint("event", entry.event)
+        for entry in command.events
+        if not entry.ai_use_allowed
+    } | {
+        entry.id: _legacy_fingerprint("observation", entry.observation)
+        for entry in command.observations
+        if not entry.ai_use_allowed
+    }
     try:
         with session.begin():
             owner = session.scalar(select(User).where(User.id == owner_id).with_for_update())
@@ -623,7 +659,8 @@ def create_daily_entry(
             if existing:
                 by_id = {obj.id: obj for obj in existing}
                 if set(by_id) != object_ids or any(
-                    by_id[object_id].create_fingerprint != fingerprint
+                    by_id[object_id].create_fingerprint
+                    not in {fingerprint, legacy_fingerprints.get(object_id)}
                     or by_id[object_id].object_type
                     != ("event" if object_id in event_ids else "observation")
                     for object_id, fingerprint in expected_fingerprints.items()
@@ -688,6 +725,7 @@ def create_daily_entry(
                     notes=event_schema.notes,
                     source=source,
                     fingerprint=expected_fingerprints[event_entry.id],
+                    ai_use_allowed=event_entry.ai_use_allowed,
                 )
                 event_subtype = EventItem(
                     owner_id=owner_id,
@@ -722,6 +760,7 @@ def create_daily_entry(
                     notes=observation_schema.notes,
                     source=source,
                     fingerprint=expected_fingerprints[observation_entry.id],
+                    ai_use_allowed=observation_entry.ai_use_allowed,
                 )
                 observation_subtype = ObservationItem(
                     owner_id=owner_id,
@@ -789,6 +828,7 @@ def update_daily_item(
     object_id: UUID,
     expected_revision: int,
     record: DailyRecord,
+    ai_use_allowed: bool | None = None,
 ) -> DailyAggregate:
     try:
         with session.begin():
@@ -841,6 +881,8 @@ def update_daily_item(
                 obj.domain = record.domain.value
                 obj.title = record.payload.label
                 obj.notes = record.notes
+                if ai_use_allowed is not None:
+                    obj.ai_use_allowed = ai_use_allowed
                 obj.revision += 1
                 sequence = next_daily_sequence(session, owner_id)
                 session.flush()
@@ -889,6 +931,8 @@ def update_daily_item(
                     else record.payload.value.metric.value.replace("_", " ").title()
                 )
                 obj.notes = record.notes
+                if ai_use_allowed is not None:
+                    obj.ai_use_allowed = ai_use_allowed
                 obj.revision += 1
                 sequence = next_daily_sequence(session, owner_id)
                 session.flush()

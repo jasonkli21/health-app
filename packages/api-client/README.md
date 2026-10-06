@@ -10,4 +10,8 @@ pnpm --filter @personal-health/api-client typecheck
 pnpm --filter @personal-health/mobile test
 ```
 
-Generation exports FastAPI's contract and runs the repository-owned Node standard-library generator; it performs no database or cloud request. The generator covers the OpenAPI schema subset currently used by the API. Unsupported additions must extend the generator before they are used. CI checks that a fresh generation leaves no tracked changes.
+Generation exports FastAPI's contract and runs the repository-owned Node
+generator plus the pinned workspace Prettier formatter; it performs no database
+or cloud request. The generator covers the OpenAPI schema subset currently
+used by the API. Unsupported additions must extend the generator before they
+are used. CI checks that a fresh generation leaves no tracked changes.

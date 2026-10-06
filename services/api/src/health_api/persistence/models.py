@@ -20,7 +20,9 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Uuid,
+    cast,
     func,
+    literal_column,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -210,6 +212,16 @@ class HealthObject(Base):
             name="ck_health_objects_validity",
         ),
         Index("ix_health_objects_owner_status_created", "owner_id", "status", "created_at", "id"),
+        Index(
+            "ix_health_objects_ai_search",
+            func.to_tsvector(
+                literal_column("'simple'"),
+                func.coalesce(title, literal_column("''"))
+                .op("||")(literal_column("' '"))
+                .op("||")(func.coalesce(notes, literal_column("''"))),
+            ),
+            postgresql_using="gin",
+        ),
     )
 
 
@@ -249,6 +261,11 @@ class ProfileItem(Base):
             name="ck_profile_items_payload_consistency",
         ),
         Index("ix_profile_items_owner_category_key", "owner_id", "category", "key"),
+        Index(
+            "ix_profile_items_ai_search",
+            func.to_tsvector(literal_column("'simple'"), cast(payload, Text)),
+            postgresql_using="gin",
+        ),
     )
 
 
@@ -372,6 +389,11 @@ class EventItem(Base):
         ),
         Index("ix_events_owner_instant", "owner_id", "occurred_at", "object_id"),
         Index("ix_events_owner_date", "owner_id", "local_date", "object_id"),
+        Index(
+            "ix_events_ai_search",
+            func.to_tsvector(literal_column("'simple'"), cast(payload, Text)),
+            postgresql_using="gin",
+        ),
     )
 
 
@@ -483,6 +505,11 @@ class ObservationItem(Base):
         Index(
             "ix_observations_owner_metric_date", "owner_id", "metric_key", "local_date", "object_id"
         ),
+        Index(
+            "ix_observations_ai_search",
+            func.to_tsvector(literal_column("'simple'"), cast(payload, Text)),
+            postgresql_using="gin",
+        ),
     )
 
 
@@ -563,6 +590,11 @@ class PlanningResource(Base):
         CheckConstraint("jsonb_typeof(payload) = 'object'", name="ck_planning_resources_payload"),
         Index(
             "ix_planning_resources_owner_kind_lifecycle", "owner_id", "resource_kind", "lifecycle"
+        ),
+        Index(
+            "ix_planning_resources_ai_search",
+            func.to_tsvector(literal_column("'simple'"), cast(payload, Text)),
+            postgresql_using="gin",
         ),
     )
 

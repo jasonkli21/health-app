@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from health_api.api.ai import router as ai_router
 from health_api.api.daily import router as daily_router
 from health_api.api.errors import install_error_handlers
 from health_api.api.middleware import RequestBoundaryMiddleware
@@ -17,6 +18,7 @@ from health_api.api.profile import router as profile_router
 from health_api.config.settings import Settings, get_settings
 from health_api.integrations.firebase_auth import FirebaseTokenVerifier, IdentityVerifier
 from health_api.integrations.object_storage import create_object_storage
+from health_api.integrations.personal_ai import PersonalAIAdapter, create_personal_ai_adapter
 from health_api.persistence.database import create_database_engine, create_session_factory
 
 
@@ -24,6 +26,7 @@ def create_app(
     settings: Settings | None = None,
     engine: Engine | None = None,
     identity_verifier: IdentityVerifier | None = None,
+    personal_ai_adapter: PersonalAIAdapter | None = None,
 ) -> FastAPI:
     configured_settings = settings or get_settings()
     database_engine = engine or create_database_engine(
@@ -46,7 +49,7 @@ def create_app(
         title="Personal Health API",
         version="1.0.0",
         description=(
-            "Owner-scoped Profile, daily Event/Observation, and planning v1 APIs. "
+            "Owner-scoped Profile, daily Event/Observation, planning, and read-only Assistant APIs. "
             "Identity is resolved from server configuration or verified Firebase bearer tokens. "
             "Request bodies are limited to 65,536 bytes."
         ),
@@ -59,6 +62,7 @@ def create_app(
     app.state.engine = database_engine
     app.state.session_factory = sessions
     app.state.object_storage = create_object_storage(configured_settings)
+    app.state.personal_ai_adapter = personal_ai_adapter or create_personal_ai_adapter()
     if identity_verifier is not None:
         app.state.identity_verifier = identity_verifier
     elif configured_settings.auth_mode == "firebase":
@@ -72,6 +76,7 @@ def create_app(
     app.include_router(profile_router)
     app.include_router(daily_router)
     app.include_router(planning_router)
+    app.include_router(ai_router)
 
     @app.get("/healthz", tags=["system"], operation_id="healthcheck")
     def healthcheck() -> dict[str, str]:

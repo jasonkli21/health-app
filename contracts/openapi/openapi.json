@@ -1,6 +1,593 @@
 {
   "components": {
     "schemas": {
+      "AIContextEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmation_status": {
+            "$ref": "#/components/schemas/ConfirmationStatus"
+          },
+          "content": {
+            "additionalProperties": true,
+            "title": "Content",
+            "type": "object"
+          },
+          "content_is_user_data": {
+            "const": true,
+            "title": "Content Is User Data",
+            "type": "boolean"
+          },
+          "domain": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Domain",
+            "type": "string"
+          },
+          "object_id": {
+            "format": "uuid",
+            "title": "Object Id",
+            "type": "string"
+          },
+          "object_type": {
+            "enum": [
+              "profile_item",
+              "event",
+              "observation",
+              "goal",
+              "regimen",
+              "plan",
+              "context"
+            ],
+            "title": "Object Type",
+            "type": "string"
+          },
+          "relevance_reason": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Relevance Reason",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "source_kind": {
+            "enum": [
+              "manual",
+              "device",
+              "document",
+              "provider",
+              "ai",
+              "system"
+            ],
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          }
+        },
+        "required": [
+          "object_id",
+          "revision",
+          "object_type",
+          "domain",
+          "title",
+          "valid_from",
+          "valid_to",
+          "source_kind",
+          "confirmation_status",
+          "content",
+          "content_is_user_data",
+          "relevance_reason"
+        ],
+        "title": "AIContextEntry",
+        "type": "object"
+      },
+      "AIContextPack": {
+        "additionalProperties": false,
+        "properties": {
+          "as_of": {
+            "format": "date-time",
+            "title": "As Of",
+            "type": "string"
+          },
+          "budget_bytes": {
+            "const": 65536,
+            "title": "Budget Bytes",
+            "type": "integer"
+          },
+          "built_at": {
+            "format": "date-time",
+            "title": "Built At",
+            "type": "string"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/AIContextEntry"
+            },
+            "maxItems": 100,
+            "title": "Entries",
+            "type": "array"
+          },
+          "included_counts": {
+            "additionalProperties": {
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "title": "Included Counts",
+            "type": "object"
+          },
+          "lookback_days": {
+            "maximum": 90.0,
+            "minimum": 0.0,
+            "title": "Lookback Days",
+            "type": "integer"
+          },
+          "omitted_by_budget": {
+            "minimum": 0.0,
+            "title": "Omitted By Budget",
+            "type": "integer"
+          },
+          "omitted_by_user": {
+            "minimum": 0.0,
+            "title": "Omitted By User",
+            "type": "integer"
+          },
+          "owner_scope": {
+            "maxLength": 64,
+            "minLength": 32,
+            "title": "Owner Scope",
+            "type": "string"
+          },
+          "request_id": {
+            "format": "uuid",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "resource_types": {
+            "items": {
+              "enum": [
+                "profile_item",
+                "event",
+                "observation",
+                "goal",
+                "regimen",
+                "plan",
+                "context"
+              ],
+              "type": "string"
+            },
+            "title": "Resource Types",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "serialized_bytes": {
+            "maximum": 65536.0,
+            "minimum": 0.0,
+            "title": "Serialized Bytes",
+            "type": "integer"
+          },
+          "task": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Task",
+            "type": "string"
+          },
+          "task_kind": {
+            "enum": [
+              "general_wellness",
+              "education",
+              "understand_health_data",
+              "consequential_medical",
+              "urgent_safety"
+            ],
+            "title": "Task Kind",
+            "type": "string"
+          },
+          "timezone": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Timezone",
+            "type": "string"
+          },
+          "today_summaries": {
+            "items": {
+              "$ref": "#/components/schemas/MetricSummaryV1"
+            },
+            "title": "Today Summaries",
+            "type": "array"
+          },
+          "today_summary_date": {
+            "format": "date",
+            "title": "Today Summary Date",
+            "type": "string"
+          },
+          "today_summary_scope": {
+            "const": "included_opted_in_entries_only",
+            "title": "Today Summary Scope",
+            "type": "string"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "schema_version",
+          "request_id",
+          "owner_scope",
+          "built_at",
+          "as_of",
+          "timezone",
+          "task",
+          "task_kind",
+          "resource_types",
+          "lookback_days",
+          "entries",
+          "today_summary_date",
+          "today_summary_scope",
+          "today_summaries",
+          "included_counts",
+          "omitted_by_user",
+          "omitted_by_budget",
+          "truncated",
+          "budget_bytes",
+          "serialized_bytes"
+        ],
+        "title": "AIContextPack",
+        "type": "object"
+      },
+      "AIContextRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "excluded_object_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Excluded Object Ids",
+            "type": "array"
+          },
+          "lookback_days": {
+            "default": 30,
+            "maximum": 90.0,
+            "minimum": 0.0,
+            "title": "Lookback Days",
+            "type": "integer"
+          },
+          "resource_types": {
+            "items": {
+              "enum": [
+                "profile_item",
+                "event",
+                "observation",
+                "goal",
+                "regimen",
+                "plan",
+                "context"
+              ],
+              "type": "string"
+            },
+            "maxItems": 7,
+            "minItems": 1,
+            "title": "Resource Types",
+            "type": "array"
+          },
+          "task": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Task",
+            "type": "string"
+          },
+          "task_kind": {
+            "default": "general_wellness",
+            "enum": [
+              "general_wellness",
+              "education",
+              "understand_health_data",
+              "consequential_medical",
+              "urgent_safety"
+            ],
+            "title": "Task Kind",
+            "type": "string"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          }
+        },
+        "required": ["task", "resource_types"],
+        "title": "AIContextRequest",
+        "type": "object"
+      },
+      "AIEvidenceReference": {
+        "additionalProperties": false,
+        "properties": {
+          "object_id": {
+            "format": "uuid",
+            "title": "Object Id",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": ["object_id", "revision"],
+        "title": "AIEvidenceReference",
+        "type": "object"
+      },
+      "AISearchResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AISearchResult"
+            },
+            "maxItems": 50,
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": ["items", "next_cursor"],
+        "title": "AISearchResponse",
+        "type": "object"
+      },
+      "AISearchResult": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmation_status": {
+            "$ref": "#/components/schemas/ConfirmationStatus"
+          },
+          "domain": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Domain",
+            "type": "string"
+          },
+          "excerpt": {
+            "maxLength": 400,
+            "title": "Excerpt",
+            "type": "string"
+          },
+          "object_id": {
+            "format": "uuid",
+            "title": "Object Id",
+            "type": "string"
+          },
+          "object_type": {
+            "enum": [
+              "profile_item",
+              "event",
+              "observation",
+              "goal",
+              "regimen",
+              "plan",
+              "context"
+            ],
+            "title": "Object Type",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "source_kind": {
+            "enum": [
+              "manual",
+              "device",
+              "document",
+              "provider",
+              "ai",
+              "system"
+            ],
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "object_id",
+          "revision",
+          "object_type",
+          "domain",
+          "title",
+          "source_kind",
+          "confirmation_status",
+          "excerpt"
+        ],
+        "title": "AISearchResult",
+        "type": "object"
+      },
+      "AssistantMessageRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/AIContextRequest"
+          }
+        },
+        "required": ["message", "scope"],
+        "title": "AssistantMessageRequest",
+        "type": "object"
+      },
+      "AssistantMessageResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "context_summary": {
+            "additionalProperties": {
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "title": "Context Summary",
+            "type": "object"
+          },
+          "evidence_refs": {
+            "items": {
+              "$ref": "#/components/schemas/AIEvidenceReference"
+            },
+            "maxItems": 100,
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "reply": {
+            "maxLength": 8000,
+            "title": "Reply",
+            "type": "string"
+          },
+          "request_id": {
+            "format": "uuid",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "risk_class": {
+            "enum": [
+              "general_wellness",
+              "education",
+              "understand_health_data",
+              "consequential_medical",
+              "urgent_safety"
+            ],
+            "title": "Risk Class",
+            "type": "string"
+          },
+          "service_status": {
+            "const": "complete",
+            "title": "Service Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "reply",
+          "risk_class",
+          "context_summary",
+          "evidence_refs",
+          "service_status"
+        ],
+        "title": "AssistantMessageResponse",
+        "type": "object"
+      },
+      "AssistantStatusResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "adapter_status": {
+            "enum": ["disabled", "ready"],
+            "title": "Adapter Status",
+            "type": "string"
+          },
+          "allowed_capabilities": {
+            "items": {
+              "enum": [
+                "health.context",
+                "health.search",
+                "health.today",
+                "health.profile",
+                "health.goals",
+                "health.plans"
+              ],
+              "type": "string"
+            },
+            "title": "Allowed Capabilities",
+            "type": "array"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "message": {
+            "maxLength": 240,
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "enabled",
+          "adapter_status",
+          "allowed_capabilities",
+          "message"
+        ],
+        "title": "AssistantStatusResponse",
+        "type": "object"
+      },
       "BooleanValue": {
         "additionalProperties": false,
         "properties": {
@@ -14,18 +601,12 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "type",
-          "value"
-        ],
+        "required": ["type", "value"],
         "title": "BooleanValue",
         "type": "object"
       },
       "ConfirmationStatus": {
-        "enum": [
-          "unconfirmed",
-          "user_confirmed"
-        ],
+        "enum": ["unconfirmed", "user_confirmed"],
         "title": "ConfirmationStatus",
         "type": "string"
       },
@@ -63,18 +644,12 @@
             "title": "Notes"
           }
         },
-        "required": [
-          "id",
-          "context"
-        ],
+        "required": ["id", "context"],
         "title": "ContextCreateRequest",
         "type": "object"
       },
       "ContextLifecycle": {
-        "enum": [
-          "active",
-          "ended"
-        ],
+        "enum": ["active", "ended"],
         "title": "ContextLifecycle",
         "type": "string"
       },
@@ -142,10 +717,7 @@
             "title": "Start At"
           }
         },
-        "required": [
-          "label",
-          "context_type"
-        ],
+        "required": ["label", "context_type"],
         "title": "ContextPayloadV1",
         "type": "object"
       },
@@ -172,9 +744,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "object_id"
-        ],
+        "required": ["object_id"],
         "title": "ContextRelation",
         "type": "object"
       },
@@ -249,10 +819,7 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": [
-              "active",
-              "archived"
-            ],
+            "enum": ["active", "archived"],
             "title": "Status",
             "type": "string"
           },
@@ -317,13 +884,7 @@
         "type": "object"
       },
       "ContextType": {
-        "enum": [
-          "travel",
-          "illness",
-          "recovery",
-          "schedule_change",
-          "other"
-        ],
+        "enum": ["travel", "illness", "recovery", "schedule_change", "other"],
         "title": "ContextType",
         "type": "string"
       },
@@ -361,10 +922,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "expected_revision",
-          "context"
-        ],
+        "required": ["expected_revision", "context"],
         "title": "ContextUpdateRequest",
         "type": "object"
       },
@@ -382,10 +940,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "known_count",
-          "total_count"
-        ],
+        "required": ["known_count", "total_count"],
         "title": "CoverageV1",
         "type": "object"
       },
@@ -420,23 +975,12 @@
             "type": "object"
           }
         },
-        "required": [
-          "metric",
-          "tracker_id",
-          "schema_version",
-          "values"
-        ],
+        "required": ["metric", "tracker_id", "schema_version", "values"],
         "title": "CustomTrackerValueV1",
         "type": "object"
       },
       "DailyDomain": {
-        "enum": [
-          "nutrition",
-          "exercise",
-          "sleep",
-          "symptoms",
-          "measurements"
-        ],
+        "enum": ["nutrition", "exercise", "sleep", "symptoms", "measurements"],
         "title": "DailyDomain",
         "type": "string"
       },
@@ -493,17 +1037,18 @@
             "type": "array"
           }
         },
-        "required": [
-          "events",
-          "observations",
-          "created"
-        ],
+        "required": ["events", "observations", "created"],
         "title": "DailyEntryCreateResponse",
         "type": "object"
       },
       "DailyEventCreateRequest": {
         "additionalProperties": false,
         "properties": {
+          "ai_use_allowed": {
+            "default": false,
+            "title": "Ai Use Allowed",
+            "type": "boolean"
+          },
           "event": {
             "$ref": "#/components/schemas/EventSchemaV1"
           },
@@ -513,10 +1058,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "event"
-        ],
+        "required": ["id", "event"],
         "title": "DailyEventCreateRequest",
         "type": "object"
       },
@@ -542,10 +1084,7 @@
             "title": "Next Cursor"
           }
         },
-        "required": [
-          "items",
-          "next_cursor"
-        ],
+        "required": ["items", "next_cursor"],
         "title": "DailyEventListResponse",
         "type": "object"
       },
@@ -621,10 +1160,7 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": [
-              "active",
-              "archived"
-            ],
+            "enum": ["active", "archived"],
             "title": "Status",
             "type": "string"
           },
@@ -691,6 +1227,10 @@
       "DailyEventUpdateRequest": {
         "additionalProperties": false,
         "properties": {
+          "ai_use_allowed": {
+            "title": "Ai Use Allowed",
+            "type": "boolean"
+          },
           "event": {
             "$ref": "#/components/schemas/EventSchemaV1"
           },
@@ -700,10 +1240,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "expected_revision",
-          "event"
-        ],
+        "required": ["expected_revision", "event"],
         "title": "DailyEventUpdateRequest",
         "type": "object"
       },
@@ -716,11 +1253,7 @@
             "type": "string"
           },
           "reason": {
-            "enum": [
-              "create",
-              "update",
-              "archive"
-            ],
+            "enum": ["create", "update", "archive"],
             "title": "Reason",
             "type": "string"
           },
@@ -785,10 +1318,7 @@
             "title": "Next After Revision"
           }
         },
-        "required": [
-          "items",
-          "next_after_revision"
-        ],
+        "required": ["items", "next_after_revision"],
         "title": "DailyHistoryResponse",
         "type": "object"
       },
@@ -812,16 +1342,18 @@
             "type": "string"
           }
         },
-        "required": [
-          "event_id",
-          "observation_id"
-        ],
+        "required": ["event_id", "observation_id"],
         "title": "DailyLinkRequest",
         "type": "object"
       },
       "DailyObservationCreateRequest": {
         "additionalProperties": false,
         "properties": {
+          "ai_use_allowed": {
+            "default": false,
+            "title": "Ai Use Allowed",
+            "type": "boolean"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -831,10 +1363,7 @@
             "$ref": "#/components/schemas/ObservationSchemaV1"
           }
         },
-        "required": [
-          "id",
-          "observation"
-        ],
+        "required": ["id", "observation"],
         "title": "DailyObservationCreateRequest",
         "type": "object"
       },
@@ -860,10 +1389,7 @@
             "title": "Next Cursor"
           }
         },
-        "required": [
-          "items",
-          "next_cursor"
-        ],
+        "required": ["items", "next_cursor"],
         "title": "DailyObservationListResponse",
         "type": "object"
       },
@@ -931,10 +1457,7 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": [
-              "active",
-              "archived"
-            ],
+            "enum": ["active", "archived"],
             "title": "Status",
             "type": "string"
           },
@@ -1000,6 +1523,10 @@
       "DailyObservationUpdateRequest": {
         "additionalProperties": false,
         "properties": {
+          "ai_use_allowed": {
+            "title": "Ai Use Allowed",
+            "type": "boolean"
+          },
           "expected_revision": {
             "minimum": 1.0,
             "title": "Expected Revision",
@@ -1009,10 +1536,7 @@
             "$ref": "#/components/schemas/ObservationSchemaV1"
           }
         },
-        "required": [
-          "expected_revision",
-          "observation"
-        ],
+        "required": ["expected_revision", "observation"],
         "title": "DailyObservationUpdateRequest",
         "type": "object"
       },
@@ -1053,11 +1577,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "precision",
-          "local_date",
-          "timezone"
-        ],
+        "required": ["precision", "local_date", "timezone"],
         "title": "DateOnlyTimePoint",
         "type": "object"
       },
@@ -1065,11 +1585,7 @@
         "additionalProperties": false,
         "properties": {
           "unit": {
-            "enum": [
-              "m",
-              "km",
-              "mi"
-            ],
+            "enum": ["m", "km", "mi"],
             "title": "Unit",
             "type": "string"
           },
@@ -1077,10 +1593,7 @@
             "$ref": "#/components/schemas/FiniteDailyNumber"
           }
         },
-        "required": [
-          "value",
-          "unit"
-        ],
+        "required": ["value", "unit"],
         "title": "DistanceQuantity",
         "type": "object"
       },
@@ -1088,10 +1601,7 @@
         "additionalProperties": false,
         "properties": {
           "unit": {
-            "enum": [
-              "min",
-              "h"
-            ],
+            "enum": ["min", "h"],
             "title": "Unit",
             "type": "string"
           },
@@ -1099,10 +1609,7 @@
             "$ref": "#/components/schemas/FiniteDailyNumber"
           }
         },
-        "required": [
-          "value",
-          "unit"
-        ],
+        "required": ["value", "unit"],
         "title": "DurationQuantity",
         "type": "object"
       },
@@ -1110,10 +1617,7 @@
         "additionalProperties": false,
         "properties": {
           "unit": {
-            "enum": [
-              "kcal",
-              "kJ"
-            ],
+            "enum": ["kcal", "kJ"],
             "title": "Unit",
             "type": "string"
           },
@@ -1121,10 +1625,7 @@
             "$ref": "#/components/schemas/FiniteDailyNumber"
           }
         },
-        "required": [
-          "value",
-          "unit"
-        ],
+        "required": ["value", "unit"],
         "title": "EnergyQuantity",
         "type": "object"
       },
@@ -1138,10 +1639,7 @@
             "$ref": "#/components/schemas/FiniteDailyNumber"
           }
         },
-        "required": [
-          "value",
-          "unit"
-        ],
+        "required": ["value", "unit"],
         "title": "EnteredQuantity",
         "type": "object"
       },
@@ -1175,11 +1673,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "code",
-          "message",
-          "request_id"
-        ],
+        "required": ["code", "message", "request_id"],
         "title": "ErrorResponse",
         "type": "object"
       },
@@ -1243,11 +1737,7 @@
             "$ref": "#/components/schemas/DailyTimePoint"
           }
         },
-        "required": [
-          "domain",
-          "time",
-          "payload"
-        ],
+        "required": ["domain", "time", "payload"],
         "title": "EventSchemaV1",
         "type": "object"
       },
@@ -1263,10 +1753,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "field",
-          "message"
-        ],
+        "required": ["field", "message"],
         "title": "FieldError",
         "type": "object"
       },
@@ -1277,11 +1764,7 @@
         "type": "number"
       },
       "GoalComparator": {
-        "enum": [
-          "at_least",
-          "at_most",
-          "equal"
-        ],
+        "enum": ["at_least", "at_most", "equal"],
         "title": "GoalComparator",
         "type": "string"
       },
@@ -1319,10 +1802,7 @@
             "title": "Notes"
           }
         },
-        "required": [
-          "id",
-          "goal"
-        ],
+        "required": ["id", "goal"],
         "title": "GoalCreateRequest",
         "type": "object"
       },
@@ -1339,11 +1819,7 @@
         "type": "string"
       },
       "GoalLifecycle": {
-        "enum": [
-          "active",
-          "paused",
-          "completed"
-        ],
+        "enum": ["active", "paused", "completed"],
         "title": "GoalLifecycle",
         "type": "string"
       },
@@ -1396,13 +1872,7 @@
           "target_period": {
             "anyOf": [
               {
-                "enum": [
-                  "day",
-                  "week",
-                  "month",
-                  "year",
-                  "once"
-                ],
+                "enum": ["day", "week", "month", "year", "once"],
                 "type": "string"
               },
               {
@@ -1412,10 +1882,7 @@
             "title": "Target Period"
           }
         },
-        "required": [
-          "label",
-          "domain"
-        ],
+        "required": ["label", "domain"],
         "title": "GoalPayloadV1",
         "type": "object"
       },
@@ -1490,10 +1957,7 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": [
-              "active",
-              "archived"
-            ],
+            "enum": ["active", "archived"],
             "title": "Status",
             "type": "string"
           },
@@ -1591,10 +2055,7 @@
             "$ref": "#/components/schemas/GoalPayloadV1"
           }
         },
-        "required": [
-          "expected_revision",
-          "goal"
-        ],
+        "required": ["expected_revision", "goal"],
         "title": "GoalUpdateRequest",
         "type": "object"
       },
@@ -1616,11 +2077,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "precision",
-          "occurred_at",
-          "timezone"
-        ],
+        "required": ["precision", "occurred_at", "timezone"],
         "title": "InstantTimePoint",
         "type": "object"
       },
@@ -1672,10 +2129,7 @@
             "title": "Lifecycle"
           }
         },
-        "required": [
-          "expected_revision",
-          "lifecycle"
-        ],
+        "required": ["expected_revision", "lifecycle"],
         "title": "LifecycleUpdateRequest",
         "type": "object"
       },
@@ -1714,10 +2168,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "kind",
-          "label"
-        ],
+        "required": ["kind", "label"],
         "title": "MealEventV1",
         "type": "object"
       },
@@ -1763,11 +2214,7 @@
             "$ref": "#/components/schemas/FiniteDailyNumber"
           }
         },
-        "required": [
-          "metric",
-          "value",
-          "unit"
-        ],
+        "required": ["metric", "value", "unit"],
         "title": "MeasurementValueV1",
         "type": "object"
       },
@@ -1881,12 +2328,7 @@
             "$ref": "#/components/schemas/FiniteDailyNumber"
           }
         },
-        "required": [
-          "metric",
-          "comparator",
-          "value",
-          "unit"
-        ],
+        "required": ["metric", "comparator", "value", "unit"],
         "title": "MetricTarget",
         "type": "object"
       },
@@ -1902,10 +2344,7 @@
             "$ref": "#/components/schemas/FiniteProfileNumber"
           }
         },
-        "required": [
-          "type",
-          "value"
-        ],
+        "required": ["type", "value"],
         "title": "NumberValue",
         "type": "object"
       },
@@ -1916,9 +2355,7 @@
             "$ref": "#/components/schemas/ObservationValueV1"
           }
         },
-        "required": [
-          "value"
-        ],
+        "required": ["value"],
         "title": "ObservationPayloadV1",
         "type": "object"
       },
@@ -1957,11 +2394,7 @@
             "$ref": "#/components/schemas/DailyTimePoint"
           }
         },
-        "required": [
-          "domain",
-          "time",
-          "payload"
-        ],
+        "required": ["domain", "time", "payload"],
         "title": "ObservationSchemaV1",
         "type": "object"
       },
@@ -2047,19 +2480,12 @@
             "title": "Rescheduled At"
           },
           "state": {
-            "enum": [
-              "completed",
-              "skipped",
-              "rescheduled"
-            ],
+            "enum": ["completed", "skipped", "rescheduled"],
             "title": "State",
             "type": "string"
           }
         },
-        "required": [
-          "expected_schedule_revision",
-          "state"
-        ],
+        "required": ["expected_schedule_revision", "state"],
         "title": "OccurrenceActionRequest",
         "type": "object"
       },
@@ -2119,11 +2545,7 @@
             "type": "integer"
           },
           "state": {
-            "enum": [
-              "completed",
-              "skipped",
-              "rescheduled"
-            ],
+            "enum": ["completed", "skipped", "rescheduled"],
             "title": "State",
             "type": "string"
           },
@@ -2154,11 +2576,7 @@
             "type": "string"
           },
           "action": {
-            "enum": [
-              "completed",
-              "skipped",
-              "rescheduled"
-            ],
+            "enum": ["completed", "skipped", "rescheduled"],
             "title": "Action",
             "type": "string"
           },
@@ -2244,10 +2662,7 @@
             "title": "Next After Revision"
           }
         },
-        "required": [
-          "items",
-          "next_after_revision"
-        ],
+        "required": ["items", "next_after_revision"],
         "title": "OccurrenceHistoryResponse",
         "type": "object"
       },
@@ -2262,9 +2677,7 @@
             "type": "array"
           }
         },
-        "required": [
-          "items"
-        ],
+        "required": ["items"],
         "title": "OccurrenceListResponse",
         "type": "object"
       },
@@ -2277,11 +2690,7 @@
             "type": "boolean"
           },
           "dst_resolution": {
-            "enum": [
-              "exact",
-              "earlier_offset",
-              "next_valid_time"
-            ],
+            "enum": ["exact", "earlier_offset", "next_valid_time"],
             "title": "Dst Resolution",
             "type": "string"
           },
@@ -2375,12 +2784,7 @@
             "type": "integer"
           },
           "state": {
-            "enum": [
-              "unknown",
-              "completed",
-              "skipped",
-              "rescheduled"
-            ],
+            "enum": ["unknown", "completed", "skipped", "rescheduled"],
             "title": "State",
             "type": "string"
           },
@@ -2444,10 +2848,7 @@
             "$ref": "#/components/schemas/PlanPayloadV1"
           }
         },
-        "required": [
-          "id",
-          "plan"
-        ],
+        "required": ["id", "plan"],
         "title": "PlanCreateRequest",
         "type": "object"
       },
@@ -2481,29 +2882,17 @@
             "title": "Reference Id"
           }
         },
-        "required": [
-          "id",
-          "kind",
-          "label"
-        ],
+        "required": ["id", "kind", "label"],
         "title": "PlanItemInput",
         "type": "object"
       },
       "PlanItemKind": {
-        "enum": [
-          "goal",
-          "regimen",
-          "task"
-        ],
+        "enum": ["goal", "regimen", "task"],
         "title": "PlanItemKind",
         "type": "string"
       },
       "PlanLifecycle": {
-        "enum": [
-          "active",
-          "paused",
-          "completed"
-        ],
+        "enum": ["active", "paused", "completed"],
         "title": "PlanLifecycle",
         "type": "string"
       },
@@ -2548,10 +2937,7 @@
             "type": "array"
           }
         },
-        "required": [
-          "expected_revision",
-          "item_ids"
-        ],
+        "required": ["expected_revision", "item_ids"],
         "title": "PlanOrderRequest",
         "type": "object"
       },
@@ -2597,9 +2983,7 @@
             "title": "Start Date"
           }
         },
-        "required": [
-          "label"
-        ],
+        "required": ["label"],
         "title": "PlanPayloadV1",
         "type": "object"
       },
@@ -2674,10 +3058,7 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": [
-              "active",
-              "archived"
-            ],
+            "enum": ["active", "archived"],
             "title": "Status",
             "type": "string"
           },
@@ -2775,10 +3156,7 @@
             "$ref": "#/components/schemas/PlanPayloadV1"
           }
         },
-        "required": [
-          "expected_revision",
-          "plan"
-        ],
+        "required": ["expected_revision", "plan"],
         "title": "PlanUpdateRequest",
         "type": "object"
       },
@@ -2791,11 +3169,7 @@
             "type": "string"
           },
           "reason": {
-            "enum": [
-              "create",
-              "update",
-              "archive"
-            ],
+            "enum": ["create", "update", "archive"],
             "title": "Reason",
             "type": "string"
           },
@@ -2847,10 +3221,7 @@
             "title": "Next After Revision"
           }
         },
-        "required": [
-          "items",
-          "next_after_revision"
-        ],
+        "required": ["items", "next_after_revision"],
         "title": "PlanningHistoryResponse",
         "type": "object"
       },
@@ -2892,19 +3263,12 @@
             "title": "Next Cursor"
           }
         },
-        "required": [
-          "items",
-          "next_cursor"
-        ],
+        "required": ["items", "next_cursor"],
         "title": "PlanningListResponse",
         "type": "object"
       },
       "ProfileCategory": {
-        "enum": [
-          "background",
-          "constraints",
-          "preferences"
-        ],
+        "enum": ["background", "constraints", "preferences"],
         "title": "ProfileCategory",
         "type": "string"
       },
@@ -2923,10 +3287,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "title"
-        ],
+        "required": ["id", "title"],
         "title": "ProfileContextReference",
         "type": "object"
       },
@@ -2987,10 +3348,7 @@
             ]
           }
         },
-        "required": [
-          "id",
-          "profile"
-        ],
+        "required": ["id", "profile"],
         "title": "ProfileCreateRequest",
         "type": "object"
       },
@@ -3003,11 +3361,7 @@
             "type": "string"
           },
           "reason": {
-            "enum": [
-              "create",
-              "update",
-              "archive"
-            ],
+            "enum": ["create", "update", "archive"],
             "title": "Reason",
             "type": "string"
           },
@@ -3057,10 +3411,7 @@
             "title": "Next After Revision"
           }
         },
-        "required": [
-          "items",
-          "next_after_revision"
-        ],
+        "required": ["items", "next_after_revision"],
         "title": "ProfileHistoryResponse",
         "type": "object"
       },
@@ -3130,10 +3481,7 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": [
-              "active",
-              "archived"
-            ],
+            "enum": ["active", "archived"],
             "title": "Status",
             "type": "string"
           },
@@ -3197,11 +3545,7 @@
         "type": "object"
       },
       "ProfileKind": {
-        "enum": [
-          "fact",
-          "constraint",
-          "preference"
-        ],
+        "enum": ["fact", "constraint", "preference"],
         "title": "ProfileKind",
         "type": "string"
       },
@@ -3232,11 +3576,7 @@
             "title": "Next Cursor"
           }
         },
-        "required": [
-          "items",
-          "as_of",
-          "next_cursor"
-        ],
+        "required": ["items", "as_of", "next_cursor"],
         "title": "ProfileListResponse",
         "type": "object"
       },
@@ -3319,9 +3659,7 @@
             "title": "Valid To"
           }
         },
-        "required": [
-          "expected_revision"
-        ],
+        "required": ["expected_revision"],
         "title": "ProfilePatchRequest",
         "type": "object"
       },
@@ -3358,13 +3696,7 @@
             ]
           }
         },
-        "required": [
-          "kind",
-          "category",
-          "key",
-          "label",
-          "value"
-        ],
+        "required": ["kind", "category", "key", "label", "value"],
         "title": "ProfilePayloadV1",
         "type": "object"
       },
@@ -3380,10 +3712,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "ai_use_allowed",
-          "cross_domain_use_allowed"
-        ],
+        "required": ["ai_use_allowed", "cross_domain_use_allowed"],
         "title": "ProfilePermissions",
         "type": "object"
       },
@@ -3414,11 +3743,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "kind",
-          "name"
-        ],
+        "required": ["id", "kind", "name"],
         "title": "ProfileSource",
         "type": "object"
       },
@@ -3489,11 +3814,7 @@
             "$ref": "#/components/schemas/FiniteProfileNumber"
           }
         },
-        "required": [
-          "type",
-          "value",
-          "unit"
-        ],
+        "required": ["type", "value", "unit"],
         "title": "QuantityValue",
         "type": "object"
       },
@@ -3531,29 +3852,17 @@
             "$ref": "#/components/schemas/RegimenPayloadV1"
           }
         },
-        "required": [
-          "id",
-          "regimen"
-        ],
+        "required": ["id", "regimen"],
         "title": "RegimenCreateRequest",
         "type": "object"
       },
       "RegimenKind": {
-        "enum": [
-          "habit",
-          "medication",
-          "supplement",
-          "activity"
-        ],
+        "enum": ["habit", "medication", "supplement", "activity"],
         "title": "RegimenKind",
         "type": "string"
       },
       "RegimenLifecycle": {
-        "enum": [
-          "active",
-          "paused",
-          "completed"
-        ],
+        "enum": ["active", "paused", "completed"],
         "title": "RegimenLifecycle",
         "type": "string"
       },
@@ -3620,10 +3929,7 @@
             "title": "Start Date"
           }
         },
-        "required": [
-          "label",
-          "kind"
-        ],
+        "required": ["label", "kind"],
         "title": "RegimenPayloadV1",
         "type": "object"
       },
@@ -3698,10 +4004,7 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": [
-              "active",
-              "archived"
-            ],
+            "enum": ["active", "archived"],
             "title": "Status",
             "type": "string"
           },
@@ -3799,10 +4102,7 @@
             "$ref": "#/components/schemas/RegimenPayloadV1"
           }
         },
-        "required": [
-          "expected_revision",
-          "regimen"
-        ],
+        "required": ["expected_revision", "regimen"],
         "title": "RegimenUpdateRequest",
         "type": "object"
       },
@@ -3858,12 +4158,7 @@
             "type": "array"
           }
         },
-        "required": [
-          "start_date",
-          "local_time",
-          "timezone",
-          "recurrence"
-        ],
+        "required": ["start_date", "local_time", "timezone", "recurrence"],
         "title": "ScheduleDefinitionV1",
         "type": "object"
       },
@@ -3891,18 +4186,12 @@
             "$ref": "#/components/schemas/ScheduleDefinitionV1"
           }
         },
-        "required": [
-          "effective_from",
-          "schedule"
-        ],
+        "required": ["effective_from", "schedule"],
         "title": "ScheduleEditRequest",
         "type": "object"
       },
       "ScheduleRecurrence": {
-        "enum": [
-          "daily",
-          "weekly"
-        ],
+        "enum": ["daily", "weekly"],
         "title": "ScheduleRecurrence",
         "type": "string"
       },
@@ -3966,9 +4255,7 @@
             "title": "Quality"
           }
         },
-        "required": [
-          "kind"
-        ],
+        "required": ["kind"],
         "title": "SleepEventV1",
         "type": "object"
       },
@@ -3987,10 +4274,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "kind",
-          "label"
-        ],
+        "required": ["kind", "label"],
         "title": "SymptomEventV1",
         "type": "object"
       },
@@ -4015,10 +4299,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "metric",
-          "value"
-        ],
+        "required": ["metric", "value"],
         "title": "SymptomSeverityV1",
         "type": "object"
       },
@@ -4040,10 +4321,7 @@
             "type": "array"
           }
         },
-        "required": [
-          "type",
-          "value"
-        ],
+        "required": ["type", "value"],
         "title": "TextListValue",
         "type": "object"
       },
@@ -4061,10 +4339,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "type",
-          "value"
-        ],
+        "required": ["type", "value"],
         "title": "TextValue",
         "type": "object"
       },
@@ -4258,10 +4533,7 @@
             "title": "Notes"
           }
         },
-        "required": [
-          "id",
-          "definition"
-        ],
+        "required": ["id", "definition"],
         "title": "TrackerCreateRequest",
         "type": "object"
       },
@@ -4287,23 +4559,12 @@
             "type": "string"
           }
         },
-        "required": [
-          "name",
-          "domain",
-          "fields"
-        ],
+        "required": ["name", "domain", "fields"],
         "title": "TrackerDefinitionV1",
         "type": "object"
       },
       "TrackerFieldKind": {
-        "enum": [
-          "text",
-          "number",
-          "boolean",
-          "enum",
-          "date",
-          "quantity"
-        ],
+        "enum": ["text", "number", "boolean", "enum", "date", "quantity"],
         "title": "TrackerFieldKind",
         "type": "string"
       },
@@ -4350,11 +4611,7 @@
             ]
           }
         },
-        "required": [
-          "id",
-          "label",
-          "kind"
-        ],
+        "required": ["id", "label", "kind"],
         "title": "TrackerFieldV1",
         "type": "object"
       },
@@ -4434,10 +4691,7 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": [
-              "active",
-              "archived"
-            ],
+            "enum": ["active", "archived"],
             "title": "Status",
             "type": "string"
           },
@@ -4524,10 +4778,7 @@
             "title": "Next After Version"
           }
         },
-        "required": [
-          "items",
-          "next_after_version"
-        ],
+        "required": ["items", "next_after_version"],
         "title": "TrackerSchemaVersionListResponse",
         "type": "object"
       },
@@ -4548,11 +4799,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "version",
-          "definition",
-          "created_at"
-        ],
+        "required": ["version", "definition", "created_at"],
         "title": "TrackerSchemaVersionResponse",
         "type": "object"
       },
@@ -4590,10 +4837,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "expected_revision",
-          "definition"
-        ],
+        "required": ["expected_revision", "definition"],
         "title": "TrackerUpdateRequest",
         "type": "object"
       },
@@ -4636,10 +4880,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "kind",
-          "label"
-        ],
+        "required": ["kind", "label"],
         "title": "WorkoutEventV1",
         "type": "object"
       }
@@ -4653,12 +4894,194 @@
     }
   },
   "info": {
-    "description": "Owner-scoped Profile, daily Event/Observation, and planning v1 APIs. Identity is resolved from server configuration or verified Firebase bearer tokens. Request bodies are limited to 65,536 bytes.",
+    "description": "Owner-scoped Profile, daily Event/Observation, planning, and read-only Assistant APIs. Identity is resolved from server configuration or verified Firebase bearer tokens. Request bodies are limited to 65,536 bytes.",
     "title": "Personal Health API",
     "version": "1.0.0"
   },
   "openapi": "3.1.0",
   "paths": {
+    "/ai/context": {
+      "post": {
+        "operationId": "previewAIContext",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIContextRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIContextPack"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The optional Assistant is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Preview Ai Context",
+        "tags": ["assistant"]
+      }
+    },
+    "/assistant/messages": {
+      "post": {
+        "operationId": "sendAssistantMessage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantMessageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantMessageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The optional Assistant is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Send Assistant Message",
+        "tags": ["assistant"]
+      }
+    },
+    "/assistant/status": {
+      "get": {
+        "operationId": "getAssistantStatus",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Assistant Status",
+        "tags": ["assistant"]
+      }
+    },
     "/contexts": {
       "get": {
         "operationId": "listContexts",
@@ -4777,9 +5200,7 @@
           }
         ],
         "summary": "List Contexts",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "post": {
         "operationId": "createContext",
@@ -4851,9 +5272,7 @@
           }
         ],
         "summary": "Create Context",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/contexts/{context_id}": {
@@ -4939,9 +5358,7 @@
           }
         ],
         "summary": "Archive Context",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "get": {
         "operationId": "getContext",
@@ -5015,9 +5432,7 @@
           }
         ],
         "summary": "Get Context",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "patch": {
         "operationId": "updateContext",
@@ -5101,9 +5516,7 @@
           }
         ],
         "summary": "Update Context",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/contexts/{context_id}/history": {
@@ -5202,9 +5615,7 @@
           }
         ],
         "summary": "Context History",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/contexts/{context_id}/lifecycle": {
@@ -5290,9 +5701,7 @@
           }
         ],
         "summary": "Transition Context",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/daily-entries": {
@@ -5386,9 +5795,7 @@
           }
         ],
         "summary": "Create Compound Daily Entry",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       }
     },
     "/events": {
@@ -5534,9 +5941,7 @@
           }
         ],
         "summary": "List Events",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       },
       "post": {
         "operationId": "createEvent",
@@ -5628,9 +6033,7 @@
           }
         ],
         "summary": "Create Event",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       }
     },
     "/events/{event_id}": {
@@ -5736,9 +6139,7 @@
           }
         ],
         "summary": "Delete Event",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       },
       "get": {
         "operationId": "getEvent",
@@ -5822,9 +6223,7 @@
           }
         ],
         "summary": "Get Event",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       },
       "patch": {
         "operationId": "updateEvent",
@@ -5928,9 +6327,7 @@
           }
         ],
         "summary": "Patch Event",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       }
     },
     "/events/{event_id}/history": {
@@ -6039,9 +6436,7 @@
           }
         ],
         "summary": "Get Event History",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       }
     },
     "/goals": {
@@ -6162,9 +6557,7 @@
           }
         ],
         "summary": "List Goals",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "post": {
         "operationId": "createGoal",
@@ -6236,9 +6629,7 @@
           }
         ],
         "summary": "Create Goal",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/goals/{goal_id}": {
@@ -6324,9 +6715,7 @@
           }
         ],
         "summary": "Archive Goal",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "get": {
         "operationId": "getGoal",
@@ -6400,9 +6789,7 @@
           }
         ],
         "summary": "Get Goal",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "patch": {
         "operationId": "updateGoal",
@@ -6486,9 +6873,7 @@
           }
         ],
         "summary": "Update Goal",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/goals/{goal_id}/history": {
@@ -6587,9 +6972,7 @@
           }
         ],
         "summary": "Goal History",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/goals/{goal_id}/lifecycle": {
@@ -6675,9 +7058,7 @@
           }
         ],
         "summary": "Transition Goal",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/healthz": {
@@ -6701,9 +7082,7 @@
           }
         },
         "summary": "Healthcheck",
-        "tags": [
-          "system"
-        ]
+        "tags": ["system"]
       }
     },
     "/observations": {
@@ -6849,9 +7228,7 @@
           }
         ],
         "summary": "List Observations",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       },
       "post": {
         "operationId": "createObservation",
@@ -6943,9 +7320,7 @@
           }
         ],
         "summary": "Create Observation",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       }
     },
     "/observations/{observation_id}": {
@@ -7051,9 +7426,7 @@
           }
         ],
         "summary": "Delete Observation",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       },
       "get": {
         "operationId": "getObservation",
@@ -7137,9 +7510,7 @@
           }
         ],
         "summary": "Get Observation",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       },
       "patch": {
         "operationId": "updateObservation",
@@ -7243,9 +7614,7 @@
           }
         ],
         "summary": "Patch Observation",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       }
     },
     "/observations/{observation_id}/history": {
@@ -7354,9 +7723,7 @@
           }
         ],
         "summary": "Get Observation History",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       }
     },
     "/plan-occurrences/{occurrence_key}": {
@@ -7441,9 +7808,7 @@
           }
         ],
         "summary": "Update Occurrence",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/plan-occurrences/{occurrence_key}/history": {
@@ -7541,9 +7906,7 @@
           }
         ],
         "summary": "Occurrence History",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/plans": {
@@ -7664,9 +8027,7 @@
           }
         ],
         "summary": "List Plans",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "post": {
         "operationId": "createPlan",
@@ -7738,9 +8099,7 @@
           }
         ],
         "summary": "Create Plan",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/plans/{plan_id}": {
@@ -7826,9 +8185,7 @@
           }
         ],
         "summary": "Archive Plan",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "get": {
         "operationId": "getPlan",
@@ -7902,9 +8259,7 @@
           }
         ],
         "summary": "Get Plan",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "patch": {
         "operationId": "updatePlan",
@@ -7988,9 +8343,7 @@
           }
         ],
         "summary": "Update Plan",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/plans/{plan_id}/history": {
@@ -8089,9 +8442,7 @@
           }
         ],
         "summary": "Plan History",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/plans/{plan_id}/items/order": {
@@ -8177,9 +8528,7 @@
           }
         ],
         "summary": "Reorder Plan",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/plans/{plan_id}/items/{item_id}/schedule": {
@@ -8273,9 +8622,7 @@
           }
         ],
         "summary": "Plan Item Schedule",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "put": {
         "operationId": "editPlanItemSchedule",
@@ -8369,9 +8716,7 @@
           }
         ],
         "summary": "Edit Plan Item Schedule",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/plans/{plan_id}/lifecycle": {
@@ -8457,9 +8802,7 @@
           }
         ],
         "summary": "Transition Plan",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/plans/{plan_id}/occurrences": {
@@ -8565,9 +8908,7 @@
           }
         ],
         "summary": "Plan Occurrences",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/profile": {
@@ -8695,9 +9036,7 @@
           }
         ],
         "summary": "List Profiles",
-        "tags": [
-          "profile"
-        ]
+        "tags": ["profile"]
       },
       "post": {
         "operationId": "createProfileItem",
@@ -8789,9 +9128,7 @@
           }
         ],
         "summary": "Create Profile",
-        "tags": [
-          "profile"
-        ]
+        "tags": ["profile"]
       }
     },
     "/profile/{item_id}": {
@@ -8897,9 +9234,7 @@
           }
         ],
         "summary": "Delete Profile",
-        "tags": [
-          "profile"
-        ]
+        "tags": ["profile"]
       },
       "get": {
         "operationId": "getProfileItem",
@@ -8983,9 +9318,7 @@
           }
         ],
         "summary": "Get Profile",
-        "tags": [
-          "profile"
-        ]
+        "tags": ["profile"]
       },
       "patch": {
         "operationId": "updateProfileItem",
@@ -9089,9 +9422,7 @@
           }
         ],
         "summary": "Patch Profile",
-        "tags": [
-          "profile"
-        ]
+        "tags": ["profile"]
       }
     },
     "/profile/{item_id}/history": {
@@ -9200,9 +9531,7 @@
           }
         ],
         "summary": "Get Profile History",
-        "tags": [
-          "profile"
-        ]
+        "tags": ["profile"]
       }
     },
     "/regimens": {
@@ -9323,9 +9652,7 @@
           }
         ],
         "summary": "List Regimens",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "post": {
         "operationId": "createRegimen",
@@ -9397,9 +9724,7 @@
           }
         ],
         "summary": "Create Regimen",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/regimens/{regimen_id}": {
@@ -9485,9 +9810,7 @@
           }
         ],
         "summary": "Archive Regimen",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "get": {
         "operationId": "getRegimen",
@@ -9561,9 +9884,7 @@
           }
         ],
         "summary": "Get Regimen",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "patch": {
         "operationId": "updateRegimen",
@@ -9647,9 +9968,7 @@
           }
         ],
         "summary": "Update Regimen",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/regimens/{regimen_id}/history": {
@@ -9748,9 +10067,7 @@
           }
         ],
         "summary": "Regimen History",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/regimens/{regimen_id}/lifecycle": {
@@ -9836,9 +10153,7 @@
           }
         ],
         "summary": "Transition Regimen",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/regimens/{regimen_id}/occurrences": {
@@ -9944,9 +10259,7 @@
           }
         ],
         "summary": "Regimen Occurrences",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/regimens/{regimen_id}/schedule": {
@@ -10030,9 +10343,7 @@
           }
         ],
         "summary": "Regimen Schedule",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "put": {
         "operationId": "editRegimenSchedule",
@@ -10116,9 +10427,130 @@
           }
         ],
         "summary": "Edit Regimen Schedule",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
+      }
+    },
+    "/search": {
+      "get": {
+        "operationId": "searchAIEligibleHealthData",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 500,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "types",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Types"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 2048,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AISearchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The optional Assistant is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Search Ai Eligible Health Data",
+        "tags": ["assistant"]
       }
     },
     "/today": {
@@ -10248,9 +10680,7 @@
           }
         ],
         "summary": "Get Today",
-        "tags": [
-          "daily"
-        ]
+        "tags": ["daily"]
       }
     },
     "/trackers": {
@@ -10355,9 +10785,7 @@
           }
         ],
         "summary": "List Trackers",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "post": {
         "operationId": "createTracker",
@@ -10429,9 +10857,7 @@
           }
         ],
         "summary": "Create Tracker",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/trackers/{tracker_id}": {
@@ -10517,9 +10943,7 @@
           }
         ],
         "summary": "Archive Tracker",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "get": {
         "operationId": "getTracker",
@@ -10593,9 +11017,7 @@
           }
         ],
         "summary": "Get Tracker",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       },
       "patch": {
         "operationId": "updateTracker",
@@ -10679,9 +11101,7 @@
           }
         ],
         "summary": "Update Tracker",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/trackers/{tracker_id}/history": {
@@ -10780,9 +11200,7 @@
           }
         ],
         "summary": "Tracker History",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     },
     "/trackers/{tracker_id}/versions": {
@@ -10881,9 +11299,7 @@
           }
         ],
         "summary": "Tracker Versions",
-        "tags": [
-          "planning"
-        ]
+        "tags": ["planning"]
       }
     }
   }
