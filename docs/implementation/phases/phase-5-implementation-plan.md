@@ -2,9 +2,46 @@
 
 ## Implementation-time reconciliation gate
 
-**Status: planned. Dependencies: accepted Phases 1–4 with actual release evidence.** Read [Phase 5 roadmap](../implementation-plan.md#phase-5--personal-ai-integration), [AI boundary](../../ai/personal-ai-integration.md), security docs/ADRs and actual permission/context/identity APIs. Inspect the actual Personal AI service repository or its supplied API/auth/tool contract before writing a live adapter. Record drift; materially changed boundary/protocol requires updated plan/ADR before code.
+**Status: local implementation delivered; live integration remains gated. Dependencies: accepted Phases 1–4 with actual release evidence.** Read [Phase 5 roadmap](../implementation-plan.md#phase-5--personal-ai-integration), [AI boundary](../../ai/personal-ai-integration.md), security docs/ADRs and actual permission/context/identity APIs. Inspect the actual Personal AI service repository or its supplied API/auth/tool contract before writing a live adapter. Record drift; materially changed boundary/protocol requires updated plan/ADR before code. See [Phase 5 release evidence](../evidence/phase-5-release.md) for implemented scope and open gates.
 
-Real scaffold locations: API `application`, `domain`, `api`, `integrations`, `config` directories; `services/api/tests`; `contracts/openapi`; `packages/api-client`; mobile `app/src/tests`. All new artifacts below are **planned/provisional**. Prior product code and the external Personal AI service are prerequisites to reconcile, not already-existing interfaces in this scaffold.
+Real scaffold locations: API `application`, `domain`, `api`, `integrations`, `config` directories; `services/api/tests`; `contracts/openapi`; `packages/api-client`; mobile `apps/mobile/app`, `apps/mobile/src/features`, and `apps/mobile/tests`. The task descriptions below preserve the original planning baseline; local delivery, actual paths, deviations, and release gates are recorded in [Phase 5 release evidence](../evidence/phase-5-release.md). Prior product code and the external Personal AI service were prerequisites to reconcile, not assumed interfaces.
+
+### Reconciliation before implementation — October 5, 2026
+
+- Phase 4 is implemented locally through the reviewed checkpoint in
+  [`phase-4-release.md`](../evidence/phase-4-release.md). The actual mobile
+  homes are `apps/mobile/app`, `apps/mobile/src/features`, and
+  `apps/mobile/tests`; the path shorthand above is stale. Phase 4 exposes
+  Profile, daily, planning, tracker, schedule, context and Today APIs, with
+  existing per-object `ai_use_allowed` flags on `health_objects`.
+- This repository contains no Personal AI service, endpoint definition,
+  service identity, user-delegation contract, tool callback protocol, or
+  retention terms. Phase 3 supplies Firebase end-user identity only. The
+  `.env.example` `PERSONAL_AI_BASE_URL` is an unsupported placeholder and is
+  not evidence of a service. There are no AI context/search/assistant routes
+  or full-text search indexes.
+- Profile and planning create/edit flows can explicitly set AI permission.
+  Daily Event/Observation creation hard-codes it off and their edit requests
+  cannot change it. All create defaults in the existing model are restrictive.
+- The canonical model has source kind and confirmation status, but no source
+  confidence score. Pack entries carry the available provenance fields;
+  confirmed items rank first within each deterministic relevance class, while
+  source kind is shown without inventing an unvalidated confidence weighting.
+- The live adapter and delegated callback portions of P5.3 cannot be
+  implemented against a guessed protocol. This implementation adds typed
+  Health-owned context/search/message contracts, bounded owner-scoped reads,
+  and an adapter that is disabled by default and refuses activation without
+  the external contract. It will not send health data to an invented endpoint.
+  Assistant preview and search remain useful offline; message submission
+  returns a sanitized unavailable response while the adapter is disabled.
+- Add explicit daily-item permission controls because otherwise the Phase 5
+  context builder could never include user-created Events or Observations.
+  Keep all pre-existing entries off until the owner opts in. Preserve each
+  permission change in the ordinary revision history. Implement a PostgreSQL
+  full-text index for typed payloads and common envelope text, with only
+  additive index migration changes. Keep delegation, provider registration,
+  live safety copy, retention policy, and real-service evaluation as launch
+  gates for a later supplied-contract follow-up.
 
 ## User outcome / scope
 

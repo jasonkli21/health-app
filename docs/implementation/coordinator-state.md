@@ -2,21 +2,26 @@
 
 ## Current checkpoint — October 5, 2026
 
-The user explicitly authorized Phase 4 implementation on October 5. This
-supersedes the October 4 instruction below to stop before Phase 4. Phase 4
-source implementation and documentation are complete locally, with changes
-grouped into API/data, mobile, and release-documentation commits.
+The user explicitly authorized Phase 5 implementation on October 5. Local
+Health-side consent, context preview, search, Assistant UI and documentation
+are complete in logical commits: `1c82bd6` (API/data/contracts), `a2b9808`
+(mobile), and `f939f35` (confirmation-aware context ranking). Release evidence
+and this coordinator checkpoint are recorded with the current documentation
+commit. A real Personal AI integration remains disabled because no provider,
+service identity, delegation, tool-callback or retention contract was supplied.
 
-Static verification passed: Python syntax compilation, Ruff check/format,
-mypy (28 API source files), OpenAPI export and generated client sync, API-client
-TypeScript, mobile TypeScript, mobile ESLint, and `git diff --check`. No tests
-were added or run. The Phase 4 release evidence records the exact commands and
-limitations.
+Static verification passed: changed-file Ruff, mypy (32 API source files),
+mobile TypeScript, ESLint, Prettier, OpenAPI export/client generation, Alembic
+head/offline SQL generation, and `git diff --check`. A broader Ruff pass found
+six import-order issues in unchanged API files; changed files are clean. No
+tests were added or run. See [`phase-5-release.md`](evidence/phase-5-release.md)
+for commands, scope, limitations and open gates.
 
-Acceptance remains open. The Phase 2 PostgreSQL gate, current migration
-upgrade/downgrade/re-upgrade and model-drift check, query-cost evidence, Phase 3
-live cloud/auth/storage parity, and mobile device/timezone/accessibility review
-remain unverified. Do not claim database, cloud, or device acceptance.
+Do not claim live AI, clinical-safety, database-migration, cloud, or device
+acceptance. The Phase 2 PostgreSQL migration/query gate, Phase 3 live
+cloud/auth/storage parity, Phase 5 provider/retention/safety evaluation, and
+mobile device/timezone/accessibility review remain open. Earlier Phase 4
+acceptance limits are carried forward in its release evidence.
 
 ### Historical checkpoints
 

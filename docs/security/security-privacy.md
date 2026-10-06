@@ -17,3 +17,20 @@ The mobile SDK owns persisted Firebase session state and refreshes ID tokens bef
 Cloud config requires a private GCS bucket, a pooled runtime Neon endpoint with `sslmode=verify-full`, a separate direct `MIGRATION_DATABASE_URL`, and an explicit API connection budget. The app uses one worker, five connections per instance, zero overflow and a short pool/connect timeout by default. The budget reserves `2 × maximum instances × per-instance SQLAlchemy pool capacity` to account for old and new Cloud Run revisions overlapping during rollout. Database and object-storage credentials never appear in API errors or OpenAPI. `/healthz` remains process liveness; interactive API documentation is disabled in cloud.
 
 These controls are a private product security baseline, not a claim of formal HIPAA compliance. Cloud identity, connection, GCS IAM, billing, and restore behavior remain unverified until a user-supplied staging environment is deployed.
+
+## Phase 5 AI data controls
+
+Every health object defaults to `ai_use_allowed=false`. Profile, planning, and
+daily Event/Observation forms expose the item-level choice; daily permission
+updates create ordinary revision snapshots. Context and search recheck owner,
+active/current status, temporal validity and item permission on each request.
+The separate cross-domain flag does not grant Personal AI access. Context is
+bounded to 100 entries and 65,536 serialized bytes; daily history and
+unconsented objects are not included. Search has a 90-day daily-entry window
+and bounded pages.
+
+No health data is sent to an AI provider in the current build. The actual
+Personal AI service and its service identity, delegation, tool registration and
+retention terms were not supplied; the adapter is disabled, and configuration
+rejects `PERSONAL_AI_ENABLED=true`. The real provider boundary, retention
+review and service safety checks remain release gates.
