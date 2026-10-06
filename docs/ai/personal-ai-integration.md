@@ -19,8 +19,11 @@ AI-permission-filtered full-text search. The pack contains only active,
 temporally eligible owner objects that the user individually marked
 `ai_use_allowed` and selected by resource type. Daily summaries cover only the
 included, opted-in entries, and evidence references identify exact object
-revisions. Text and notes remain untrusted data. Cross-domain permission is a
-separate flag and does not authorize this Assistant.
+revisions. Ranking is deterministic: safety constraints and active context
+come first, then confirmation state and task relevance; source kind is
+displayed as provenance without an invented confidence score. Text and notes
+remain untrusted data. Cross-domain permission is a separate flag and does not
+authorize this Assistant.
 
 The mobile Assistant shows the requested scope and local preview. The provider
 adapter remains disabled: this repository has no Personal AI service or

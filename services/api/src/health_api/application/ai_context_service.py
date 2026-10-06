@@ -210,6 +210,9 @@ def _candidate_branch(
             *extra_values,
             priority.label("priority"),
             context_priority.label("context_priority"),
+            case((HealthObject.confirmation_status == "user_confirmed", 0), else_=1).label(
+                "confirmation_priority"
+            ),
             relevance.label("relevance"),
         )
         .select_from(HealthObject)
@@ -412,6 +415,7 @@ def build_ai_context(
         .order_by(
             candidates.c.priority.asc(),
             candidates.c.context_priority.desc(),
+            candidates.c.confirmation_priority.asc(),
             candidates.c.relevance.desc(),
             candidates.c.recorded_at.desc(),
             candidates.c.object_id,
