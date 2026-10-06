@@ -35,6 +35,7 @@ export interface components {
       as_of: string;
       budget_bytes: 65536;
       built_at: string;
+      domains: Array<string>;
       entries: Array<components["schemas"]["AIContextEntry"]>;
       included_counts: {
         [key: string]: number;
@@ -54,6 +55,7 @@ export interface components {
         | "context"
       >;
       schema_version: 1;
+      sections: Array<"entries" | "today_summaries">;
       serialized_bytes: number;
       task: string;
       task_kind:
@@ -70,6 +72,7 @@ export interface components {
     };
     AIContextRequest: {
       as_of?: string | null;
+      domains?: Array<string>;
       excluded_object_ids?: Array<string>;
       lookback_days?: number;
       resource_types: Array<
@@ -81,6 +84,7 @@ export interface components {
         | "plan"
         | "context"
       >;
+      sections?: Array<"entries" | "today_summaries">;
       task: string;
       task_kind?:
         | "general_wellness"
@@ -92,7 +96,17 @@ export interface components {
     };
     AIEvidenceReference: {
       object_id: string;
+      object_type?:
+        | "profile_item"
+        | "event"
+        | "observation"
+        | "goal"
+        | "regimen"
+        | "plan"
+        | "context"
+        | null;
       revision: number;
+      title?: string | null;
     };
     AISearchResponse: {
       items: Array<components["schemas"]["AISearchResult"]>;
@@ -102,6 +116,8 @@ export interface components {
       confirmation_status: components["schemas"]["ConfirmationStatus"];
       domain: string;
       excerpt: string;
+      interval_end?: string | null;
+      local_date?: string | null;
       object_id: string;
       object_type:
         | "profile_item"
@@ -111,6 +127,7 @@ export interface components {
         | "regimen"
         | "plan"
         | "context";
+      occurred_at?: string | null;
       revision: number;
       source_kind:
         | "manual"
@@ -119,7 +136,11 @@ export interface components {
         | "provider"
         | "ai"
         | "system";
+      time_precision?: "instant" | "date_only" | null;
+      timezone?: string | null;
       title: string;
+      valid_from?: string | null;
+      valid_to?: string | null;
     };
     AssistantMessageRequest: {
       message: string;

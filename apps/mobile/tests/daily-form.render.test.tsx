@@ -32,6 +32,22 @@ vi.mock("react-native", () => {
         children as React.ReactNode,
       ),
     ScrollView: container("div"),
+    Switch: ({
+      accessibilityLabel,
+      accessibilityHint,
+      value,
+      onValueChange,
+    }: Props) =>
+      React.createElement("input", {
+        type: "checkbox",
+        checked: value,
+        onChange: (event: { currentTarget: { checked: boolean } }) =>
+          (onValueChange as (value: boolean) => void)(
+            event.currentTarget.checked,
+          ),
+        "aria-label": accessibilityLabel,
+        "aria-description": accessibilityHint,
+      }),
     StyleSheet: { create: (styles: unknown) => styles },
     Text: container("span"),
     TextInput: ({
@@ -115,5 +131,25 @@ describe("DailyEntryForm first render", () => {
     expect(markup).toContain("same transaction as this symptom");
     expect(markup).toContain('aria-label="Retry original daily save"');
     expect(markup).toContain("Date only");
+  });
+
+  it("renders the AI permission off by default with accessible control text", async () => {
+    const { DailyEntryForm } = await import(
+      "../src/features/daily/components/DailyEntryForm"
+    );
+    const markup = renderToStaticMarkup(
+      React.createElement(DailyEntryForm, {
+        domain: "nutrition",
+        submitLabel: "Save entry",
+        onCancel: () => undefined,
+        onCreate: async () => undefined,
+      }),
+    );
+    expect(markup).toContain('aria-label="Allow AI use of this daily entry"');
+    expect(markup).toContain(
+      'aria-description="Off by default. This entry can be included only when you allow AI use and select its type in the context preview."',
+    );
+    expect(markup).toContain('type="checkbox"');
+    expect(markup).not.toContain('type="checkbox" checked=""');
   });
 });

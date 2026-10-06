@@ -6,11 +6,12 @@ from uuid import UUID, uuid4
 import pytest
 import pytest_asyncio
 from fastapi import FastAPI
-from health_api.config.settings import Settings
-from health_api.main import create_app
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
+
+from health_api.config.settings import Settings
+from health_api.main import create_app
 
 OWNER_ID = UUID("00000000-0000-0000-0000-000000000111")
 OTHER_OWNER_ID = UUID("00000000-0000-0000-0000-000000000222")
@@ -159,13 +160,17 @@ async def test_compound_symptom_entry_and_blood_pressure_are_atomic_and_roll_up_
     compound = await api_client.post(
         "/daily-entries",
         json={
-            "events": [{"id": str(symptom_id), "event": symptom}],
-            "observations": [{"id": str(severity_id), "observation": severity}],
+            "events": [{"id": str(symptom_id), "event": symptom, "ai_use_allowed": True}],
+            "observations": [
+                {"id": str(severity_id), "observation": severity, "ai_use_allowed": False}
+            ],
             "links": [{"event_id": str(symptom_id), "observation_id": str(severity_id)}],
         },
     )
     assert compound.status_code == 201
     assert compound.json()["events"][0]["linked_observation_ids"] == [str(severity_id)]
+    assert compound.json()["events"][0]["permissions"]["ai_use_allowed"] is True
+    assert compound.json()["observations"][0]["permissions"]["ai_use_allowed"] is False
     assert compound.json()["observations"][0]["revision"] == 1
     today_after_compound = await api_client.get("/today", params={"date": "2026-05-01"})
     assert today_after_compound.json()["as_of_sequence"] == 1

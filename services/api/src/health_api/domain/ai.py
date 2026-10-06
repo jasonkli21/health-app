@@ -27,6 +27,11 @@ AITaskKind = Literal[
     "consequential_medical",
     "urgent_safety",
 ]
+AIContextSection = Literal["entries", "today_summaries"]
+
+
+def _default_context_sections() -> list[AIContextSection]:
+    return ["entries", "today_summaries"]
 
 
 class AIContextRequest(StrictModel):
@@ -37,6 +42,12 @@ class AIContextRequest(StrictModel):
     timezone: Annotated[str, Field(min_length=1, max_length=64)] | None = None
     lookback_days: Annotated[StrictInt, Field(ge=0, le=90)] = 30
     excluded_object_ids: list[UUID] = Field(default_factory=list, max_length=100)
+    domains: list[Annotated[str, Field(min_length=1, max_length=32)]] = Field(
+        default_factory=list, max_length=16
+    )
+    sections: list[AIContextSection] = Field(
+        default_factory=_default_context_sections, max_length=2
+    )
 
     @model_validator(mode="after")
     def validate_scope(self) -> AIContextRequest:
@@ -44,6 +55,12 @@ class AIContextRequest(StrictModel):
             raise ValueError("resource_types must not contain duplicates")
         if len(set(self.excluded_object_ids)) != len(self.excluded_object_ids):
             raise ValueError("excluded_object_ids must not contain duplicates")
+        if len(set(self.domains)) != len(self.domains) or len(set(self.sections)) != len(
+            self.sections
+        ):
+            raise ValueError("domains and sections must not contain duplicates")
+        if "entries" not in self.sections:
+            raise ValueError("entries must be included in the request")
         return self
 
 
@@ -72,6 +89,8 @@ class AIContextPack(StrictModel):
     task: Annotated[str, Field(min_length=1, max_length=300)]
     task_kind: AITaskKind
     resource_types: list[AIResourceType]
+    domains: list[str]
+    sections: list[AIContextSection]
     lookback_days: Annotated[StrictInt, Field(ge=0, le=90)]
     entries: list[AIContextEntry] = Field(max_length=100)
     today_summary_date: date
@@ -94,6 +113,13 @@ class AISearchResult(StrictModel):
     source_kind: Literal["manual", "device", "document", "provider", "ai", "system"]
     confirmation_status: ConfirmationStatus
     excerpt: Annotated[str, Field(max_length=400)]
+    time_precision: Literal["instant", "date_only"] | None = None
+    occurred_at: AwareDatetime | None = None
+    local_date: date | None = None
+    interval_end: AwareDatetime | None = None
+    timezone: Annotated[str, Field(min_length=1, max_length=64)] | None = None
+    valid_from: AwareDatetime | None = None
+    valid_to: AwareDatetime | None = None
 
 
 class AISearchResponse(StrictModel):
@@ -109,6 +135,8 @@ class AssistantMessageRequest(StrictModel):
 class AIEvidenceReference(StrictModel):
     object_id: UUID
     revision: Annotated[StrictInt, Field(ge=1)]
+    object_type: AIResourceType | None = None
+    title: Annotated[str, Field(min_length=1, max_length=120)] | None = None
 
 
 class AssistantMessageResponse(StrictModel):

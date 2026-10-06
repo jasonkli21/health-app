@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -32,6 +32,9 @@ export default function DailyEditScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
+  const [customPermission, setCustomPermission] = useState(false);
+  const [customSaving, setCustomSaving] = useState(false);
+  const [customError, setCustomError] = useState<string | null>(null);
   const explicitlyReloading = useRef(false);
   const item = editState.item?.id === params.itemId ? editState.item : null;
   const draft = item ? editState.draft : null;
@@ -52,6 +55,8 @@ export default function DailyEditScreen() {
                 });
           if (active) {
             explicitlyReloading.current = false;
+            setCustomPermission(result.permissions.ai_use_allowed);
+            setCustomError(null);
             setEditState((state) =>
               acceptDailyRefresh(state, result, replaceDraft),
             );
@@ -106,6 +111,35 @@ export default function DailyEditScreen() {
     });
   }
 
+  async function saveCustomPermission() {
+    if (
+      !item ||
+      item.object_type !== "observation" ||
+      !customTrackerValue(item)
+    )
+      return;
+    setCustomSaving(true);
+    setCustomError(null);
+    try {
+      await dailyApi.updateObservation(
+        { observation_id: item.id },
+        {
+          expected_revision: item.revision,
+          observation: item.observation,
+          ai_use_allowed: customPermission,
+        },
+      );
+      router.replace({
+        pathname: "/daily/item/[itemId]",
+        params: { itemId: item.id, type: item.object_type },
+      });
+    } catch (requestError) {
+      setCustomError(dailyErrorMessage(requestError));
+    } finally {
+      setCustomSaving(false);
+    }
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -124,10 +158,34 @@ export default function DailyEditScreen() {
           </View>
         ) : null}
         {item && customTrackerValue(item) ? (
-          <StatusMessage
-            title="Custom tracker entry is read-only"
-            message="This entry keeps the tracker schema version it was created with. Edit the tracker definition from Plan to make a new version for future entries."
-          />
+          <View>
+            <StatusMessage
+              title="Custom tracker entry"
+              message="This entry keeps the tracker schema version it was created with. Its content cannot be edited here; you can change only its AI use permission."
+            />
+            <Text>Allow AI use of this entry</Text>
+            <Switch
+              accessibilityLabel="Allow AI use of this custom tracker entry"
+              accessibilityHint="Off by default. This changes permission only and preserves the saved tracker values."
+              value={customPermission}
+              onValueChange={setCustomPermission}
+            />
+            {customError ? (
+              <StatusMessage
+                title="Permission could not save"
+                message={customError}
+                tone="error"
+              />
+            ) : null}
+            <ActionButton
+              label={customSaving ? "Saving permission…" : "Save permission"}
+              disabled={
+                customSaving ||
+                customPermission === item.permissions.ai_use_allowed
+              }
+              onPress={() => void saveCustomPermission()}
+            />
+          </View>
         ) : null}
         {item && draft && !customTrackerValue(item) ? (
           <DailyEntryForm

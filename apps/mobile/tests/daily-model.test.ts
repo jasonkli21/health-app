@@ -343,6 +343,13 @@ describe("daily entry builders", () => {
     const restored = draftFromDailyItem(zeroMeal);
     expect(restored.precision).toBe("date_only");
     expect(restored.energyValue).toBe("0");
+    expect(restored.aiUseAllowed).toBe(false);
+    expect(
+      draftFromDailyItem({
+        ...zeroMeal,
+        permissions: { ai_use_allowed: true, cross_domain_use_allowed: false },
+      }).aiUseAllowed,
+    ).toBe(true);
     expect(buildDailyUpdateRecord(zeroMeal, restored)).toMatchObject({
       ok: true,
       value: {

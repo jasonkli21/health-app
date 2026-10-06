@@ -45,6 +45,7 @@ from health_api.domain.schemas import (
 )
 from health_api.persistence.models import (
     EventItem,
+    EventObservationLink,
     HealthObject,
     ObservationItem,
     PlanningResource,
@@ -68,7 +69,15 @@ def _common_vector():
 
 
 def _payload_vector(payload: Any):
-    return func.to_tsvector(literal_column("'simple'"), cast(payload, Text))
+    return func.to_tsvector(
+        literal_column("'simple'"), cast(_payload_search_projection(payload), Text)
+    )
+
+
+def _payload_search_projection(payload: Any):
+    # Relationship labels and identifiers are not search evidence. They are
+    # omitted from matching/ranking, as well as from displayed excerpts.
+    return payload.op("-")("related").op("-")("items").op("-")("linked_observation_ids")
 
 
 def _candidate_branch(
@@ -126,6 +135,41 @@ def _candidate_branch(
         )
     if object_type in {"goal", "regimen", "plan", "context"}:
         conditions.append(PlanningResource.lifecycle == "active")
+        # Payload dates are the canonical planning validity. Context intervals
+        # are half-open; plan and regimen endings are inclusive. Goal targets
+        # are deadlines, so only their start date limits current eligibility.
+        local_selected_date = end_date
+        if object_type == "context":
+            conditions.extend(
+                (
+                    or_(
+                        payload["start_at"].astext.is_(None),
+                        payload["start_at"].astext <= local_selected_date.isoformat(),
+                    ),
+                    or_(
+                        payload["end_at"].astext.is_(None),
+                        payload["end_at"].astext > local_selected_date.isoformat(),
+                    ),
+                )
+            )
+        elif object_type in {"goal", "regimen", "plan"}:
+            conditions.append(
+                or_(
+                    payload["start_date"].astext.is_(None),
+                    payload["start_date"].astext <= local_selected_date.isoformat(),
+                )
+            )
+            if object_type in {"regimen", "plan"}:
+                conditions.append(
+                    or_(
+                        payload["end_date"].astext.is_(None),
+                        payload["end_date"].astext >= local_selected_date.isoformat(),
+                    )
+                )
+    if object_type == "observation":
+        # Custom tracker values are excluded until their immutable schema
+        # labels and units can be joined into the authorized context.
+        conditions.append(ObservationItem.payload["value"]["metric"].astext != "custom")
     if search_query is not None:
         conditions.append(
             or_(common_vector.op("@@")(search_query), payload_vector.op("@@")(search_query))
@@ -235,15 +279,22 @@ def _eligible_candidates(
     lookback_days: int,
     excluded_object_ids: tuple[UUID, ...] = (),
     search_text: str | None = None,
+    domains: tuple[str, ...] = (),
 ) -> Any:
-    local_date = as_of.astimezone(ZoneInfo(timezone)).date()
+    try:
+        local_date = as_of.astimezone(ZoneInfo(timezone)).date()
+    except (OverflowError, ValueError) as exc:
+        raise ValueError("Context date is outside the supported calendar.") from exc
     try:
         start_date = local_date - timedelta(days=lookback_days)
     except OverflowError as exc:
         raise ValueError("Context date range is outside the supported calendar.") from exc
     if local_date == date.max:
         raise ValueError("Context date range is outside the supported calendar.")
-    start_at = local_day_bounds(start_date, timezone)[0]
+    try:
+        start_at = local_day_bounds(start_date, timezone)[0]
+    except (OverflowError, ValueError) as exc:
+        raise ValueError("Context date range is outside the supported calendar.") from exc
     task_query = func.plainto_tsquery(literal_column("'simple'"), task)
     search_query = (
         func.plainto_tsquery(literal_column("'simple'"), search_text)
@@ -271,6 +322,8 @@ def _eligible_candidates(
             end_date=local_date,
             search_query=search_query,
         )
+        if domains:
+            branch = branch.where(HealthObject.domain.in_(domains))
         if excluded_object_ids:
             branch = branch.where(HealthObject.id.not_in(excluded_object_ids))
         branches.append(branch)
@@ -362,9 +415,32 @@ def _set_serialized_size(pack: AIContextPack) -> int:
     return _serialized_size(pack)
 
 
-def _today_summaries(entries: list[AIContextEntry], local_date: date, timezone: str):
+def _today_summaries(
+    session: Session,
+    owner_id: UUID,
+    entries: list[AIContextEntry],
+    local_date: date,
+    timezone: str,
+):
     events: list[tuple[UUID, EventSchemaV1]] = []
     observations: list[tuple[UUID, ObservationSchemaV1]] = []
+    included_ids = {entry.object_id for entry in entries}
+    linked_observation_ids: set[UUID] = set()
+    event_ids = [
+        entry.object_id
+        for entry in entries
+        if entry.object_type == "event" and entry.domain == "symptoms"
+    ]
+    if event_ids:
+        linked_observation_ids = set(
+            session.scalars(
+                select(EventObservationLink.observation_object_id).where(
+                    EventObservationLink.owner_id == owner_id,
+                    EventObservationLink.event_object_id.in_(event_ids),
+                    EventObservationLink.observation_object_id.in_(included_ids),
+                )
+            ).all()
+        )
     for entry in entries:
         time_data = entry.content.get("time")
         if not isinstance(time_data, dict):
@@ -381,6 +457,13 @@ def _today_summaries(entries: list[AIContextEntry], local_date: date, timezone: 
             body["ended_at"] = ended_at
             events.append((entry.object_id, EventSchemaV1.model_validate(body)))
         elif entry.object_type == "observation":
+            payload = entry.content.get("payload")
+            value = payload.get("value", {}) if isinstance(payload, dict) else {}
+            if (
+                value.get("metric") == "symptom_severity"
+                and entry.object_id not in linked_observation_ids
+            ):
+                continue
             body["interval_end"] = time_data.get("ended_at")
             observations.append((entry.object_id, ObservationSchemaV1.model_validate(body)))
     return summarize_today(events, observations, local_date, timezone)
@@ -398,9 +481,31 @@ def build_ai_context(
         timezone = validate_iana_timezone(request.timezone or owner_timezone)
     except ValueError as exc:
         raise ValueError("Timezone must be a valid IANA name.") from exc
-    as_of = (request.as_of or datetime.now(UTC)).astimezone(UTC)
+    try:
+        as_of = (request.as_of or datetime.now(UTC)).astimezone(UTC)
+    except (OverflowError, ValueError) as exc:
+        raise ValueError("Context date is outside the supported calendar.") from exc
     if session.get_bind().dialect.name == "postgresql":
         session.execute(text("SET LOCAL statement_timeout = '2000ms'"))
+    all_eligible = _eligible_candidates(
+        owner_id,
+        resource_types=tuple(request.resource_types),
+        task=request.task,
+        as_of=as_of,
+        timezone=timezone,
+        lookback_days=request.lookback_days,
+        domains=tuple(request.domains),
+    )
+    eligible_total = session.scalar(select(func.count()).select_from(all_eligible)) or 0
+    excluded_eligible_count = (
+        session.scalar(
+            select(func.count())
+            .select_from(all_eligible)
+            .where(all_eligible.c.object_id.in_(request.excluded_object_ids))
+        )
+        if request.excluded_object_ids
+        else 0
+    ) or 0
     candidates = _eligible_candidates(
         owner_id,
         resource_types=tuple(request.resource_types),
@@ -409,6 +514,7 @@ def build_ai_context(
         timezone=timezone,
         lookback_days=request.lookback_days,
         excluded_object_ids=tuple(request.excluded_object_ids),
+        domains=tuple(request.domains),
     )
     stmt = (
         select(candidates)
@@ -438,13 +544,15 @@ def build_ai_context(
         task=request.task,
         task_kind=request.task_kind,
         resource_types=request.resource_types,
+        domains=request.domains,
+        sections=request.sections,
         lookback_days=request.lookback_days,
         entries=[],
         today_summary_date=as_of.astimezone(ZoneInfo(timezone)).date(),
         today_summary_scope="included_opted_in_entries_only",
         today_summaries=[],
         included_counts={},
-        omitted_by_user=len(request.excluded_object_ids),
+        omitted_by_user=excluded_eligible_count,
         omitted_by_budget=0,
         truncated=has_more_candidates,
         budget_bytes=65_536,
@@ -470,8 +578,12 @@ def build_ai_context(
     _set_serialized_size(pack)
     if critical_omitted:
         raise ValueError("Eligible safety constraints do not fit in the context preview budget.")
-    if {"event", "observation"}.intersection(request.resource_types):
-        pack.today_summaries = _today_summaries(pack.entries, pack.today_summary_date, timezone)
+    if "today_summaries" in request.sections and {"event", "observation"}.intersection(
+        request.resource_types
+    ):
+        pack.today_summaries = _today_summaries(
+            session, owner_id, pack.entries, pack.today_summary_date, timezone
+        )
     counts: dict[str, int] = {}
     while True:
         counts.clear()
@@ -492,12 +604,19 @@ def build_ai_context(
             and payload.get("kind") == "constraint"
         ):
             critical_omitted = True
-        if {"event", "observation"}.intersection(request.resource_types):
-            pack.today_summaries = _today_summaries(pack.entries, pack.today_summary_date, timezone)
+        if "today_summaries" in request.sections and {"event", "observation"}.intersection(
+            request.resource_types
+        ):
+            pack.today_summaries = _today_summaries(
+                session, owner_id, pack.entries, pack.today_summary_date, timezone
+            )
     if critical_omitted:
         raise ValueError("Eligible safety constraints do not fit in the context preview budget.")
     if final_size > MAX_CONTEXT_BYTES:
         raise ValueError("Context preview exceeds the maximum serialized size.")
+    pack.omitted_by_budget = max(eligible_total - excluded_eligible_count - len(pack.entries), 0)
+    pack.truncated = pack.omitted_by_budget > 0
+    _set_serialized_size(pack)
     return pack
 
 
@@ -580,7 +699,14 @@ def search_ai_resources(
             title=row.title,
             source_kind=row.source_kind,
             confirmation_status=row.confirmation_status,
-            excerpt=_excerpt(row.title, row.notes, row.payload, query),
+            excerpt=_excerpt(row.title, row.notes, _payload_search_projection(row.payload), query),
+            time_precision=row.time_precision,
+            occurred_at=row.occurred_at,
+            local_date=row.local_date,
+            interval_end=row.ended_at,
+            timezone=row.timezone,
+            valid_from=row.valid_from,
+            valid_to=row.valid_to,
         )
         for row in page
     ]

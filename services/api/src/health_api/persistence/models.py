@@ -263,7 +263,13 @@ class ProfileItem(Base):
         Index("ix_profile_items_owner_category_key", "owner_id", "category", "key"),
         Index(
             "ix_profile_items_ai_search",
-            func.to_tsvector(literal_column("'simple'"), cast(payload, Text)),
+            func.to_tsvector(
+                literal_column("'simple'"),
+                cast(
+                    payload.op("-")("related").op("-")("items").op("-")("linked_observation_ids"),
+                    Text,
+                ),
+            ),
             postgresql_using="gin",
         ),
     )
@@ -391,7 +397,13 @@ class EventItem(Base):
         Index("ix_events_owner_date", "owner_id", "local_date", "object_id"),
         Index(
             "ix_events_ai_search",
-            func.to_tsvector(literal_column("'simple'"), cast(payload, Text)),
+            func.to_tsvector(
+                literal_column("'simple'"),
+                cast(
+                    payload.op("-")("related").op("-")("items").op("-")("linked_observation_ids"),
+                    Text,
+                ),
+            ),
             postgresql_using="gin",
         ),
     )
@@ -507,7 +519,13 @@ class ObservationItem(Base):
         ),
         Index(
             "ix_observations_ai_search",
-            func.to_tsvector(literal_column("'simple'"), cast(payload, Text)),
+            func.to_tsvector(
+                literal_column("'simple'"),
+                cast(
+                    payload.op("-")("related").op("-")("items").op("-")("linked_observation_ids"),
+                    Text,
+                ),
+            ),
             postgresql_using="gin",
         ),
     )
@@ -593,7 +611,13 @@ class PlanningResource(Base):
         ),
         Index(
             "ix_planning_resources_ai_search",
-            func.to_tsvector(literal_column("'simple'"), cast(payload, Text)),
+            func.to_tsvector(
+                literal_column("'simple'"),
+                cast(
+                    payload.op("-")("related").op("-")("items").op("-")("linked_observation_ids"),
+                    Text,
+                ),
+            ),
             postgresql_using="gin",
         ),
     )

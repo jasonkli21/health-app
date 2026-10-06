@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -39,6 +39,15 @@ const TASK_KINDS: { value: TaskKind; label: string }[] = [
   { value: "urgent_safety", label: "Urgent safety concern" },
 ];
 
+const RESOURCE_DOMAINS = [
+  "nutrition",
+  "exercise",
+  "sleep",
+  "symptoms",
+  "measurements",
+  "general",
+] as const;
+
 const LOOKBACK_OPTIONS = [7, 30, 90] as const;
 
 function requestMessage(error: unknown): string {
@@ -54,12 +63,60 @@ function typeLabel(value: string): string {
   return RESOURCE_TYPES.find((item) => item.value === value)?.label ?? value;
 }
 
+function timeLabel(value: Record<string, unknown> | undefined): string | null {
+  if (!value) return null;
+  const timezone =
+    typeof value.timezone === "string" ? value.timezone : "timezone unknown";
+  if (value.precision === "date_only" && typeof value.local_date === "string") {
+    return `${value.local_date} · date only · ${timezone}`;
+  }
+  if (value.precision === "instant" && typeof value.occurred_at === "string") {
+    const end =
+      typeof value.ended_at === "string" ? ` – ${value.ended_at}` : "";
+    return `${value.occurred_at}${end} · ${timezone}`;
+  }
+  return "Time not recorded";
+}
+
+function readablePayload(value: unknown): string {
+  const lines: string[] = [];
+  const hiddenKeys = new Set([
+    "id",
+    "object_id",
+    "reference_id",
+    "target_object_id",
+    "related",
+    "metadata",
+    "schema_version",
+    "tracker_id",
+  ]);
+  const visit = (current: unknown, path: string[]) => {
+    if (Array.isArray(current)) {
+      current.forEach((item) => visit(item, path));
+    } else if (current && typeof current === "object") {
+      for (const [key, nested] of Object.entries(current)) {
+        if (!hiddenKeys.has(key))
+          visit(nested, [...path, key.replaceAll("_", " ")]);
+      }
+    } else if (current !== null && current !== undefined) {
+      lines.push(`${path.join(" · ")}: ${String(current)}`);
+    }
+  };
+  visit(value, []);
+  const text = lines.join("\n");
+  return text.length > 1000
+    ? `${text.slice(0, 1000)}…`
+    : text || "No readable values";
+}
+
 export default function AssistantScreen() {
   const [status, setStatus] = useState<
     components["schemas"]["AssistantStatusResponse"] | null
   >(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [resourceTypes, setResourceTypes] = useState<ResourceType[]>([]);
+  const [domains, setDomains] = useState<string[]>([]);
+  const [excludedObjectIds, setExcludedObjectIds] = useState<string[]>([]);
   const [task, setTask] = useState("");
   const [taskKind, setTaskKind] = useState<TaskKind>("general_wellness");
   const [lookbackDays, setLookbackDays] =
@@ -77,9 +134,14 @@ export default function AssistantScreen() {
   const [searchResults, setSearchResults] = useState<
     components["schemas"]["AISearchResult"][]
   >([]);
+  const [searchResultKey, setSearchResultKey] = useState<string | null>(null);
   const [searchCursor, setSearchCursor] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchErrorKey, setSearchErrorKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const viewGeneration = useRef(0);
+  const searchGeneration = useRef(0);
+  const [searchStale, setSearchStale] = useState(false);
 
   const scopeTask =
     task.trim() ||
@@ -91,11 +153,27 @@ export default function AssistantScreen() {
       task_kind: taskKind,
       resource_types: resourceTypes,
       lookback_days: lookbackDays,
+      domains,
+      excluded_object_ids: excludedObjectIds,
+      sections: ["entries", "today_summaries"],
     }),
-    [lookbackDays, resourceTypes, scopeTask, taskKind],
+    [
+      domains,
+      excludedObjectIds,
+      lookbackDays,
+      resourceTypes,
+      scopeTask,
+      taskKind,
+    ],
   );
   const currentScopeKey = JSON.stringify(scope);
   const previewIsCurrent = previewKey === currentScopeKey;
+  const currentSearchKey = JSON.stringify([searchText.trim(), resourceTypes]);
+  const currentSearchKeyRef = useRef(currentSearchKey);
+  const visibleSearchResults =
+    searchResultKey === currentSearchKey ? searchResults : [];
+  const visibleSearchCursor =
+    searchResultKey === currentSearchKey ? searchCursor : null;
 
   const loadStatus = useCallback(async () => {
     try {
@@ -108,17 +186,35 @@ export default function AssistantScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      viewGeneration.current += 1;
+      searchGeneration.current += 1;
+      setPreviewKey(null);
+      setSearchStale(true);
+      const generation = viewGeneration.current;
       void loadStatus();
+      return () => {
+        if (viewGeneration.current === generation) viewGeneration.current += 1;
+        searchGeneration.current += 1;
+        setPreviewKey(null);
+        setSearchStale(true);
+      };
     }, [loadStatus]),
   );
 
   function toggleResourceType(resourceType: ResourceType, enabled: boolean) {
-    setResourceTypes((current) =>
-      enabled
-        ? [...current, resourceType]
-        : current.filter((value) => value !== resourceType),
-    );
+    const next = enabled
+      ? [...resourceTypes, resourceType]
+      : resourceTypes.filter((value) => value !== resourceType);
+    currentSearchKeyRef.current = JSON.stringify([searchText.trim(), next]);
+    searchGeneration.current += 1;
+    setResourceTypes(next);
     setReply(null);
+  }
+
+  function changeSearchText(value: string) {
+    currentSearchKeyRef.current = JSON.stringify([value.trim(), resourceTypes]);
+    searchGeneration.current += 1;
+    setSearchText(value);
   }
 
   async function previewContext() {
@@ -129,16 +225,21 @@ export default function AssistantScreen() {
       return;
     }
     setBusy(true);
+    const generation = viewGeneration.current;
     setPreviewError(null);
     setReply(null);
     try {
       const result = await assistantApi.previewAIContext(scope);
-      setPack(result);
-      setPreviewKey(currentScopeKey);
+      if (viewGeneration.current === generation) {
+        setPack(result);
+        setPreviewKey(currentScopeKey);
+      }
     } catch (error) {
-      setPreviewError(requestMessage(error));
+      if (viewGeneration.current === generation) {
+        setPreviewError(requestMessage(error));
+      }
     } finally {
-      setBusy(false);
+      if (viewGeneration.current === generation) setBusy(false);
     }
   }
 
@@ -147,23 +248,46 @@ export default function AssistantScreen() {
       setSearchError("Enter a word or phrase to search.");
       return;
     }
+    if (resourceTypes.length === 0) {
+      setSearchError("Choose at least one health item type to search.");
+      return;
+    }
+    const generation = ++searchGeneration.current;
+    const queryKey = currentSearchKey;
     setBusy(true);
     setSearchError(null);
     try {
       const result = await assistantApi.searchAIEligibleHealthData({
         q: searchText.trim(),
-        types: resourceTypes.length ? resourceTypes.join(",") : undefined,
+        types: resourceTypes.join(","),
         limit: 20,
         cursor: append ? searchCursor : undefined,
       });
-      setSearchResults((current) =>
-        append ? [...current, ...result.items] : result.items,
-      );
-      setSearchCursor(result.next_cursor);
+      if (
+        searchGeneration.current === generation &&
+        currentSearchKeyRef.current === queryKey
+      ) {
+        setSearchResults((current) => {
+          const combined =
+            append && searchResultKey === queryKey
+              ? [...current, ...result.items]
+              : result.items;
+          return [
+            ...new Map(combined.map((item) => [item.object_id, item])).values(),
+          ];
+        });
+        setSearchResultKey(queryKey);
+        setSearchCursor(result.next_cursor);
+        setSearchStale(false);
+      }
     } catch (error) {
-      setSearchError(requestMessage(error));
+      if (searchGeneration.current === generation) {
+        setSearchError(requestMessage(error));
+        setSearchErrorKey(queryKey);
+        setSearchStale(true);
+      }
     } finally {
-      setBusy(false);
+      if (searchGeneration.current === generation) setBusy(false);
     }
   }
 
@@ -171,6 +295,7 @@ export default function AssistantScreen() {
     if (!status?.enabled || !message.trim() || resourceTypes.length === 0)
       return;
     setBusy(true);
+    const generation = viewGeneration.current;
     setPreviewError(null);
     setReply(null);
     try {
@@ -178,11 +303,13 @@ export default function AssistantScreen() {
         message: message.trim(),
         scope,
       });
-      setReply(result);
+      if (viewGeneration.current === generation) setReply(result);
     } catch (error) {
-      setPreviewError(requestMessage(error));
+      if (viewGeneration.current === generation) {
+        setPreviewError(requestMessage(error));
+      }
     } finally {
-      setBusy(false);
+      if (viewGeneration.current === generation) setBusy(false);
     }
   }
 
@@ -273,6 +400,28 @@ export default function AssistantScreen() {
             />
           </View>
         ))}
+
+        <Text style={styles.fieldLabel}>Limit to domains (optional)</Text>
+        <Text style={styles.hint}>
+          An empty selection includes all domains represented by the selected
+          types.
+        </Text>
+        <View style={styles.choiceRow}>
+          {RESOURCE_DOMAINS.map((domain) => (
+            <Choice
+              key={domain}
+              label={domain}
+              selected={domains.includes(domain)}
+              onPress={() =>
+                setDomains((current) =>
+                  current.includes(domain)
+                    ? current.filter((value) => value !== domain)
+                    : [...current, domain],
+                )
+              }
+            />
+          ))}
+        </View>
 
         <Text style={styles.fieldLabel}>
           What should the Assistant help with?
@@ -374,9 +523,54 @@ export default function AssistantScreen() {
                 {entry.revision} · {entry.confirmation_status}
               </Text>
               <Text style={styles.hint}>{entry.relevance_reason}</Text>
+              {timeLabel(
+                entry.content.time as Record<string, unknown> | undefined,
+              ) ? (
+                <Text style={styles.hint}>
+                  Source time:{" "}
+                  {timeLabel(entry.content.time as Record<string, unknown>)}
+                </Text>
+              ) : null}
+              {entry.valid_from || entry.valid_to ? (
+                <Text style={styles.hint}>
+                  Validity: {entry.valid_from ?? "open"} to{" "}
+                  {entry.valid_to ?? "open"}
+                </Text>
+              ) : null}
+              <Choice
+                label={
+                  excludedObjectIds.includes(entry.object_id)
+                    ? "Include for this request"
+                    : "Exclude from this request"
+                }
+                selected={excludedObjectIds.includes(entry.object_id)}
+                onPress={() =>
+                  setExcludedObjectIds((current) =>
+                    current.includes(entry.object_id)
+                      ? current.filter((id) => id !== entry.object_id)
+                      : [...current, entry.object_id].slice(0, 100),
+                  )
+                }
+              />
               <Text selectable style={styles.payload}>
-                {JSON.stringify(entry.content.payload)}
+                {readablePayload(entry.content.payload)}
               </Text>
+              {entry.object_type === "event" ||
+              entry.object_type === "observation" ? (
+                <Link
+                  accessibilityRole="button"
+                  style={styles.textLink}
+                  href={{
+                    pathname: "/daily/item/[itemId]",
+                    params: {
+                      itemId: entry.object_id,
+                      type: entry.object_type,
+                    },
+                  }}
+                >
+                  Open source entry
+                </Link>
+              ) : null}
               {typeof entry.content.notes === "string" &&
               entry.content.notes ? (
                 <Text style={styles.hint}>Note: {entry.content.notes}</Text>
@@ -392,23 +586,31 @@ export default function AssistantScreen() {
         </Text>
         <Text style={styles.hint}>
           Search is owner-scoped and returns only current items with AI use
-          permission enabled.
+          permission enabled. Select one or more resource types above to set the
+          search scope.
         </Text>
         <TextInput
           accessibilityLabel="Search eligible health items"
           value={searchText}
-          onChangeText={setSearchText}
+          onChangeText={changeSearchText}
           maxLength={500}
           placeholder="Search selected health items"
           style={styles.input}
         />
         <Button
           label="Search"
-          disabled={busy || !searchText.trim()}
+          disabled={busy || !searchText.trim() || resourceTypes.length === 0}
           onPress={() => void search(false)}
         />
-        {searchError ? <ErrorMessage message={searchError} /> : null}
-        {searchResults.map((item) => (
+        {searchErrorKey === currentSearchKey && searchError ? (
+          <ErrorMessage message={searchError} />
+        ) : null}
+        {searchStale && visibleSearchResults.length ? (
+          <Text style={styles.warning}>
+            These results may be stale. Search again to refresh them.
+          </Text>
+        ) : null}
+        {visibleSearchResults.map((item) => (
           <View key={`${item.object_id}:${item.revision}`} style={styles.entry}>
             <Text style={styles.entryTitle}>{item.title}</Text>
             <Text style={styles.hint}>
@@ -416,9 +618,41 @@ export default function AssistantScreen() {
               {item.confirmation_status}
             </Text>
             <Text style={styles.payload}>{item.excerpt}</Text>
+            {item.time_precision === "date_only" && item.local_date ? (
+              <Text style={styles.hint}>
+                Source date: {item.local_date} · date only ·{" "}
+                {item.timezone ?? "timezone unknown"}
+              </Text>
+            ) : null}
+            {item.time_precision === "instant" && item.occurred_at ? (
+              <Text style={styles.hint}>
+                Source time: {item.occurred_at}
+                {item.interval_end ? ` – ${item.interval_end}` : ""} ·{" "}
+                {item.timezone ?? "timezone unknown"}
+              </Text>
+            ) : null}
+            {item.valid_from || item.valid_to ? (
+              <Text style={styles.hint}>
+                Validity: {item.valid_from ?? "open"} to{" "}
+                {item.valid_to ?? "open"}
+              </Text>
+            ) : null}
+            {item.object_type === "event" ||
+            item.object_type === "observation" ? (
+              <Link
+                accessibilityRole="button"
+                style={styles.textLink}
+                href={{
+                  pathname: "/daily/item/[itemId]",
+                  params: { itemId: item.object_id, type: item.object_type },
+                }}
+              >
+                Open source entry
+              </Link>
+            ) : null}
           </View>
         ))}
-        {searchCursor ? (
+        {visibleSearchCursor ? (
           <Button
             label="Load more search results"
             disabled={busy}
@@ -465,6 +699,38 @@ export default function AssistantScreen() {
             <Text style={styles.hint}>
               Evidence: {reply.evidence_refs.length} revision-linked source(s)
             </Text>
+            {reply.evidence_refs.map((reference) =>
+              reference.object_type && reference.title ? (
+                <Link
+                  key={`${reference.object_id}:${reference.revision}`}
+                  accessibilityRole="button"
+                  style={styles.textLink}
+                  href={
+                    reference.object_type === "event" ||
+                    reference.object_type === "observation"
+                      ? {
+                          pathname: "/daily/item/[itemId]",
+                          params: {
+                            itemId: reference.object_id,
+                            type: reference.object_type,
+                          },
+                        }
+                      : reference.object_type === "profile_item"
+                        ? "/profile"
+                        : "/planning"
+                  }
+                >
+                  {reference.title} · revision {reference.revision}
+                </Link>
+              ) : (
+                <Text
+                  key={`${reference.object_id}:${reference.revision}`}
+                  style={styles.hint}
+                >
+                  Source unavailable · revision {reference.revision}
+                </Text>
+              ),
+            )}
           </View>
         ) : null}
       </View>

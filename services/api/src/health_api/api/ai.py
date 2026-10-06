@@ -5,11 +5,13 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+from asyncio import wait_for
 from datetime import UTC, datetime
 from typing import Annotated, Any, cast, get_args
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Query, Request
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from health_api.api.dependencies import get_current_owner, get_session
@@ -33,7 +35,6 @@ from health_api.integrations.personal_ai import (
     READ_CAPABILITIES,
     PersonalAIAdapter,
     PersonalAIAdapterError,
-    PersonalAIUnavailable,
 )
 
 router = APIRouter(tags=["assistant"])
@@ -53,6 +54,7 @@ _RISK_RANK: dict[AITaskKind, int] = {
     "consequential_medical": 2,
     "urgent_safety": 3,
 }
+ADAPTER_TIMEOUT_SECONDS = 30
 
 
 def _owner_binding(owner_id: UUID) -> str:
@@ -87,11 +89,24 @@ def _decode_cursor(
     resource_types: tuple[AIResourceType, ...],
 ) -> tuple[datetime, UUID]:
     try:
-        payload = json.loads(base64.urlsafe_b64decode(cursor.encode()))
-        if set(payload) != {"v", "owner", "query", "types", "recorded_at", "id"}:
+        payload = json.loads(base64.b64decode(cursor.encode(), altchars=b"-_", validate=True))
+        if not isinstance(payload, dict) or set(payload) != {
+            "v",
+            "owner",
+            "query",
+            "types",
+            "recorded_at",
+            "id",
+        }:
             raise ValueError
         if (
-            payload["v"] != 1
+            type(payload["v"]) is not int
+            or payload["v"] != 1
+            or not isinstance(payload["owner"], str)
+            or not isinstance(payload["query"], str)
+            or not isinstance(payload["types"], list)
+            or not isinstance(payload["recorded_at"], str)
+            or not isinstance(payload["id"], str)
             or payload["owner"] != _owner_binding(owner_id)
             or payload["query"] != _query_binding(query)
             or payload["types"] != sorted(resource_types)
@@ -101,7 +116,15 @@ def _decode_cursor(
         if recorded_at.tzinfo is None or recorded_at.utcoffset() is None:
             raise ValueError
         return recorded_at.astimezone(UTC), UUID(payload["id"])
-    except (ValueError, TypeError, KeyError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+    except (
+        ValueError,
+        TypeError,
+        KeyError,
+        AttributeError,
+        OverflowError,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+    ) as exc:
         raise APIError(
             422, "invalid_cursor", "Pagination cursor is invalid for these filters."
         ) from exc
@@ -126,6 +149,59 @@ def _risk_floor(
     if _RISK_RANK[response.risk_class] < _RISK_RANK[requested]:
         response.risk_class = requested
     return response
+
+
+def _validate_adapter_response(
+    raw_result: Any,
+    *,
+    request_id: UUID,
+    included_counts: dict[str, int],
+    permitted_refs: dict[tuple[UUID, int], tuple[AIResourceType, str]],
+    requested_risk: AITaskKind,
+) -> AssistantMessageResponse:
+    try:
+        result = AssistantMessageResponse.model_validate(raw_result)
+    except (ValidationError, TypeError, ValueError) as exc:
+        raise APIError(
+            503, "assistant_invalid_response", "Assistant returned an unsupported response."
+        ) from exc
+    if result.request_id != request_id:
+        raise APIError(
+            503, "assistant_invalid_response", "Assistant returned an unsupported response."
+        )
+    if any(
+        (reference.object_id, reference.revision) not in permitted_refs
+        for reference in result.evidence_refs
+    ):
+        raise APIError(
+            503, "assistant_invalid_evidence", "Assistant returned unsupported evidence."
+        )
+    result.context_summary = dict(included_counts)
+    result.evidence_refs = [
+        reference.model_copy(
+            update={
+                "object_type": permitted_refs[(reference.object_id, reference.revision)][0],
+                "title": permitted_refs[(reference.object_id, reference.revision)][1],
+            }
+        )
+        for reference in result.evidence_refs
+    ]
+    return _risk_floor(result, requested_risk)
+
+
+async def _invoke_adapter(
+    adapter: PersonalAIAdapter,
+    body: AssistantMessageRequest,
+    context: AIContextPack,
+) -> Any:
+    try:
+        return await wait_for(adapter.send_message(body, context), timeout=ADAPTER_TIMEOUT_SECONDS)
+    except TimeoutError:
+        raise APIError(503, "assistant_unavailable", "Assistant request timed out.") from None
+    except PersonalAIAdapterError:
+        raise APIError(
+            503, "assistant_unavailable", "Assistant is temporarily unavailable."
+        ) from None
 
 
 @router.get(
@@ -235,22 +311,15 @@ async def send_assistant_message(
             "context_budget_exceeded" if "safety constraint" in message else "invalid_context_scope"
         )
         raise APIError(422, code, message) from exc
-    try:
-        result = await adapter.send_message(body, context)
-    except PersonalAIUnavailable:
-        raise APIError(
-            503, "assistant_unavailable", "Assistant is temporarily unavailable."
-        ) from None
-    except PersonalAIAdapterError:
-        raise APIError(
-            503, "assistant_unavailable", "Assistant is temporarily unavailable."
-        ) from None
-    permitted_refs = {(entry.object_id, entry.revision) for entry in context.entries}
-    if any(
-        (reference.object_id, reference.revision) not in permitted_refs
-        for reference in result.evidence_refs
-    ):
-        raise APIError(
-            503, "assistant_invalid_evidence", "Assistant returned unsupported evidence."
-        )
-    return _risk_floor(result, body.scope.task_kind)
+    raw_result = await _invoke_adapter(adapter, body, context)
+    # The Health service owns request binding, evidence and inclusion summary.
+    return _validate_adapter_response(
+        raw_result,
+        request_id=context.request_id,
+        included_counts=context.included_counts,
+        permitted_refs={
+            (entry.object_id, entry.revision): (entry.object_type, entry.title)
+            for entry in context.entries
+        },
+        requested_risk=body.scope.task_kind,
+    )
