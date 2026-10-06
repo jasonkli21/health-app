@@ -2,9 +2,9 @@
 
 ## Implementation-time reconciliation gate
 
-**Status: implementation in progress. Dependencies: locally delivered Phases 1–5 and their actual release evidence.** Read [Phase 6 roadmap](../implementation-plan.md#phase-6--ai-action-proposals), ADR 0006, actual Phase 5 evidence, owner/source/revision/permission schemas, Profile/daily/planning command contracts and mobile form flows. Identify actual external proposal capability support; record drift and update material plan/ADR changes before code.
+**Status: local proposal core delivered; live AI submission remains gated. Dependencies: locally delivered Phases 1–5 and their actual release evidence.** Read [Phase 6 roadmap](../implementation-plan.md#phase-6--ai-action-proposals), ADR 0006, actual Phase 5 evidence, owner/source/revision/permission schemas, Profile/daily/planning command contracts and mobile form flows. Identify actual external proposal capability support; record drift and update material plan/ADR changes before code.
 
-Actual scaffold homes are API domain/application/api/persistence/integrations/config, API tests, root migrations/contracts, api-client and mobile app/src/tests. All proposed artifacts below are **planned/provisional**; previously completed product modules must be inspected rather than assumed by filename.
+The original scaffold names below were provisional. The local reconciliation and delivery checkpoint above record which existing API, application, persistence, generated-client, and mobile modules were inspected and changed; provider integration and release verification remain open.
 
 ### Reconciliation before implementation — October 5, 2026
 
@@ -39,17 +39,37 @@ Actual scaffold homes are API domain/application/api/persistence/integrations/co
 ADR 0006 and this plan were reconciled before code to record these actual
 service and persistence boundaries.
 
+### Local delivery checkpoint — October 5, 2026
+
+- The closed command schemas, proposal/revision/event/receipt persistence,
+  owner-authenticated APIs, shared-transaction executor, target history
+  provenance, generated client, and mobile review/edit/confirm/reject inbox
+  are implemented.
+- The API can create owner-authored pending drafts, but provider submission is
+  not implemented. The AI adapter remains disabled. No delegated tool role,
+  callback, or live provider confirmation walkthrough can be claimed.
+- The mobile command editor presents the bounded typed command list as JSON
+  for user editing; every edited revision is validated by the closed server
+  command union and requires confirmation again. A more polished family-specific
+  form editor remains a UX follow-up.
+- AI-populated direct form Save has no source flow to exercise while the
+  provider is unavailable. Existing manual forms keep their existing direct
+  save commands; proposal apply is the single implemented confirmed executor.
+- Release evidence records exact static checks and the unrun database/race,
+  mobile-device, and live provider gates. The phase is not accepted for live AI
+  use until these gates are completed against actual configured systems.
+
 ## Outcome / strict deliver and defer
 
-**Deliver:** profile create/update, Event creation (including explicitly linked supported Observations), goal create/update, plan create/update and tracker-definition creation as typed proposals. User previews, edits, confirms/rejects them; one transactional executor applies approved changes with provenance/history and idempotency.
+**Local delivery:** profile create/update, Event creation (including explicitly linked supported Observations), goal create/update, plan create/update and tracker-definition creation as typed owner-authored proposals. The owner can review, edit, confirm or reject them; one transactional executor applies approved changes with provenance/history and idempotency. Provider-authored proposals remain gated on the missing Personal AI service/delegation contract.
 
-**Defer:** autonomous changes, bulk destructive/archive/delete proposals, regimen/context-specific proposal commands unless explicitly added by an approved contract extension, automated insight/recommendation generation to Phase 7, record extraction proposals to Phase 9, device import/web. Existing manual CRUD remains available. Personal AI may create proposals but cannot apply them or approve itself.
+**Defer:** provider submission until its actual identity/delegation contract is supplied; autonomous changes, bulk destructive/archive/delete proposals, regimen/context-specific proposal commands unless explicitly added by an approved contract extension, automated insight/recommendation generation to Phase 7, record extraction proposals to Phase 9, device import/web. Existing manual CRUD remains available. Any future AI-originated proposal cannot apply or approve itself.
 
 ## Proposal state machine / persisted contract
 
-Use existing health_objects envelope/source/history for identity and owner, with planned `action_proposals` subtype. Fields: proposal kind, schema_version, originating request/conversation reference, AI source metadata (no credential), bounded rationale, evidence object+revision refs, normalized typed commands, target/base revisions, canonical content hash, created/expiry instants, state and last validation summary. Default expiry24h/max7days, configurable server-side with explicit reason. Expiry is checked at apply even without a background process.
+Implementation stores proposals in dedicated `action_proposals`, immutable revision, event, and receipt tables, separate from canonical `health_objects`. Health resources retain the owner-scoped envelope/source/history and a nullable `proposal_id` provenance link. The bounded proposal snapshot contains schema version, server-owned origin, rationale, evidence object+revision refs, normalized typed commands, target/base revisions, canonical content hash, created/expiry instants, state and last validation summary. Default expiry is 24 hours and maximum is 7 days, configured server-side. Expiry is checked at apply without requiring a background process.
 
-States: `pending -> applied|rejected|expired|superseded`; application conflict/validation failure leaves pending with structured error until reviewed/rejected/expired. Editing creates a new immutable proposal revision/content hash and supersedes the prior confirmation view; never change the payload of an already-applied proposal. Do not persist an `applying` state that can get stranded after process failure; use transaction locks and final terminal state. Applied stores result IDs/revisions, confirmed_by user, confirmed_at, command receipt reference and applied_at. Rejected records actor/time and optional bounded reason; no target writes.
+The current proposal state transitions from `pending` to `applied`, `rejected`, or `expired`; application conflict/validation failure leaves it pending with a structured summary. Editing creates a new immutable proposal revision/content hash and supersedes the prior confirmation view; never change the payload of an already-applied proposal. Do not persist an `applying` state that can get stranded after process failure; use transaction locks and a final terminal state. Applied stores result IDs/revisions, `confirmed_by`, `confirmed_at`, the command receipt, and `applied_at`. Rejected records actor/time and optional bounded reason; no target writes.
 
 Typed command union uses established domain request schemas, not SQL/JSON patches/unrestricted endpoint names:
 
@@ -63,11 +83,11 @@ Typed command union uses established domain request schemas, not SQL/JSON patche
 
 Maximum10 commands/proposal, total payload64KB; new IDs allocated on proposal creation and retained across retries. Commands execute in declared dependency order (create target before linking); reject cycles/missing references/duplicate conflicting commands. Unsupported schemas/actions/units/owners/evidence IDs or permission changes reject at creation and again at apply. Proposal may not grant AI-use/cross-domain permissions; those are separate explicit user settings. Constraints/goals/context consulted at apply with current revisions; proposing medical content does not bypass high-risk Phase 5 policy. Server validates rather than trusting model assertions. Quantities/sparse/time/schema semantics identical to manual command services.
 
-Source after apply remains `ai` origin + `user_confirmed` confirmation, with original external/request/evidence metadata and user edits recorded. It must not be relabeled manual solely because confirmed. Store minimal rationale/evidence needed for audit; no chain-of-thought or entire conversation dump. Target history actor records confirming user and proposal ID; proposal history and target history share a commit boundary. AI eligibility does not become true by inference.
+Owner-authored proposals use a manual source and `user_confirmed` state. If provider-originated proposals are enabled after the external contract is supplied, apply must retain their AI source and `user_confirmed` status rather than relabeling the origin as manual. Store minimal rationale/evidence needed for audit; no chain-of-thought or entire conversation dump. Target history actor records the confirming user and proposal ID; proposal history and target history share a commit boundary. AI eligibility does not become true by inference.
 
 ## Apply transaction and authorization
 
-Planned `command_receipts` holds owner, proposal ID/revision, idempotency key, canonical command hash and committed result; unique owner+key and proposal applied revision. It is an explicit reliability addition here, not a message queue. Scope key max128 opaque characters. Same key/hash returns committed result even after network loss; key reuse with different proposal/content returns409. Same proposal concurrently applied under different keys still creates one result via row lock/unique applied state and returns the original result. Do not rely on in-memory locks.
+`action_command_receipts` holds owner, proposal ID/revision, idempotency key, canonical command hash and committed result; unique owner+key and proposal applied revision. It is an explicit reliability addition here, not a message queue. Scope key max128 characters. A same-proposal, same-key/content retry returns the committed result after network loss; key reuse with different proposal/content returns 409. The same proposal concurrently applied under different keys still creates one result via row lock/unique applied state and returns the original result. Do not rely on in-memory locks.
 
 Apply order in **one DB transaction**: authenticate normal user; owner-load and lock proposal; verify pending/current revision/hash and expiry; verify explicit confirmation of the viewed revision; resolve every owner reference/current target revision; revalidate current schemas/constraints; call existing application commands using the shared transaction; append source/target/proposal histories and receipt; mark applied and commit. Refactor command transaction ownership only as necessary to support a unit of work; no duplicate validation or second proposal-only domain implementation. No external AI call while holding this transaction. Injected failure at any command rolls back all target/history/receipt changes. On stale target409, return sanitized changed-reference hints, refresh preview and require confirmation again; never auto-rebase or infer merge.
 
@@ -79,9 +99,9 @@ Planned `POST /action-proposals`, list/detail/history endpoints, `PATCH /action-
 
 Assistant UI gains pending proposal cards/details showing exact added/changed fields, time/unit, provenance, evidence and uncertainty, plus edit/confirm/reject. Refresh stale evidence/targets and require review when content changes. Pending/expired/rejected/applied/conflict/network-uncertain states are distinct. Disable duplicate taps but use server idempotency for correctness. On unknown network outcome poll proposal/result with same owner/key, never emit fresh command IDs.
 
-**Explicit direct-save exception:** user already inside a structured create/edit form may review AI-populated fields and tap Save as the confirmation; no second redundant confirmation dialog is required. For this phase, reuse proposal validation/apply/audit behind that Save action, allowing immediate application with the viewed proposal revision. General conversation always creates pending proposals. Existing purely manual forms still call manual commands normally. This implementation chooses one backend apply path rather than a separate unreviewed AI write route; it satisfies ADR 0006 without inventing a second executor. Server-created origin metadata cannot be spoofed by arbitrary client `source` fields.
+**Explicit direct-save exception:** when an actual provider can populate a structured create/edit form, the user may review those fields and tap Save as confirmation; no redundant second confirmation dialog is needed. This checkpoint does not implement that flow because no provider submission or AI-prefilled form exists. Its implemented `Confirm and save` action uses the same proposal executor; existing manual forms retain their ordinary manual save path. Server-created origin metadata cannot be spoofed by arbitrary client `source` fields.
 
-Natural-language universal Add can now ask Personal AI for supported proposal types using Phase 5 bounded context/delegation and show a preview before save. Disabled AI leaves structured Add working. No auto-event logging from recommendations. Accessibility includes focus on diff/conflict errors, clear action labels and draft preservation in memory.
+Natural-language universal Add may later ask Personal AI for supported proposal types using Phase 5 bounded context/delegation and show a preview before save, after that provider contract is supplied and reviewed. The current disabled AI leaves structured Add working. No auto-event logging from recommendations. Accessibility includes focus on diff/conflict errors, clear action labels and draft preservation in memory.
 
 ## Order and packages
 

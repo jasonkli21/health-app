@@ -13,7 +13,7 @@ import { Link, useFocusEffect } from "expo-router";
 
 import type { components } from "@personal-health/api-client";
 import { ApiError } from "@personal-health/api-client";
-import { assistantApi } from "../api";
+import { assistantApi, listActionProposals } from "../api";
 
 type ResourceType =
   components["schemas"]["AIContextRequest"]["resource_types"][number];
@@ -79,34 +79,46 @@ function timeLabel(value: Record<string, unknown> | undefined): string | null {
 }
 
 function readablePayload(value: unknown): string {
-  const lines: string[] = [];
-  const hiddenKeys = new Set([
-    "id",
-    "object_id",
-    "reference_id",
-    "target_object_id",
-    "related",
-    "metadata",
-    "schema_version",
-    "tracker_id",
-  ]);
-  const visit = (current: unknown, path: string[]) => {
-    if (Array.isArray(current)) {
-      current.forEach((item) => visit(item, path));
-    } else if (current && typeof current === "object") {
-      for (const [key, nested] of Object.entries(current)) {
-        if (!hiddenKeys.has(key))
-          visit(nested, [...path, key.replaceAll("_", " ")]);
+  return JSON.stringify(value, null, 2);
+}
+
+function commandTitle(action: string): string {
+  return action
+    .split(".")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" · ");
+}
+
+function editableCommands(
+  commands: components["schemas"]["ProposalState"]["commands"],
+): string {
+  return JSON.stringify(
+    commands.map((command) => {
+      if (command.action === "profile.create") {
+        const { id: _id, ...draft } = command;
+        return draft;
       }
-    } else if (current !== null && current !== undefined) {
-      lines.push(`${path.join(" · ")}: ${String(current)}`);
-    }
-  };
-  visit(value, []);
-  const text = lines.join("\n");
-  return text.length > 1000
-    ? `${text.slice(0, 1000)}…`
-    : text || "No readable values";
+      if (command.action === "event.create") {
+        const {
+          event_id: _eventId,
+          observation_ids: _observationIds,
+          ...draft
+        } = command;
+        return draft;
+      }
+      if (
+        command.action === "goal.create" ||
+        command.action === "plan.create" ||
+        command.action === "tracker.create"
+      ) {
+        const { id: _id, ...draft } = command;
+        return draft;
+      }
+      return command;
+    }),
+    null,
+    2,
+  );
 }
 
 export default function AssistantScreen() {
@@ -139,6 +151,17 @@ export default function AssistantScreen() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchErrorKey, setSearchErrorKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [proposals, setProposals] = useState<
+    components["schemas"]["ProposalState"][]
+  >([]);
+  const [proposalsLoading, setProposalsLoading] = useState(true);
+  const [proposalError, setProposalError] = useState<string | null>(null);
+  const [proposalActionId, setProposalActionId] = useState<string | null>(null);
+  const [editingProposalId, setEditingProposalId] = useState<string | null>(
+    null,
+  );
+  const [proposalRationaleDraft, setProposalRationaleDraft] = useState("");
+  const [proposalCommandDraft, setProposalCommandDraft] = useState("");
   const viewGeneration = useRef(0);
   const searchGeneration = useRef(0);
   const [searchStale, setSearchStale] = useState(false);
@@ -184,6 +207,21 @@ export default function AssistantScreen() {
     }
   }, []);
 
+  const loadProposals = useCallback(async () => {
+    const generation = viewGeneration.current;
+    try {
+      setProposalsLoading(true);
+      setProposalError(null);
+      const result = await listActionProposals();
+      if (viewGeneration.current === generation) setProposals(result.items);
+    } catch (error) {
+      if (viewGeneration.current === generation)
+        setProposalError(requestMessage(error));
+    } finally {
+      if (viewGeneration.current === generation) setProposalsLoading(false);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       viewGeneration.current += 1;
@@ -192,13 +230,14 @@ export default function AssistantScreen() {
       setSearchStale(true);
       const generation = viewGeneration.current;
       void loadStatus();
+      void loadProposals();
       return () => {
         if (viewGeneration.current === generation) viewGeneration.current += 1;
         searchGeneration.current += 1;
         setPreviewKey(null);
         setSearchStale(true);
       };
-    }, [loadStatus]),
+    }, [loadProposals, loadStatus]),
   );
 
   function toggleResourceType(resourceType: ResourceType, enabled: boolean) {
@@ -313,6 +352,132 @@ export default function AssistantScreen() {
     }
   }
 
+  function replaceProposal(updated: components["schemas"]["ProposalState"]) {
+    setProposals((current) =>
+      current.map((proposal) =>
+        proposal.id === updated.id ? updated : proposal,
+      ),
+    );
+  }
+
+  async function refreshProposal(proposalId: string) {
+    const current = await assistantApi.getActionProposal({
+      proposal_id: proposalId,
+    });
+    replaceProposal(current);
+    return current;
+  }
+
+  async function confirmProposal(
+    proposal: components["schemas"]["ProposalState"],
+  ) {
+    if (proposalActionId) return;
+    setProposalActionId(proposal.id);
+    setProposalError(null);
+    try {
+      const result = await assistantApi.applyActionProposal(
+        { proposal_id: proposal.id },
+        {
+          proposal_revision: proposal.revision,
+          content_hash: proposal.content_hash,
+          idempotency_key: `proposal-${proposal.id}-${proposal.revision}`,
+          confirmation: "explicit_user_save",
+        },
+      );
+      replaceProposal(result.proposal);
+    } catch (error) {
+      try {
+        const current = await refreshProposal(proposal.id);
+        if (current.state === "applied") {
+          setProposalError(
+            "This proposal was saved. Its result is shown below.",
+          );
+        } else {
+          setProposalError(
+            `${requestMessage(error)} If the connection failed during confirmation, retrying uses the same receipt key.`,
+          );
+        }
+      } catch {
+        setProposalError(
+          `${requestMessage(error)} The outcome is unknown; retry this same proposal to check or replay the saved result.`,
+        );
+      }
+    } finally {
+      setProposalActionId(null);
+    }
+  }
+
+  async function rejectProposal(
+    proposal: components["schemas"]["ProposalState"],
+  ) {
+    if (proposalActionId) return;
+    setProposalActionId(proposal.id);
+    setProposalError(null);
+    try {
+      const result = await assistantApi.rejectActionProposal(
+        { proposal_id: proposal.id },
+        { proposal_revision: proposal.revision },
+      );
+      replaceProposal(result);
+      if (editingProposalId === proposal.id) setEditingProposalId(null);
+    } catch (error) {
+      setProposalError(requestMessage(error));
+    } finally {
+      setProposalActionId(null);
+    }
+  }
+
+  function beginEdit(proposal: components["schemas"]["ProposalState"]) {
+    setEditingProposalId(proposal.id);
+    setProposalRationaleDraft(proposal.rationale);
+    setProposalCommandDraft(editableCommands(proposal.commands));
+    setProposalError(null);
+  }
+
+  async function saveProposalEdit(
+    proposal: components["schemas"]["ProposalState"],
+  ) {
+    if (proposalActionId) return;
+    let commands: components["schemas"]["ProposalDraftCommand"][];
+    try {
+      const parsed: unknown = JSON.parse(proposalCommandDraft);
+      if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 10)
+        throw new Error("Enter between one and ten typed commands.");
+      commands = parsed as components["schemas"]["ProposalDraftCommand"][];
+    } catch (error) {
+      setProposalError(
+        error instanceof Error
+          ? `Command edits are not valid JSON: ${error.message}`
+          : "Command edits are not valid JSON.",
+      );
+      return;
+    }
+    setProposalActionId(proposal.id);
+    setProposalError(null);
+    try {
+      const updated = await assistantApi.editActionProposal(
+        { proposal_id: proposal.id },
+        {
+          expected_revision: proposal.revision,
+          rationale: proposalRationaleDraft,
+          evidence_refs: proposal.evidence_refs.map(
+            ({ object_id, revision }) => ({
+              object_id,
+              revision,
+            }),
+          ),
+          commands,
+        },
+      );
+      replaceProposal(updated);
+      setEditingProposalId(null);
+    } catch (error) {
+      setProposalError(requestMessage(error));
+    } finally {
+      setProposalActionId(null);
+    }
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <Text accessibilityRole="header" style={styles.title}>
@@ -320,7 +485,9 @@ export default function AssistantScreen() {
       </Text>
       <Text style={styles.body}>
         Review the exact Health items selected for a future read-only Assistant
-        request. Suggestions cannot save or change health records.
+        request. Assistant messages cannot save directly. Supported typed
+        proposals require a deliberate review and confirmation before they can
+        change health records.
       </Text>
 
       {status ? (
@@ -377,6 +544,170 @@ export default function AssistantScreen() {
             Open Today
           </Link>
         </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text accessibilityRole="header" style={styles.sectionTitle}>
+          Action proposals
+        </Text>
+        <Text style={styles.hint}>
+          Review each typed change, evidence revision, source, and expiry. A
+          deliberate Confirm and save action applies the displayed revision
+          once. Editing creates a new revision and requires a fresh review.
+        </Text>
+        {proposalError ? <ErrorMessage message={proposalError} /> : null}
+        {proposalsLoading ? (
+          <ActivityIndicator accessibilityLabel="Loading action proposals" />
+        ) : null}
+        {!proposalsLoading && !proposalError && proposals.length === 0 ? (
+          <Text style={styles.hint}>There are no recent action proposals.</Text>
+        ) : null}
+        {proposals.map((proposal) => (
+          <View key={proposal.id} style={styles.entry}>
+            <Text style={styles.entryTitle}>
+              {proposal.state === "pending"
+                ? "Review proposal"
+                : `Proposal ${proposal.state}`}
+            </Text>
+            <Text style={styles.hint}>
+              {proposal.origin === "ai" ? "AI suggested" : "Owner submitted"} ·
+              revision {proposal.revision} · expires {proposal.expires_at}
+            </Text>
+            {proposal.rationale ? (
+              <Text style={styles.body}>{proposal.rationale}</Text>
+            ) : null}
+            {proposal.evidence_refs.length ? (
+              <View style={styles.evidenceList}>
+                <Text style={styles.fieldLabel}>Evidence</Text>
+                {proposal.evidence_refs.map((evidence) => (
+                  <Text
+                    key={`${evidence.object_id}:${evidence.revision}`}
+                    style={styles.hint}
+                  >
+                    {evidence.title} · {evidence.object_type} · revision{" "}
+                    {evidence.revision}
+                  </Text>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.hint}>
+                No supporting evidence references.
+              </Text>
+            )}
+            {proposal.commands.map((command, index) => (
+              <View
+                key={`${proposal.id}:${index}`}
+                style={styles.proposalCommand}
+              >
+                <Text style={styles.fieldLabel}>
+                  Change {index + 1} · {commandTitle(command.action)}
+                </Text>
+                {"object_id" in command ? (
+                  <Text style={styles.hint}>
+                    Target {command.object_id} · based on revision{" "}
+                    {command.expected_revision}
+                  </Text>
+                ) : null}
+                {"id" in command ? (
+                  <Text style={styles.hint}>New target ID · {command.id}</Text>
+                ) : null}
+                <Text selectable style={styles.payload}>
+                  {readablePayload(command)}
+                </Text>
+              </View>
+            ))}
+            {proposal.state === "applied" &&
+            proposal.results &&
+            proposal.results.length > 0 ? (
+              <View style={styles.evidenceList}>
+                <Text style={styles.fieldLabel}>Saved results</Text>
+                {proposal.results.map((result) => (
+                  <Text
+                    key={`${result.object_id}:${result.revision}`}
+                    style={styles.hint}
+                  >
+                    {result.object_type} · revision {result.revision} ·{" "}
+                    {result.object_id}
+                  </Text>
+                ))}
+              </View>
+            ) : null}
+            {proposal.state === "pending" ? (
+              editingProposalId === proposal.id ? (
+                <View style={styles.editor}>
+                  <Text style={styles.fieldLabel}>Rationale</Text>
+                  <TextInput
+                    accessibilityLabel="Edit proposal rationale"
+                    value={proposalRationaleDraft}
+                    onChangeText={setProposalRationaleDraft}
+                    maxLength={1000}
+                    multiline
+                    style={[styles.input, styles.multiline]}
+                  />
+                  <Text style={styles.fieldLabel}>Typed commands</Text>
+                  <Text style={styles.hint}>
+                    Edit the command objects as JSON. The server accepts only
+                    the supported typed actions and validates every field and
+                    owner reference before saving this new revision.
+                  </Text>
+                  <TextInput
+                    accessibilityLabel="Edit typed proposal commands"
+                    accessibilityHint="Commands are checked against the supported action schemas. Permission changes and delete actions are not accepted."
+                    value={proposalCommandDraft}
+                    onChangeText={setProposalCommandDraft}
+                    maxLength={65_536}
+                    multiline
+                    autoCapitalize="none"
+                    style={[styles.input, styles.commandEditor]}
+                  />
+                  <Button
+                    label={
+                      proposalActionId === proposal.id
+                        ? "Saving…"
+                        : "Save new proposal revision"
+                    }
+                    disabled={proposalActionId !== null}
+                    onPress={() => void saveProposalEdit(proposal)}
+                  />
+                  <Button
+                    label="Cancel edit"
+                    disabled={proposalActionId !== null}
+                    onPress={() => setEditingProposalId(null)}
+                  />
+                </View>
+              ) : (
+                <View style={styles.proposalActions}>
+                  <Button
+                    label="Edit proposal"
+                    disabled={proposalActionId !== null}
+                    onPress={() => beginEdit(proposal)}
+                  />
+                  <Button
+                    label={
+                      proposalActionId === proposal.id
+                        ? "Saving…"
+                        : "Confirm and save"
+                    }
+                    disabled={proposalActionId !== null}
+                    onPress={() => void confirmProposal(proposal)}
+                  />
+                  <Button
+                    label="Reject proposal"
+                    disabled={proposalActionId !== null}
+                    onPress={() => void rejectProposal(proposal)}
+                  />
+                </View>
+              )
+            ) : null}
+          </View>
+        ))}
+        {!proposalsLoading ? (
+          <Button
+            label="Refresh proposals"
+            disabled={proposalActionId !== null}
+            onPress={() => void loadProposals()}
+          />
+        ) : null}
       </View>
 
       <View style={styles.section}>
@@ -750,7 +1081,7 @@ function Button({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityState={{ disabled, busy: disabled && label === "Working…" }}
+      accessibilityState={{ disabled, busy: disabled && label.endsWith("…") }}
       disabled={disabled}
       onPress={onPress}
       style={[styles.button, disabled && styles.disabled]}
@@ -890,6 +1221,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 7,
     padding: 12,
+  },
+  evidenceList: { gap: 4 },
+  proposalCommand: {
+    backgroundColor: "#f5f8f5",
+    borderColor: "#d2ddd5",
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 6,
+    padding: 10,
+  },
+  proposalActions: { gap: 8 },
+  editor: { gap: 10 },
+  commandEditor: {
+    minHeight: 240,
+    textAlignVertical: "top",
+    fontFamily: "monospace",
+    fontSize: 13,
   },
   summaryCard: {
     backgroundColor: "#fff",
