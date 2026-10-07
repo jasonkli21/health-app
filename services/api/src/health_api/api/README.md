@@ -2,6 +2,14 @@
 
 HTTP routes, authentication dependencies, typed Profile v1 request/response schemas, and transport concerns only. Route handlers delegate to application commands/queries. Error translation, owner binding, request IDs, body limits and cursor validation stay at this boundary; never accept the owner from request data.
 
+`analytics.py` exposes the Phase 7 metric and pair catalogs, bounded trend and
+association reads, insight refresh/list/detail/dismissal, recommendation
+list/detail/acceptance/dismissal, and manual experiment CRUD/lifecycle/results.
+All routes use the verified owner dependency. List cursors bind to owner and
+filters; write actions use expected artifact revisions. Numerical outputs carry
+method version, coverage, unit, window, and source evidence; they do not assert
+diagnosis or causation.
+
 ## Optional Assistant boundary
 
 `POST /ai/context` returns a minimized, revision-linked preview scoped to the
@@ -24,6 +32,13 @@ not been supplied. `PERSONAL_AI_ENABLED=true` is rejected at configuration
 time; there is no configurable destination URL. Context preview and
 permission-filtered search work without a provider, while message submission
 returns a sanitized 503. This is not evidence of live provider compatibility.
+
+Phase 7 permits a `trends` context section with one selected metric, only when
+both Event and Observation types are in scope and the request has no domain
+filter. Health recomputes the summary from current `ai_use_allowed` rows;
+numeric tracker metrics also require their active tracker definition to be
+AI-permitted. This remains a local preview capability while the provider is
+disabled.
 
 ## Typed action proposals
 

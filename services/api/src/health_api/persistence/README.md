@@ -4,6 +4,11 @@
 planning tables. Phase 6 adds separate `action_proposals`, immutable
 `action_proposal_revisions`, append-only `action_proposal_events`, and
 `action_command_receipts`; pending proposals are not `health_objects`.
+Phase 7 stores derived signals, insights, recommendations, and experiments as
+typed `health_objects` with `analytics_artifacts` payload/lifecycle rows.
+`analytics_evidence` references exact owner object revisions with restrictive
+foreign keys, so historical evidence remains resolvable and input edits can
+stale current derived artifacts without rewriting their original snapshots.
 JSON health payloads use PostgreSQL JSONB and are validated through typed
 domain schemas before writes. Composite foreign keys include `owner_id` for
 source, subtype, revision, proposal, receipt, and relationship references;

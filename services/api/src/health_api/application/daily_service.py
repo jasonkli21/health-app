@@ -14,6 +14,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from health_api.application.analytics_service import invalidate_analytics
 from health_api.application.envelope_service import manual_source, next_daily_sequence, unit_of_work
 from health_api.application.errors import DailyConflict, DailyNotFound, DailyValidationError
 from health_api.domain.daily import local_day_bounds
@@ -827,6 +828,7 @@ def create_daily_entry(
             )
             if any(item is None for item in (*event_results, *observation_results)):
                 raise RuntimeError("new daily save is missing a subtype row")
+            invalidate_analytics(session, owner_id)
             return CreateDailyEntryResult(
                 events=event_results,  # type: ignore[arg-type]
                 observations=observation_results,  # type: ignore[arg-type]
@@ -977,6 +979,7 @@ def update_daily_item(
                     proposal_id,
                 )
             session.flush()
+            invalidate_analytics(session, owner_id, object_ids={object_id})
             return _daily_aggregate(session, owner_id, object_id)
     except IntegrityError as exc:
         session.rollback()
@@ -1029,6 +1032,7 @@ def archive_daily_item(
         else:
             raise RuntimeError("daily aggregate is invalid")
         session.flush()
+        invalidate_analytics(session, owner_id, object_ids={object_id})
         return _daily_aggregate(session, owner_id, object_id)
 
 

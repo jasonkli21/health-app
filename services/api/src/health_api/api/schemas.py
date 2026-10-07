@@ -8,6 +8,17 @@ from uuid import UUID
 
 from pydantic import AwareDatetime, ConfigDict, Field, StrictBool, StrictInt, model_validator
 
+from health_api.domain.analytics import (
+    AnalysisMetricId,
+    AssociationPair,
+    AssociationResult,
+    ExperimentPayloadV1,
+    ExperimentResult,
+    InsightPayloadV1,
+    MetricDefinition,
+    RecommendationPayloadV1,
+    TrendResult,
+)
 from health_api.domain.daily_rollups import MetricSummaryV1
 from health_api.domain.planning import (
     ContextLifecycle,
@@ -550,6 +561,137 @@ class TodayResponse(StrictModel):
     plan_items: list[OccurrenceResponse] = Field(default_factory=list)
     active_contexts: list[TodayContextSummary] = Field(default_factory=list)
     next_cursor: str | None
+
+
+class AnalyticsMetricCatalogResponse(StrictModel):
+    items: list[MetricDefinition]
+
+
+class AnalyticsAssociationCatalogResponse(StrictModel):
+    items: list[AssociationPair]
+
+
+class StoredTrendResponse(StrictModel):
+    id: UUID
+    revision: Annotated[int, Field(ge=1)]
+    state: Literal["current", "stale"]
+    source_kind: Literal["system"] = "system"
+    result: TrendResult
+
+
+class StoredAssociationResponse(StrictModel):
+    id: UUID
+    revision: Annotated[int, Field(ge=1)]
+    state: Literal["current", "stale"]
+    source_kind: Literal["system"] = "system"
+    result: AssociationResult
+
+
+class AnalyticsPageResponse(StrictModel):
+    next_cursor: str | None
+
+
+class InsightResponse(StrictModel):
+    id: UUID
+    revision: Annotated[int, Field(ge=1)]
+    title: Annotated[str, Field(min_length=1, max_length=120)]
+    state: Literal["current", "stale", "dismissed", "expired"]
+    source_kind: Literal["system"] = "system"
+    created_at: datetime
+    updated_at: datetime
+    insight: InsightPayloadV1
+
+
+class InsightListResponse(AnalyticsPageResponse):
+    items: list[InsightResponse]
+
+
+class RecommendationResponse(StrictModel):
+    id: UUID
+    revision: Annotated[int, Field(ge=1)]
+    title: Annotated[str, Field(min_length=1, max_length=120)]
+    state: Literal["proposed", "accepted", "dismissed", "expired", "stale"]
+    source_kind: Literal["system"] = "system"
+    created_at: datetime
+    updated_at: datetime
+    recommendation: RecommendationPayloadV1
+
+
+class RecommendationListResponse(AnalyticsPageResponse):
+    items: list[RecommendationResponse]
+
+
+class ExperimentResponse(StrictModel):
+    id: UUID
+    revision: Annotated[int, Field(ge=1)]
+    title: Annotated[str, Field(min_length=1, max_length=120)]
+    state: Literal["draft", "active", "completed", "stopped", "archived"]
+    source_kind: Literal["manual"] = "manual"
+    created_at: datetime
+    updated_at: datetime
+    experiment: ExperimentPayloadV1
+
+
+class ExperimentListResponse(AnalyticsPageResponse):
+    items: list[ExperimentResponse]
+
+
+class InsightGenerateRequest(StrictModel):
+    metrics: list[AnalysisMetricId] = Field(default_factory=list, max_length=5)
+    association_pairs: list[str] = Field(default_factory=list, max_length=5)
+    from_date: date
+    to_date: date
+    timezone: Annotated[str, Field(min_length=1, max_length=64)]
+
+    @model_validator(mode="after")
+    def metrics_are_unique_and_window_bounded(self) -> InsightGenerateRequest:
+        if (
+            not self.metrics
+            and not self.association_pairs
+            or len(set(self.metrics)) != len(self.metrics)
+            or len(set(self.association_pairs)) != len(self.association_pairs)
+        ):
+            raise ValueError("Select unique trend metrics or association pairs.")
+        if self.to_date < self.from_date or (self.to_date - self.from_date).days >= 366:
+            raise ValueError("date range is invalid or exceeds 366 days")
+        return self
+
+
+class InsightGenerateResponse(StrictModel):
+    signals: list[StoredTrendResponse]
+    associations: list[StoredAssociationResponse]
+    insights: list[InsightResponse]
+    recommendations: list[RecommendationResponse]
+
+
+class ExperimentCreateRequest(StrictModel):
+    id: UUID
+    experiment: ExperimentPayloadV1
+
+
+class ExperimentUpdateRequest(StrictModel):
+    expected_revision: Annotated[int, Field(ge=1)]
+    experiment: ExperimentPayloadV1
+
+
+class ExperimentStateRequest(StrictModel):
+    expected_revision: Annotated[int, Field(ge=1)]
+    state: Literal["active", "completed", "stopped", "archived"]
+
+
+class InsightStateRequest(StrictModel):
+    expected_revision: Annotated[int, Field(ge=1)]
+    state: Literal["dismissed"]
+
+
+class RecommendationStateRequest(StrictModel):
+    expected_revision: Annotated[int, Field(ge=1)]
+    state: Literal["accepted", "dismissed"]
+
+
+class ExperimentResultResponse(StrictModel):
+    experiment: ExperimentResponse
+    result: ExperimentResult
 
 
 class FieldError(StrictModel):

@@ -4,6 +4,48 @@
 
 Check [current state](../../current-state.md) for delivery status and open gates. This plan defines intended scope; it is not evidence of delivery or authorization to begin work. Before implementation or a follow-up, inspect current code, preceding release/review evidence, accepted ADRs and contracts, and external dependencies. Reconcile material drift here before coding.
 
+## Implementation reconciliation — October 7, 2026
+
+The implementation uses the existing Health envelope and Phase 2 rollup rather
+than introducing a second health store. The metric catalog includes meal
+energy, exercise duration/distance, sleep duration, symptom severity/episode
+count, and weight, temperature, blood pressure, and pulse. Numeric/quantity
+custom tracker metrics encode the tracker, field, and immutable schema version;
+boolean, enum, text, and date tracker values are not analyzed. Trends reuse
+`unit-v1`, include all dates with null gaps, use `fsum` means and medians, label
+seven-known-sample rolling means, and compare window halves only when each has
+five known days. The value `minimum_known_days=5` is a comparison/interpretation
+floor; sparse daily points still appear as descriptive values.
+
+`spearman-sameday-v1` implements average ranks for ties, finite rank
+correlation clamped to [-1, 1], same-day lag 0, and five fixed pairs:
+sleep-duration/symptom-severity, exercise-duration/sleep-duration,
+exercise-duration/symptom-episode-count, energy/symptom-severity, and
+sleep-duration/pulse. Its display gate remains 14 paired days over 21 calendar
+days. Each API request loads at most 10,000 total active Event/Observation rows
+for at most 366 inclusive local dates; bounded PostgreSQL reads use a
+transaction-local two-second statement timeout. The API returns all daily
+points; mobile shows the last 14 calendar dates with full-window coverage.
+
+The implementation persists revisioned `derived_signal`, `insight`,
+`recommendation`, and `experiment` envelopes with exact evidence revision
+foreign keys. Daily edits/archives invalidate only dependent snapshots; new
+daily writes conservatively stale all current analytics. Recomputes are
+on-demand and deduplicated by scope/input fingerprint. Insights and the sole
+low-risk v1 recommendation (continue logging) expire in seven days. Acceptance
+of that recommendation records interest and makes no Health write or Phase 6
+proposal because it has no structured action to review. Experiments are
+manual, draft-editable, explicitly started/stopped/completed, and return
+descriptive known/missing baseline and intervention summaries.
+
+The optional AI extension is a user-selected trend preview in a context pack,
+recomputed only from currently AI-permitted inputs; numeric tracker summaries
+also require an active AI-permitted tracker definition. The Personal AI adapter
+remains disabled. Phase 8 import code must invoke the daily analytics
+invalidation hook in the same transaction as imported changes. See [Phase 7
+release evidence](../evidence/phase-7-release.md) for commands run and gates
+that remain open.
+
 ## Goal / scope
 
 **Deliver:** deterministic derived signals/trends and modest association analysis first; evidence-linked insight/recommendation objects with uncertainty/expiry; transparent Insights surface and manual experiments. Optional AI explains supported results through Personal AI, without becoming numerical/domain authority.

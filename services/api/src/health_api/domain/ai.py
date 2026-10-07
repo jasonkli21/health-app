@@ -8,6 +8,7 @@ from uuid import UUID
 
 from pydantic import AwareDatetime, Field, StrictBool, StrictInt, model_validator
 
+from health_api.domain.analytics import AnalysisMetricId, TrendResult
 from health_api.domain.daily_rollups import MetricSummaryV1
 from health_api.domain.schemas import ConfirmationStatus, StrictModel
 
@@ -27,7 +28,7 @@ AITaskKind = Literal[
     "consequential_medical",
     "urgent_safety",
 ]
-AIContextSection = Literal["entries", "today_summaries"]
+AIContextSection = Literal["entries", "today_summaries", "trends"]
 
 
 def _default_context_sections() -> list[AIContextSection]:
@@ -46,8 +47,9 @@ class AIContextRequest(StrictModel):
         default_factory=list, max_length=16
     )
     sections: list[AIContextSection] = Field(
-        default_factory=_default_context_sections, max_length=2
+        default_factory=_default_context_sections, max_length=3
     )
+    trend_metric: AnalysisMetricId | None = None
 
     @model_validator(mode="after")
     def validate_scope(self) -> AIContextRequest:
@@ -61,6 +63,15 @@ class AIContextRequest(StrictModel):
             raise ValueError("domains and sections must not contain duplicates")
         if "entries" not in self.sections:
             raise ValueError("entries must be included in the request")
+        if "trends" in self.sections:
+            if self.trend_metric is None or not {"event", "observation"}.issubset(
+                self.resource_types
+            ):
+                raise ValueError("trend context requires one metric and both daily resource types")
+            if self.domains:
+                raise ValueError("trend context requires the full supported domain scope")
+        elif self.trend_metric is not None:
+            raise ValueError("trend_metric requires the trends section")
         return self
 
 
@@ -96,6 +107,7 @@ class AIContextPack(StrictModel):
     today_summary_date: date
     today_summary_scope: Literal["included_opted_in_entries_only"]
     today_summaries: list[MetricSummaryV1]
+    trend_summary: TrendResult | None = None
     included_counts: dict[str, Annotated[StrictInt, Field(ge=0)]]
     omitted_by_user: Annotated[StrictInt, Field(ge=0)]
     omitted_by_budget: Annotated[StrictInt, Field(ge=0)]
@@ -159,6 +171,7 @@ class AssistantStatusResponse(StrictModel):
             "health.profile",
             "health.goals",
             "health.plans",
+            "health.trends",
         ]
     ]
     message: Annotated[str, Field(max_length=240)]

@@ -10,7 +10,8 @@ their NULL reference target. Phase 5 adds full-text retrieval indexes at
 `f5c0a1e2d3b4`. The Phase 6 proposal store was added at `e7f6a5b4c3d2` on
 the planning migration branch. `20261006b1a2` merges both histories and drops
 the per-proposal-revision receipt uniqueness constraint so each accepted retry
-key can bind to the one canonical applied result. This is the current head.
+key can bind to the one canonical applied result. Phase 7 revision
+`f7c8d9e0a1b2` adds analytics artifact/evidence storage and is the current head.
 Its downgrade refuses when alternate receipt keys have already been accepted
 for one proposal revision.
 The API never calls `metadata.create_all()` and never runs migrations during a

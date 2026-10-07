@@ -121,7 +121,9 @@ active contexts, goals/preferences, facts, and recent daily records follow.
 Eligible safety constraints that cannot fit cause 422 rather than silent
 omission. Text and notes are untrusted user data. Plan and context references
 remain only when the target also appears in the Pack; other history, trackers,
-trends, records, or arbitrary database results are excluded.
+records, or arbitrary database results are excluded. Phase 7 adds only the
+explicit, opt-in trend summary described below; it is recomputed from
+AI-permitted canonical rows.
 
 Search and context filter by authenticated owner, active status, temporal
 validity, selected resource type, and per-object AI permission. Daily search
@@ -207,3 +209,46 @@ remains the display instant after completion or skipping. PATCH association
 fields omitted together preserve an existing Event/Observation link; explicitly
 supplying null clears it. Existing recorded slots use their immutable schedule
 revision for subsequent actions, with optimistic occurrence revision checks.
+
+## Phase 7 deterministic analytics and experiments
+
+All Phase 7 routes use the authenticated owner and return sanitized 401/404/409/
+413/422/503 errors. Analysis accepts at most 366 inclusive local dates and
+10,000 active Event/Observation rows total per request; PostgreSQL queries use
+a two-second statement timeout. Trend reads return each date in the window,
+including null-valued gaps, metric unit, coverage counts, exact evidence
+revisions, and `trend-v1/unit-v1`. Derived signals are idempotently keyed by
+scope and input fingerprint. Input update/archive stales dependent artifacts in
+the same transaction; a new daily input conservatively stales the owner's
+current analytics. Recompute is on demand.
+
+| Method and path                                                       | Operation                                                               | Behavior                                                                                                                                            |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /analytics/catalog`                                              | `listAnalyticsMetrics`                                                  | Fixed daily metrics plus supported numeric/quantity tracker fields keyed by immutable schema version.                                               |
+| `GET /analytics/associations/catalog`                                 | `listAnalyticsAssociationPairs`                                         | Returns the five allowed same-day metric pairs; requests cannot define arbitrary pairs.                                                             |
+| `GET /trends?metric=…&from=…&to=…&timezone=…`                         | `getTrend`                                                              | Returns daily trend values, coverage, method, unit, comparison when each half has at least five known days, and evidence.                           |
+| `GET /associations?pair=…&from=…&to=…&timezone=…`                     | `getAssociations`                                                       | One to five distinct predefined pairs; Spearman average-rank ties, at least 14 paired days over 21 calendar days, and constant/insufficient states. |
+| `POST /insights/refresh`                                              | `refreshInsights`                                                       | Computes up to five selected trends and five selected pairs, then persists eligible deterministic insights and low-risk tracking suggestions.       |
+| `GET /insights[/{id}]` and `PATCH /insights/{id}/state`               | `listInsights`, `getInsight`, `changeInsightState`                      | Owner-bound keyset pages (default 50, maximum 100), detail, and dismissal. Expiry is enforced on read/action.                                       |
+| `GET /recommendations[/{id}]` and `PATCH /recommendations/{id}/state` | `listRecommendations`, `getRecommendation`, `changeRecommendationState` | List/detail and accept-interest/dismiss actions use current expected revision. Acceptance does not apply a Health change.                           |
+| `GET, POST /experiments`                                              | `listExperiments`, `createExperiment`                                   | Manual, user-authored drafts with client UUIDs and owner-bound keyset paging.                                                                       |
+| `GET, PATCH /experiments/{id}`                                        | `getExperiment`, `updateExperiment`                                     | Draft edits require expected revision; outcome, dates, hypothesis, and intervention are immutable after start.                                      |
+| `PATCH /experiments/{id}/state`                                       | `changeExperimentState`                                                 | Manual draft → active/archive, active → complete/stop, complete/stop → archive transitions.                                                         |
+| `GET /experiments/{id}/results?timezone=…`                            | `getExperimentResults`                                                  | Bounded baseline/intervention means, medians, known/missing days, selected timezone, and source revisions; descriptive only.                        |
+
+Metric catalog definitions disclose unit and aggregation. Daily measurements
+and logged intervals reuse Phase 2 `unit-v1` and local-day overlap rules.
+Numerical tracker outcomes encode `tracker:<uuid>:<field_id>:v<schema_version>`;
+schema versions are never mixed. Boolean/enum tracker rates are not supported.
+The only v1 recommendation is to keep logging where coverage is sparse. It is
+not an actionable treatment command, has no Phase 6 proposal link, and its
+accept action records interest only. Recommendations and insights expire after
+seven days by default and are capped at 30 days by contract.
+
+The optional `trends` section of `POST /ai/context` accepts one metric only
+when both daily resource types are selected and no domain filter is supplied.
+Health recomputes this preview from active, `ai_use_allowed` inputs at context
+construction time; a numerical tracker additionally requires its active
+definition to have AI use enabled. The Personal AI adapter remains disabled.
+For future Phase 8 ingestion, call `invalidate_analytics` in the same owner
+transaction when imported daily data is created, updated, or archived.

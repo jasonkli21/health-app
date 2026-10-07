@@ -34,3 +34,11 @@ structured proposals are separate local capabilities.
 See [current state](../current-state.md) for what is implemented and
 [Phase 5 evidence](../implementation/evidence/phase-5-release.md) for the
 verified preview/search boundary and open provider gates.
+
+Phase 7 adds an optional `trends` context section for one explicitly selected
+metric. The preview is computed by Health from current active Event/Observation
+inputs marked `ai_use_allowed`; it does not read persisted insights or
+recommendations as provider instructions. Numeric tracker summaries additionally
+require an active tracker definition with AI use explicitly enabled. The
+Personal AI adapter remains disabled, and deterministic Insights work without
+it.

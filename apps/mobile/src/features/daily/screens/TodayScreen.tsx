@@ -30,6 +30,7 @@ import {
   StatusMessage,
 } from "../../profile/components/Ui";
 import { RequestScope, requestNextPage } from "../../profile/requestScope";
+import { CurrentInsightCards } from "../../insights/components/CurrentInsightCards";
 import type { components } from "@personal-health/api-client";
 import {
   canLoadTodayPage,
@@ -279,6 +280,7 @@ export default function TodayScreen() {
               onPress={() => router.push("/planning")}
             />
           </View>
+          <CurrentInsightCards />
         </View>
 
         <View style={styles.filters}>

@@ -347,6 +347,9 @@ class HealthObject(Base):
     event_item: Mapped[EventItem | None] = relationship(
         back_populates="health_object", uselist=False, cascade="all, delete-orphan"
     )
+    analytics_artifact: Mapped[AnalyticsArtifact | None] = relationship(
+        back_populates="health_object", uselist=False, cascade="all, delete-orphan"
+    )
     observation_item: Mapped[ObservationItem | None] = relationship(
         back_populates="health_object",
         uselist=False,
@@ -370,7 +373,7 @@ class HealthObject(Base):
         ),
         CheckConstraint(
             "object_type IN ('profile_item', 'event', 'observation', 'goal', 'regimen', 'plan', "
-            "'context', 'tracker_definition')",
+            "'context', 'tracker_definition', 'derived_signal', 'insight', 'recommendation', 'experiment')",
             name="ck_health_objects_type",
         ),
         CheckConstraint(
@@ -378,7 +381,8 @@ class HealthObject(Base):
             "(object_type = 'event' AND domain IN ('nutrition', 'exercise', 'sleep', 'symptoms')) OR "
             "(object_type = 'observation' AND domain IN ('measurements', 'symptoms', 'nutrition', 'exercise', 'sleep')) OR "
             "(object_type IN ('goal', 'regimen', 'plan', 'context', 'tracker_definition') AND domain IN "
-            "('planning', 'nutrition', 'exercise', 'sleep', 'symptoms', 'measurements', 'general'))",
+            "('planning', 'nutrition', 'exercise', 'sleep', 'symptoms', 'measurements', 'general')) OR "
+            "(object_type IN ('derived_signal', 'insight', 'recommendation', 'experiment') AND domain = 'analytics')",
             name="ck_health_objects_domain_type",
         ),
         CheckConstraint("status IN ('active', 'archived')", name="ck_health_objects_status"),
@@ -810,6 +814,116 @@ class PlanningResource(Base):
                 ),
             ),
             postgresql_using="gin",
+        ),
+    )
+
+
+class AnalyticsArtifact(Base):
+    """Versioned analytical snapshot attached to a canonical HealthObject."""
+
+    __tablename__ = "analytics_artifacts"
+
+    owner_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    object_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    artifact_kind: Mapped[str] = mapped_column(String(24), nullable=False)
+    state: Mapped[str] = mapped_column(String(16), nullable=False)
+    scope_key: Mapped[str | None] = mapped_column(String(128))
+    dedupe_key: Mapped[str | None] = mapped_column(String(64))
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    health_object: Mapped[HealthObject] = relationship(back_populates="analytics_artifact")
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["owner_id", "object_id"],
+            ["health_objects.owner_id", "health_objects.id"],
+            ondelete="CASCADE",
+            name="fk_analytics_artifacts_owner_object",
+        ),
+        CheckConstraint(
+            "artifact_kind IN ('derived_signal', 'insight', 'recommendation', 'experiment')",
+            name="ck_analytics_artifacts_kind",
+        ),
+        CheckConstraint(
+            "(artifact_kind = 'derived_signal' AND state IN ('current', 'stale')) OR "
+            "(artifact_kind = 'insight' AND state IN ('current', 'stale', 'dismissed', 'expired')) OR "
+            "(artifact_kind = 'recommendation' AND state IN ('proposed', 'accepted', 'dismissed', 'expired', 'stale')) OR "
+            "(artifact_kind = 'experiment' AND state IN ('draft', 'active', 'completed', 'stopped', 'archived'))",
+            name="ck_analytics_artifacts_state",
+        ),
+        CheckConstraint(
+            "(dedupe_key IS NULL OR length(dedupe_key) = 64)",
+            name="ck_analytics_artifacts_dedupe_key",
+        ),
+        CheckConstraint(
+            "artifact_kind = 'derived_signal' OR scope_key IS NULL",
+            name="ck_analytics_artifacts_scope_key",
+        ),
+        UniqueConstraint(
+            "owner_id", "artifact_kind", "dedupe_key", name="uq_analytics_artifacts_dedupe"
+        ),
+        Index(
+            "ix_analytics_artifacts_owner_kind_state_updated",
+            "owner_id",
+            "artifact_kind",
+            "state",
+            "updated_at",
+            "object_id",
+        ),
+        Index(
+            "ix_analytics_artifacts_owner_kind_scope_state",
+            "owner_id",
+            "artifact_kind",
+            "scope_key",
+            "state",
+        ),
+    )
+
+
+class AnalyticsEvidence(Base):
+    """Exact owner-scoped source revisions used by one analytical snapshot."""
+
+    __tablename__ = "analytics_evidence"
+
+    owner_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    artifact_object_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    evidence_object_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    evidence_revision: Mapped[int] = mapped_column(Integer, primary_key=True)
+    evidence_object_type: Mapped[str] = mapped_column(String(16), nullable=False)
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["owner_id", "artifact_object_id"],
+            ["analytics_artifacts.owner_id", "analytics_artifacts.object_id"],
+            ondelete="CASCADE",
+            name="fk_analytics_evidence_artifact",
+        ),
+        ForeignKeyConstraint(
+            ["owner_id", "evidence_object_id", "evidence_revision"],
+            [
+                "health_object_revisions.owner_id",
+                "health_object_revisions.object_id",
+                "health_object_revisions.revision",
+            ],
+            ondelete="RESTRICT",
+            name="fk_analytics_evidence_revision",
+        ),
+        CheckConstraint("evidence_revision > 0", name="ck_analytics_evidence_revision"),
+        CheckConstraint(
+            "evidence_object_type IN ('derived_signal', 'event', 'observation')",
+            name="ck_analytics_evidence_object_type",
+        ),
+        Index(
+            "ix_analytics_evidence_owner_source",
+            "owner_id",
+            "evidence_object_id",
+            "evidence_revision",
         ),
     )
 

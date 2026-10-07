@@ -14,6 +14,7 @@ READ_CAPABILITIES: tuple[
         "health.profile",
         "health.goals",
         "health.plans",
+        "health.trends",
     ],
     ...,
 ] = (
@@ -23,6 +24,7 @@ READ_CAPABILITIES: tuple[
     "health.profile",
     "health.goals",
     "health.plans",
+    "health.trends",
 )
 
 

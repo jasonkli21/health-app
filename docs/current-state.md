@@ -2,21 +2,23 @@
 
 Updated October 7, 2026. This page is the single living summary of delivered
 scope, current work boundaries, and open acceptance gates. It is reconciled
-from the latest code and release/review evidence through Phase 6.
+from the latest code and release/review evidence through Phase 7.
 
 ## Delivered locally
 
-| Capability                           | Current boundary                                                                                                                                                                                           | Evidence                                                                                                                                                                                                            |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Profile and canonical health records | Owner-scoped Profile facts, provenance, revision history, and generated API client are implemented. External and device acceptance remains open.                                                           | [Phase 1 release](implementation/evidence/phase-1-release.md), [review](implementation/evidence/phase-1-review.md)                                                                                                  |
-| Daily state and Today                | Typed Events/Observations, manual Add, and deterministic Today summaries/paging are implemented. PostgreSQL integration acceptance remains open.                                                           | [Phase 2 release](implementation/evidence/phase-2-release.md), [review](implementation/evidence/phase-2-review.md)                                                                                                  |
-| Identity and cloud foundation        | Firebase verification, owner mapping, private GCS/Neon configuration, and deployment artifacts exist. No live cloud deployment or parity acceptance is recorded.                                           | [Phase 3 release](implementation/evidence/phase-3-release.md), [review](implementation/evidence/phase-3-review.md)                                                                                                  |
-| Planning and trackers                | Goals, regimens, plans, active contexts, custom trackers, schedules, and occurrence history are implemented locally. Database, cloud, and device gates remain open.                                        | [Phase 4 release](implementation/evidence/phase-4-release.md), [follow-up audit](implementation/evidence/phase-4-audit.md)                                                                                          |
-| Health context and search            | Consent-scoped context preview and search are available locally. Scheduled intent is not included in the context pack; custom tracker values remain excluded until their schema can be interpreted safely. | [Phase 5 release](implementation/evidence/phase-5-release.md), [initial review findings](implementation/evidence/phase-5-independent-review-initial.md)                                                             |
-| Typed action proposals               | Owner-authored typed proposals can be reviewed, applied, rejected, and replayed idempotently. AI-originated proposal submission is unavailable. PostgreSQL concurrency and device acceptance remain open.  | [Phase 6 release](implementation/evidence/phase-6-release.md), [initial review findings](implementation/evidence/phase-6-independent-review-initial.md), [ADR 0006](architecture/adr/0006-ai-mutation-proposals.md) |
+| Capability                                         | Current boundary                                                                                                                                                                                                                                   | Evidence                                                                                                                                                                                                            |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Profile and canonical health records               | Owner-scoped Profile facts, provenance, revision history, and generated API client are implemented. External and device acceptance remains open.                                                                                                   | [Phase 1 release](implementation/evidence/phase-1-release.md), [review](implementation/evidence/phase-1-review.md)                                                                                                  |
+| Daily state and Today                              | Typed Events/Observations, manual Add, and deterministic Today summaries/paging are implemented. PostgreSQL integration acceptance remains open.                                                                                                   | [Phase 2 release](implementation/evidence/phase-2-release.md), [review](implementation/evidence/phase-2-review.md)                                                                                                  |
+| Identity and cloud foundation                      | Firebase verification, owner mapping, private GCS/Neon configuration, and deployment artifacts exist. No live cloud deployment or parity acceptance is recorded.                                                                                   | [Phase 3 release](implementation/evidence/phase-3-release.md), [review](implementation/evidence/phase-3-review.md)                                                                                                  |
+| Planning and trackers                              | Goals, regimens, plans, active contexts, custom trackers, schedules, and occurrence history are implemented locally. Database, cloud, and device gates remain open.                                                                                | [Phase 4 release](implementation/evidence/phase-4-release.md), [follow-up audit](implementation/evidence/phase-4-audit.md)                                                                                          |
+| Health context and search                          | Consent-scoped context preview and search are available locally. Phase 7 adds an explicitly selected trend summary over AI-permitted inputs; custom tracker entry details remain excluded from context/search results.                             | [Phase 5 release](implementation/evidence/phase-5-release.md), [Phase 7 release](implementation/evidence/phase-7-release.md)                                                                                        |
+| Typed action proposals                             | Owner-authored typed proposals can be reviewed, applied, rejected, and replayed idempotently. AI-originated proposal submission is unavailable. PostgreSQL concurrency and device acceptance remain open.                                          | [Phase 6 release](implementation/evidence/phase-6-release.md), [initial review findings](implementation/evidence/phase-6-independent-review-initial.md), [ADR 0006](architecture/adr/0006-ai-mutation-proposals.md) |
+| Trends, insights, recommendations, and experiments | Deterministic bounded analysis, exact revision evidence, expiring insight/recommendation history, manual experiments, and mobile Insights/Today surfaces are implemented locally. Automated and PostgreSQL-backed Phase 7 acceptance remains open. | [Phase 7 release](implementation/evidence/phase-7-release.md), [Phase 7 plan](implementation/phases/phase-7-implementation-plan.md)                                                                                 |
 
-Phase 7 insights, Phase 8 HealthKit import, Phase 9 records and hardening, and
-a web client are planned; their implementation is not evidenced here.
+Phase 8 HealthKit import, Phase 9 records and hardening, and a web client are
+planned. Phase 7 source delivery does not establish clinical validity, live
+database behavior, device accessibility, or provider behavior.
 
 ## AI, authorization, and private data
 
@@ -47,6 +49,8 @@ documents are routed only for web/shared-client work.
 
 - PostgreSQL-backed migration lifecycle, drift, query plans, ownership,
   transaction, and concurrency checks remain open across the relevant phases.
+- Phase 7 numerical goldens, revision-invalidation and race tests, query-plan
+  measurements, and device walkthrough remain open; see its release record.
 - Live cloud deployment, Firebase/GCS permissions, storage/database parity,
   backup/restore, and cost checks have not been established.
 - Device review remains open for accessibility, keyboard interaction,
@@ -63,10 +67,9 @@ source presence or a plan.
 
 ## Current scope
 
-This documentation cleanup is the current authorized task. The roadmap's next
-capability after Phase 6 is Phase 7, but this task does not authorize product
-phase implementation. Reconcile Phase 6 gates and obtain current user
-authorization before starting new product work.
+Phase 7 is implemented locally and its release evidence records the verified
+checks and remaining acceptance gates. Phase 8 is the next planned capability;
+use its plan and current authorization before starting native import work.
 
 ## High-context code areas
 

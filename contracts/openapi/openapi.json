@@ -203,7 +203,7 @@
           },
           "sections": {
             "items": {
-              "enum": ["entries", "today_summaries"],
+              "enum": ["entries", "today_summaries", "trends"],
               "type": "string"
             },
             "title": "Sections",
@@ -254,6 +254,16 @@
             "const": "included_opted_in_entries_only",
             "title": "Today Summary Scope",
             "type": "string"
+          },
+          "trend_summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrendResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "truncated": {
             "title": "Truncated",
@@ -348,10 +358,10 @@
           },
           "sections": {
             "items": {
-              "enum": ["entries", "today_summaries"],
+              "enum": ["entries", "today_summaries", "trends"],
               "type": "string"
             },
-            "maxItems": 2,
+            "maxItems": 3,
             "title": "Sections",
             "type": "array"
           },
@@ -385,6 +395,18 @@
               }
             ],
             "title": "Timezone"
+          },
+          "trend_metric": {
+            "anyOf": [
+              {
+                "pattern": "^(energy|exercise_duration|exercise_distance|sleep_duration|symptom_severity|symptom_episode_count|weight|temperature|systolic_pressure|diastolic_pressure|pulse|tracker:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:[a-z][a-z0-9_]{0,31}:v[1-9][0-9]*)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trend Metric"
           }
         },
         "required": ["task", "resource_types"],
@@ -626,6 +648,53 @@
         "title": "AISearchResult",
         "type": "object"
       },
+      "AnalyticsAssociationCatalogResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AssociationPair"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": ["items"],
+        "title": "AnalyticsAssociationCatalogResponse",
+        "type": "object"
+      },
+      "AnalyticsMetric": {
+        "enum": [
+          "energy",
+          "exercise_duration",
+          "exercise_distance",
+          "sleep_duration",
+          "symptom_severity",
+          "symptom_episode_count",
+          "weight",
+          "temperature",
+          "systolic_pressure",
+          "diastolic_pressure",
+          "pulse"
+        ],
+        "title": "AnalyticsMetric",
+        "type": "string"
+      },
+      "AnalyticsMetricCatalogResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MetricDefinition"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": ["items"],
+        "title": "AnalyticsMetricCatalogResponse",
+        "type": "object"
+      },
       "AssistantMessageRequest": {
         "additionalProperties": false,
         "properties": {
@@ -716,7 +785,8 @@
                 "health.today",
                 "health.profile",
                 "health.goals",
-                "health.plans"
+                "health.plans",
+                "health.trends"
               ],
               "type": "string"
             },
@@ -740,6 +810,121 @@
           "message"
         ],
         "title": "AssistantStatusResponse",
+        "type": "object"
+      },
+      "AssociationPair": {
+        "additionalProperties": false,
+        "properties": {
+          "first": {
+            "$ref": "#/components/schemas/AnalyticsMetric"
+          },
+          "id": {
+            "pattern": "^[a-z_]+:[a-z_]+$",
+            "title": "Id",
+            "type": "string"
+          },
+          "lag_days": {
+            "const": 0,
+            "default": 0,
+            "title": "Lag Days",
+            "type": "integer"
+          },
+          "second": {
+            "$ref": "#/components/schemas/AnalyticsMetric"
+          }
+        },
+        "required": ["id", "first", "second"],
+        "title": "AssociationPair",
+        "type": "object"
+      },
+      "AssociationResult": {
+        "additionalProperties": false,
+        "properties": {
+          "calendar_days": {
+            "maximum": 366.0,
+            "minimum": 1.0,
+            "title": "Calendar Days",
+            "type": "integer"
+          },
+          "evidence_refs": {
+            "items": {
+              "$ref": "#/components/schemas/health_api__domain__analytics__EvidenceReference"
+            },
+            "maxItems": 10000,
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "from_date": {
+            "format": "date",
+            "title": "From Date",
+            "type": "string"
+          },
+          "limitation": {
+            "const": "Association only; confounding and reporting bias are possible.",
+            "default": "Association only; confounding and reporting bias are possible.",
+            "title": "Limitation",
+            "type": "string"
+          },
+          "method_version": {
+            "const": "spearman-sameday-v1",
+            "title": "Method Version",
+            "type": "string"
+          },
+          "missing_pair_days": {
+            "minimum": 0.0,
+            "title": "Missing Pair Days",
+            "type": "integer"
+          },
+          "pair": {
+            "$ref": "#/components/schemas/AssociationPair"
+          },
+          "paired_days": {
+            "minimum": 0.0,
+            "title": "Paired Days",
+            "type": "integer"
+          },
+          "rho": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rho"
+          },
+          "status": {
+            "enum": ["available", "insufficient_data", "constant_series"],
+            "title": "Status",
+            "type": "string"
+          },
+          "timezone": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Timezone",
+            "type": "string"
+          },
+          "to_date": {
+            "format": "date",
+            "title": "To Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "method_version",
+          "pair",
+          "from_date",
+          "to_date",
+          "timezone",
+          "status",
+          "paired_days",
+          "calendar_days",
+          "missing_pair_days",
+          "rho",
+          "evidence_refs"
+        ],
+        "title": "AssociationResult",
         "type": "object"
       },
       "BooleanValue": {
@@ -1512,6 +1697,56 @@
         "title": "DailyLinkRequest",
         "type": "object"
       },
+      "DailyMetricPoint": {
+        "additionalProperties": false,
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "known_count": {
+            "minimum": 0.0,
+            "title": "Known Count",
+            "type": "integer"
+          },
+          "logged_count": {
+            "minimum": 0.0,
+            "title": "Logged Count",
+            "type": "integer"
+          },
+          "partial": {
+            "title": "Partial",
+            "type": "boolean"
+          },
+          "total_count": {
+            "minimum": 0.0,
+            "title": "Total Count",
+            "type": "integer"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "date",
+          "value",
+          "logged_count",
+          "known_count",
+          "total_count",
+          "partial"
+        ],
+        "title": "DailyMetricPoint",
+        "type": "object"
+      },
       "DailyObservationCreateRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1997,7 +2232,7 @@
         "title": "EvidenceDetail",
         "type": "object"
       },
-      "EvidenceReference": {
+      "EvidenceReference-Input": {
         "additionalProperties": false,
         "properties": {
           "object_id": {
@@ -2013,6 +2248,369 @@
         },
         "required": ["object_id", "revision"],
         "title": "EvidenceReference",
+        "type": "object"
+      },
+      "ExperimentCreateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "experiment": {
+            "$ref": "#/components/schemas/ExperimentPayloadV1"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": ["id", "experiment"],
+        "title": "ExperimentCreateRequest",
+        "type": "object"
+      },
+      "ExperimentListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ExperimentResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": ["next_cursor", "items"],
+        "title": "ExperimentListResponse",
+        "type": "object"
+      },
+      "ExperimentPayloadV1": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline_start": {
+            "format": "date",
+            "title": "Baseline Start",
+            "type": "string"
+          },
+          "end_date": {
+            "format": "date",
+            "title": "End Date",
+            "type": "string"
+          },
+          "hypothesis": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Hypothesis",
+            "type": "string"
+          },
+          "intervention": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Intervention",
+            "type": "string"
+          },
+          "linked_resource": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExperimentReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Notes",
+            "type": "string"
+          },
+          "outcome_metric": {
+            "pattern": "^(energy|exercise_duration|exercise_distance|sleep_duration|symptom_severity|symptom_episode_count|weight|temperature|systolic_pressure|diastolic_pressure|pulse|tracker:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:[a-z][a-z0-9_]{0,31}:v[1-9][0-9]*)$",
+            "title": "Outcome Metric",
+            "type": "string"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          },
+          "status": {
+            "default": "draft",
+            "enum": ["draft", "active", "completed", "stopped", "archived"],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "hypothesis",
+          "intervention",
+          "outcome_metric",
+          "baseline_start",
+          "start_date",
+          "end_date"
+        ],
+        "title": "ExperimentPayloadV1",
+        "type": "object"
+      },
+      "ExperimentPeriodResult": {
+        "additionalProperties": false,
+        "properties": {
+          "from_date": {
+            "format": "date",
+            "title": "From Date",
+            "type": "string"
+          },
+          "known_days": {
+            "minimum": 0.0,
+            "title": "Known Days",
+            "type": "integer"
+          },
+          "mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean"
+          },
+          "median": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median"
+          },
+          "missing_days": {
+            "minimum": 0.0,
+            "title": "Missing Days",
+            "type": "integer"
+          },
+          "to_date": {
+            "format": "date",
+            "title": "To Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from_date",
+          "to_date",
+          "known_days",
+          "missing_days",
+          "mean",
+          "median"
+        ],
+        "title": "ExperimentPeriodResult",
+        "type": "object"
+      },
+      "ExperimentReference": {
+        "additionalProperties": false,
+        "properties": {
+          "object_id": {
+            "format": "uuid",
+            "title": "Object Id",
+            "type": "string"
+          },
+          "object_type": {
+            "enum": ["goal", "plan", "tracker_definition"],
+            "title": "Object Type",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": ["object_id", "object_type", "revision"],
+        "title": "ExperimentReference",
+        "type": "object"
+      },
+      "ExperimentResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "experiment": {
+            "$ref": "#/components/schemas/ExperimentPayloadV1"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "source_kind": {
+            "const": "manual",
+            "default": "manual",
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "state": {
+            "enum": ["draft", "active", "completed", "stopped", "archived"],
+            "title": "State",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "title",
+          "state",
+          "created_at",
+          "updated_at",
+          "experiment"
+        ],
+        "title": "ExperimentResponse",
+        "type": "object"
+      },
+      "ExperimentResult": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline": {
+            "$ref": "#/components/schemas/ExperimentPeriodResult"
+          },
+          "evidence_refs": {
+            "items": {
+              "$ref": "#/components/schemas/health_api__domain__analytics__EvidenceReference"
+            },
+            "maxItems": 10000,
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "intervention": {
+            "$ref": "#/components/schemas/ExperimentPeriodResult"
+          },
+          "limitation": {
+            "const": "Descriptive comparison only; this does not establish causation.",
+            "default": "Descriptive comparison only; this does not establish causation.",
+            "title": "Limitation",
+            "type": "string"
+          },
+          "mean_difference": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Difference"
+          },
+          "method_version": {
+            "const": "experiment-descriptive-v1/unit-v1",
+            "title": "Method Version",
+            "type": "string"
+          },
+          "metric": {
+            "pattern": "^(energy|exercise_duration|exercise_distance|sleep_duration|symptom_severity|symptom_episode_count|weight|temperature|systolic_pressure|diastolic_pressure|pulse|tracker:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:[a-z][a-z0-9_]{0,31}:v[1-9][0-9]*)$",
+            "title": "Metric",
+            "type": "string"
+          },
+          "timezone": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Timezone",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "metric",
+          "unit",
+          "timezone",
+          "baseline",
+          "intervention",
+          "mean_difference",
+          "method_version",
+          "evidence_refs"
+        ],
+        "title": "ExperimentResult",
+        "type": "object"
+      },
+      "ExperimentResultResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "experiment": {
+            "$ref": "#/components/schemas/ExperimentResponse"
+          },
+          "result": {
+            "$ref": "#/components/schemas/ExperimentResult"
+          }
+        },
+        "required": ["experiment", "result"],
+        "title": "ExperimentResultResponse",
+        "type": "object"
+      },
+      "ExperimentStateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "state": {
+            "enum": ["active", "completed", "stopped", "archived"],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": ["expected_revision", "state"],
+        "title": "ExperimentStateRequest",
+        "type": "object"
+      },
+      "ExperimentUpdateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "experiment": {
+            "$ref": "#/components/schemas/ExperimentPayloadV1"
+          }
+        },
+        "required": ["expected_revision", "experiment"],
+        "title": "ExperimentUpdateRequest",
         "type": "object"
       },
       "FieldError": {
@@ -2420,6 +3018,283 @@
         "title": "GoalUpdateRequest",
         "type": "object"
       },
+      "InsightEvidenceReference": {
+        "additionalProperties": false,
+        "properties": {
+          "object_id": {
+            "format": "uuid",
+            "title": "Object Id",
+            "type": "string"
+          },
+          "object_type": {
+            "enum": ["derived_signal", "event", "observation"],
+            "title": "Object Type",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": ["object_id", "revision", "object_type"],
+        "title": "InsightEvidenceReference",
+        "type": "object"
+      },
+      "InsightGenerateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "association_pairs": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Association Pairs",
+            "type": "array"
+          },
+          "from_date": {
+            "format": "date",
+            "title": "From Date",
+            "type": "string"
+          },
+          "metrics": {
+            "items": {
+              "pattern": "^(energy|exercise_duration|exercise_distance|sleep_duration|symptom_severity|symptom_episode_count|weight|temperature|systolic_pressure|diastolic_pressure|pulse|tracker:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:[a-z][a-z0-9_]{0,31}:v[1-9][0-9]*)$",
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Metrics",
+            "type": "array"
+          },
+          "timezone": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Timezone",
+            "type": "string"
+          },
+          "to_date": {
+            "format": "date",
+            "title": "To Date",
+            "type": "string"
+          }
+        },
+        "required": ["from_date", "to_date", "timezone"],
+        "title": "InsightGenerateRequest",
+        "type": "object"
+      },
+      "InsightGenerateResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "associations": {
+            "items": {
+              "$ref": "#/components/schemas/StoredAssociationResponse"
+            },
+            "title": "Associations",
+            "type": "array"
+          },
+          "insights": {
+            "items": {
+              "$ref": "#/components/schemas/InsightResponse"
+            },
+            "title": "Insights",
+            "type": "array"
+          },
+          "recommendations": {
+            "items": {
+              "$ref": "#/components/schemas/RecommendationResponse"
+            },
+            "title": "Recommendations",
+            "type": "array"
+          },
+          "signals": {
+            "items": {
+              "$ref": "#/components/schemas/StoredTrendResponse"
+            },
+            "title": "Signals",
+            "type": "array"
+          }
+        },
+        "required": ["signals", "associations", "insights", "recommendations"],
+        "title": "InsightGenerateResponse",
+        "type": "object"
+      },
+      "InsightListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InsightResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": ["next_cursor", "items"],
+        "title": "InsightListResponse",
+        "type": "object"
+      },
+      "InsightPayloadV1": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence_refs": {
+            "items": {
+              "$ref": "#/components/schemas/InsightEvidenceReference"
+            },
+            "maxItems": 10001,
+            "minItems": 1,
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "explanation": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Explanation",
+            "type": "string"
+          },
+          "generated_by": {
+            "const": "deterministic",
+            "default": "deterministic",
+            "title": "Generated By",
+            "type": "string"
+          },
+          "kind": {
+            "enum": ["trend", "association", "coverage"],
+            "title": "Kind",
+            "type": "string"
+          },
+          "method_version": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Method Version",
+            "type": "string"
+          },
+          "state": {
+            "enum": ["current", "stale", "dismissed", "expired"],
+            "title": "State",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "uncertainty": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Uncertainty",
+            "type": "string"
+          },
+          "valid_from": {
+            "format": "date-time",
+            "title": "Valid From",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "explanation",
+          "kind",
+          "evidence_refs",
+          "uncertainty",
+          "method_version",
+          "valid_from",
+          "expires_at",
+          "state"
+        ],
+        "title": "InsightPayloadV1",
+        "type": "object"
+      },
+      "InsightResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "insight": {
+            "$ref": "#/components/schemas/InsightPayloadV1"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "source_kind": {
+            "const": "system",
+            "default": "system",
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "state": {
+            "enum": ["current", "stale", "dismissed", "expired"],
+            "title": "State",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "title",
+          "state",
+          "created_at",
+          "updated_at",
+          "insight"
+        ],
+        "title": "InsightResponse",
+        "type": "object"
+      },
+      "InsightStateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "state": {
+            "const": "dismissed",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": ["expected_revision", "state"],
+        "title": "InsightStateRequest",
+        "type": "object"
+      },
       "InstantTimePoint": {
         "additionalProperties": false,
         "properties": {
@@ -2602,6 +3477,48 @@
             "type": "null"
           }
         ]
+      },
+      "MetricDefinition": {
+        "additionalProperties": false,
+        "properties": {
+          "aggregation": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Aggregation",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "metric": {
+            "pattern": "^(energy|exercise_duration|exercise_distance|sleep_duration|symptom_severity|symptom_episode_count|weight|temperature|systolic_pressure|diastolic_pressure|pulse|tracker:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:[a-z][a-z0-9_]{0,31}:v[1-9][0-9]*)$",
+            "title": "Metric",
+            "type": "string"
+          },
+          "minimum_known_days": {
+            "minimum": 1.0,
+            "title": "Minimum Known Days",
+            "type": "integer"
+          },
+          "unit": {
+            "maxLength": 16,
+            "minLength": 1,
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "metric",
+          "label",
+          "unit",
+          "aggregation",
+          "minimum_known_days"
+        ],
+        "title": "MetricDefinition",
+        "type": "object"
       },
       "MetricKey": {
         "enum": [
@@ -3175,6 +4092,87 @@
         "title": "OccurrenceResponse",
         "type": "object"
       },
+      "PeriodComparison": {
+        "additionalProperties": false,
+        "properties": {
+          "after": {
+            "$ref": "#/components/schemas/PeriodSummary"
+          },
+          "before": {
+            "$ref": "#/components/schemas/PeriodSummary"
+          },
+          "mean_difference": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Difference"
+          },
+          "percent_change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percent Change"
+          }
+        },
+        "required": ["before", "after", "mean_difference", "percent_change"],
+        "title": "PeriodComparison",
+        "type": "object"
+      },
+      "PeriodSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "from_date": {
+            "format": "date",
+            "title": "From Date",
+            "type": "string"
+          },
+          "known_days": {
+            "minimum": 0.0,
+            "title": "Known Days",
+            "type": "integer"
+          },
+          "mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean"
+          },
+          "median": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median"
+          },
+          "to_date": {
+            "format": "date",
+            "title": "To Date",
+            "type": "string"
+          }
+        },
+        "required": ["from_date", "to_date", "known_days", "mean", "median"],
+        "title": "PeriodSummary",
+        "type": "object"
+      },
       "PlanCreateCommand": {
         "additionalProperties": false,
         "properties": {
@@ -3205,7 +4203,7 @@
           },
           "reference_revisions": {
             "items": {
-              "$ref": "#/components/schemas/EvidenceReference"
+              "$ref": "#/components/schemas/health_api__domain__proposals__EvidenceReference"
             },
             "maxItems": 20,
             "title": "Reference Revisions",
@@ -3552,7 +4550,7 @@
         "title": "PlanResponse",
         "type": "object"
       },
-      "PlanUpdateCommand": {
+      "PlanUpdateCommand-Input": {
         "additionalProperties": false,
         "properties": {
           "action": {
@@ -3575,7 +4573,41 @@
           },
           "reference_revisions": {
             "items": {
-              "$ref": "#/components/schemas/EvidenceReference"
+              "$ref": "#/components/schemas/EvidenceReference-Input"
+            },
+            "maxItems": 20,
+            "title": "Reference Revisions",
+            "type": "array"
+          }
+        },
+        "required": ["action", "object_id", "expected_revision", "plan"],
+        "title": "PlanUpdateCommand",
+        "type": "object"
+      },
+      "PlanUpdateCommand-Output": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "const": "plan.update",
+            "title": "Action",
+            "type": "string"
+          },
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "object_id": {
+            "format": "uuid",
+            "title": "Object Id",
+            "type": "string"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/PlanPayloadV1"
+          },
+          "reference_revisions": {
+            "items": {
+              "$ref": "#/components/schemas/health_api__domain__proposals__EvidenceReference"
             },
             "maxItems": 20,
             "title": "Reference Revisions",
@@ -4595,7 +5627,7 @@
             "goal.create": "#/components/schemas/GoalCreateCommand",
             "goal.update": "#/components/schemas/GoalUpdateCommand",
             "plan.create": "#/components/schemas/PlanCreateCommand",
-            "plan.update": "#/components/schemas/PlanUpdateCommand",
+            "plan.update": "#/components/schemas/PlanUpdateCommand-Output",
             "profile.create": "#/components/schemas/ProfileCreateCommand",
             "profile.update": "#/components/schemas/ProfileUpdateCommand",
             "tracker.create": "#/components/schemas/TrackerCreateCommand"
@@ -4622,7 +5654,7 @@
             "$ref": "#/components/schemas/PlanCreateCommand"
           },
           {
-            "$ref": "#/components/schemas/PlanUpdateCommand"
+            "$ref": "#/components/schemas/PlanUpdateCommand-Output"
           },
           {
             "$ref": "#/components/schemas/TrackerCreateCommand"
@@ -4643,7 +5675,7 @@
           },
           "evidence_refs": {
             "items": {
-              "$ref": "#/components/schemas/EvidenceReference"
+              "$ref": "#/components/schemas/EvidenceReference-Input"
             },
             "maxItems": 20,
             "title": "Evidence Refs",
@@ -4672,7 +5704,7 @@
             "goal.create": "#/components/schemas/GoalCreateDraft",
             "goal.update": "#/components/schemas/GoalUpdateCommand",
             "plan.create": "#/components/schemas/PlanCreateDraft",
-            "plan.update": "#/components/schemas/PlanUpdateCommand",
+            "plan.update": "#/components/schemas/PlanUpdateCommand-Input",
             "profile.create": "#/components/schemas/ProfileCreateDraft",
             "profile.update": "#/components/schemas/ProfileUpdateCommand",
             "tracker.create": "#/components/schemas/TrackerCreateDraft"
@@ -4699,7 +5731,7 @@
             "$ref": "#/components/schemas/PlanCreateDraft"
           },
           {
-            "$ref": "#/components/schemas/PlanUpdateCommand"
+            "$ref": "#/components/schemas/PlanUpdateCommand-Input"
           },
           {
             "$ref": "#/components/schemas/TrackerCreateDraft"
@@ -4720,7 +5752,7 @@
           },
           "evidence_refs": {
             "items": {
-              "$ref": "#/components/schemas/EvidenceReference"
+              "$ref": "#/components/schemas/EvidenceReference-Input"
             },
             "maxItems": 20,
             "title": "Evidence Refs",
@@ -5140,6 +6172,187 @@
         "title": "QuantityValue",
         "type": "object"
       },
+      "RecommendationListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RecommendationResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": ["next_cursor", "items"],
+        "title": "RecommendationListResponse",
+        "type": "object"
+      },
+      "RecommendationPayloadV1": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "evidence_refs": {
+            "items": {
+              "$ref": "#/components/schemas/InsightEvidenceReference"
+            },
+            "maxItems": 10001,
+            "minItems": 1,
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "expected_review_context": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Expected Review Context",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "generated_by": {
+            "const": "deterministic",
+            "default": "deterministic",
+            "title": "Generated By",
+            "type": "string"
+          },
+          "proposal_id": {
+            "title": "Proposal Id",
+            "type": "null"
+          },
+          "rationale": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Rationale",
+            "type": "string"
+          },
+          "risk_class": {
+            "const": "low",
+            "title": "Risk Class",
+            "type": "string"
+          },
+          "state": {
+            "enum": ["proposed", "accepted", "dismissed", "expired", "stale"],
+            "title": "State",
+            "type": "string"
+          },
+          "suggestion": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Suggestion",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "suggestion",
+          "rationale",
+          "risk_class",
+          "evidence_refs",
+          "expected_review_context",
+          "created_at",
+          "expires_at",
+          "state"
+        ],
+        "title": "RecommendationPayloadV1",
+        "type": "object"
+      },
+      "RecommendationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "recommendation": {
+            "$ref": "#/components/schemas/RecommendationPayloadV1"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "source_kind": {
+            "const": "system",
+            "default": "system",
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "state": {
+            "enum": ["proposed", "accepted", "dismissed", "expired", "stale"],
+            "title": "State",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "title",
+          "state",
+          "created_at",
+          "updated_at",
+          "recommendation"
+        ],
+        "title": "RecommendationResponse",
+        "type": "object"
+      },
+      "RecommendationStateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "state": {
+            "enum": ["accepted", "dismissed"],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": ["expected_revision", "state"],
+        "title": "RecommendationStateRequest",
+        "type": "object"
+      },
       "RegimenCreateRequest": {
         "additionalProperties": false,
         "properties": {
@@ -5428,6 +6641,29 @@
         "title": "RegimenUpdateRequest",
         "type": "object"
       },
+      "RollingMeanPoint": {
+        "additionalProperties": false,
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "known_days": {
+            "const": 7,
+            "default": 7,
+            "title": "Known Days",
+            "type": "integer"
+          },
+          "mean": {
+            "title": "Mean",
+            "type": "number"
+          }
+        },
+        "required": ["date", "mean"],
+        "title": "RollingMeanPoint",
+        "type": "object"
+      },
       "ScheduleDefinitionV1": {
         "additionalProperties": false,
         "properties": {
@@ -5579,6 +6815,70 @@
         },
         "required": ["kind"],
         "title": "SleepEventV1",
+        "type": "object"
+      },
+      "StoredAssociationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "result": {
+            "$ref": "#/components/schemas/AssociationResult"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "source_kind": {
+            "const": "system",
+            "default": "system",
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "state": {
+            "enum": ["current", "stale"],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": ["id", "revision", "state", "result"],
+        "title": "StoredAssociationResponse",
+        "type": "object"
+      },
+      "StoredTrendResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "result": {
+            "$ref": "#/components/schemas/TrendResult"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "source_kind": {
+            "const": "system",
+            "default": "system",
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "state": {
+            "enum": ["current", "stale"],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": ["id", "revision", "state", "result"],
+        "title": "StoredTrendResponse",
         "type": "object"
       },
       "SymptomEventV1": {
@@ -6224,6 +7524,162 @@
         "title": "TrackerUpdateRequest",
         "type": "object"
       },
+      "TrendCoverage": {
+        "additionalProperties": false,
+        "properties": {
+          "calendar_days": {
+            "maximum": 366.0,
+            "minimum": 1.0,
+            "title": "Calendar Days",
+            "type": "integer"
+          },
+          "known_days": {
+            "minimum": 0.0,
+            "title": "Known Days",
+            "type": "integer"
+          },
+          "logged_count": {
+            "minimum": 0.0,
+            "title": "Logged Count",
+            "type": "integer"
+          },
+          "missing_days": {
+            "minimum": 0.0,
+            "title": "Missing Days",
+            "type": "integer"
+          },
+          "partial_days": {
+            "minimum": 0.0,
+            "title": "Partial Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "calendar_days",
+          "known_days",
+          "missing_days",
+          "logged_count",
+          "partial_days"
+        ],
+        "title": "TrendCoverage",
+        "type": "object"
+      },
+      "TrendResult": {
+        "additionalProperties": false,
+        "properties": {
+          "comparison": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PeriodComparison"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/TrendCoverage"
+          },
+          "evidence_refs": {
+            "items": {
+              "$ref": "#/components/schemas/health_api__domain__analytics__EvidenceReference"
+            },
+            "maxItems": 10000,
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "from_date": {
+            "format": "date",
+            "title": "From Date",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean"
+          },
+          "median": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median"
+          },
+          "method_version": {
+            "const": "trend-v1/unit-v1",
+            "title": "Method Version",
+            "type": "string"
+          },
+          "metric": {
+            "pattern": "^(energy|exercise_duration|exercise_distance|sleep_duration|symptom_severity|symptom_episode_count|weight|temperature|systolic_pressure|diastolic_pressure|pulse|tracker:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:[a-z][a-z0-9_]{0,31}:v[1-9][0-9]*)$",
+            "title": "Metric",
+            "type": "string"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/DailyMetricPoint"
+            },
+            "maxItems": 366,
+            "title": "Points",
+            "type": "array"
+          },
+          "rolling_7_known_day_mean": {
+            "items": {
+              "$ref": "#/components/schemas/RollingMeanPoint"
+            },
+            "maxItems": 366,
+            "title": "Rolling 7 Known Day Mean",
+            "type": "array"
+          },
+          "timezone": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Timezone",
+            "type": "string"
+          },
+          "to_date": {
+            "format": "date",
+            "title": "To Date",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "method_version",
+          "metric",
+          "label",
+          "unit",
+          "from_date",
+          "to_date",
+          "timezone",
+          "points",
+          "coverage",
+          "mean",
+          "median",
+          "rolling_7_known_day_mean",
+          "comparison",
+          "evidence_refs"
+        ],
+        "title": "TrendResult",
+        "type": "object"
+      },
       "UTCInstant": {
         "format": "date-time",
         "type": "string"
@@ -6265,6 +7721,47 @@
         },
         "required": ["kind", "label"],
         "title": "WorkoutEventV1",
+        "type": "object"
+      },
+      "health_api__domain__analytics__EvidenceReference": {
+        "additionalProperties": false,
+        "properties": {
+          "object_id": {
+            "format": "uuid",
+            "title": "Object Id",
+            "type": "string"
+          },
+          "object_type": {
+            "enum": ["event", "observation"],
+            "title": "Object Type",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": ["object_id", "revision", "object_type"],
+        "title": "EvidenceReference",
+        "type": "object"
+      },
+      "health_api__domain__proposals__EvidenceReference": {
+        "additionalProperties": false,
+        "properties": {
+          "object_id": {
+            "format": "uuid",
+            "title": "Object Id",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": ["object_id", "revision"],
+        "title": "EvidenceReference",
         "type": "object"
       }
     },
@@ -7204,6 +8701,174 @@
         "tags": ["assistant"]
       }
     },
+    "/analytics/associations/catalog": {
+      "get": {
+        "operationId": "listAnalyticsAssociationPairs",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsAssociationCatalogResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The owner-scoped analytics item was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics item changed or its state conflicts."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics request is invalid or exceeds its bounds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Association Catalog",
+        "tags": ["analytics"]
+      }
+    },
+    "/analytics/catalog": {
+      "get": {
+        "operationId": "listAnalyticsMetrics",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsMetricCatalogResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The owner-scoped analytics item was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics item changed or its state conflicts."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics request is invalid or exceeds its bounds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Analytics Catalog",
+        "tags": ["analytics"]
+      }
+    },
     "/assistant/messages": {
       "post": {
         "operationId": "sendAssistantMessage",
@@ -7310,6 +8975,147 @@
         ],
         "summary": "Assistant Status",
         "tags": ["assistant"]
+      }
+    },
+    "/associations": {
+      "get": {
+        "operationId": "getAssociations",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "pair",
+            "required": true,
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 5,
+              "minItems": 1,
+              "title": "Pair",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "To",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "timezone",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Timezone"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StoredAssociationResponse"
+                  },
+                  "title": "Response Getassociations",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The owner-scoped analytics item was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics item changed or its state conflicts."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics request is invalid or exceeds its bounds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Get Associations",
+        "tags": ["analytics"]
       }
     },
     "/contexts": {
@@ -8669,6 +10475,655 @@
         "tags": ["daily"]
       }
     },
+    "/experiments": {
+      "get": {
+        "operationId": "listExperiments",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "draft",
+                    "active",
+                    "completed",
+                    "stopped",
+                    "archived"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 2048,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The owner-scoped analytics item was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics item changed or its state conflicts."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics request is invalid or exceeds its bounds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Get Experiments",
+        "tags": ["analytics"]
+      },
+      "post": {
+        "operationId": "createExperiment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExperimentCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The owner-scoped analytics item was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics item changed or its state conflicts."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics request is invalid or exceeds its bounds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Post Experiment",
+        "tags": ["analytics"]
+      }
+    },
+    "/experiments/{experiment_id}": {
+      "get": {
+        "operationId": "getExperiment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "experiment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Experiment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The owner-scoped analytics item was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics item changed or its state conflicts."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics request is invalid or exceeds its bounds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Get Experiment",
+        "tags": ["analytics"]
+      },
+      "patch": {
+        "operationId": "updateExperiment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "experiment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Experiment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExperimentUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The owner-scoped analytics item was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics item changed or its state conflicts."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics request is invalid or exceeds its bounds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Patch Experiment",
+        "tags": ["analytics"]
+      }
+    },
+    "/experiments/{experiment_id}/results": {
+      "get": {
+        "operationId": "getExperimentResults",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "experiment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Experiment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "timezone",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Timezone"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentResultResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The owner-scoped analytics item was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics item changed or its state conflicts."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics request is invalid or exceeds its bounds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Get Experiment Results",
+        "tags": ["analytics"]
+      }
+    },
+    "/experiments/{experiment_id}/state": {
+      "patch": {
+        "operationId": "changeExperimentState",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "experiment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Experiment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExperimentStateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The owner-scoped analytics item was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics item changed or its state conflicts."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics request is invalid or exceeds its bounds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Patch Experiment State",
+        "tags": ["analytics"]
+      }
+    },
     "/goals": {
       "get": {
         "operationId": "listGoals",
@@ -9313,6 +11768,434 @@
         },
         "summary": "Healthcheck",
         "tags": ["system"]
+      }
+    },
+    "/insights": {
+      "get": {
+        "operationId": "listInsights",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": ["current", "stale", "dismissed", "expired"],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 2048,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsightListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The owner-scoped analytics item was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics item changed or its state conflicts."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics request is invalid or exceeds its bounds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Get Insights",
+        "tags": ["analytics"]
+      }
+    },
+    "/insights/refresh": {
+      "post": {
+        "operationId": "refreshInsights",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InsightGenerateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsightGenerateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The owner-scoped analytics item was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics item changed or its state conflicts."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics request is invalid or exceeds its bounds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Refresh Insights",
+        "tags": ["analytics"]
+      }
+    },
+    "/insights/{insight_id}": {
+      "get": {
+        "operationId": "getInsight",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "insight_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Insight Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsightResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The owner-scoped analytics item was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics item changed or its state conflicts."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics request is invalid or exceeds its bounds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Get Insight",
+        "tags": ["analytics"]
+      }
+    },
+    "/insights/{insight_id}/state": {
+      "patch": {
+        "operationId": "changeInsightState",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "insight_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Insight Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InsightStateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsightResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The owner-scoped analytics item was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics item changed or its state conflicts."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics request is invalid or exceeds its bounds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Patch Insight State",
+        "tags": ["analytics"]
       }
     },
     "/observations": {
@@ -11764,6 +14647,346 @@
         "tags": ["profile"]
       }
     },
+    "/recommendations": {
+      "get": {
+        "operationId": "listRecommendations",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "proposed",
+                    "accepted",
+                    "dismissed",
+                    "expired",
+                    "stale"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 2048,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The owner-scoped analytics item was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics item changed or its state conflicts."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics request is invalid or exceeds its bounds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Get Recommendations",
+        "tags": ["analytics"]
+      }
+    },
+    "/recommendations/{recommendation_id}": {
+      "get": {
+        "operationId": "getRecommendation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "recommendation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Recommendation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The owner-scoped analytics item was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics item changed or its state conflicts."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics request is invalid or exceeds its bounds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Get Recommendation",
+        "tags": ["analytics"]
+      }
+    },
+    "/recommendations/{recommendation_id}/state": {
+      "patch": {
+        "operationId": "changeRecommendationState",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "recommendation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Recommendation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecommendationStateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The owner-scoped analytics item was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics item changed or its state conflicts."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics request is invalid or exceeds its bounds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Patch Recommendation State",
+        "tags": ["analytics"]
+      }
+    },
     "/regimens": {
       "get": {
         "operationId": "listRegimens",
@@ -13530,6 +16753,140 @@
         ],
         "summary": "Tracker Versions",
         "tags": ["planning"]
+      }
+    },
+    "/trends": {
+      "get": {
+        "operationId": "getTrend",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "metric",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Metric",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "To",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "timezone",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Timezone"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoredTrendResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The owner-scoped analytics item was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics item changed or its state conflicts."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics request is invalid or exceeds its bounds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Get Trend",
+        "tags": ["analytics"]
       }
     }
   }

@@ -28,6 +28,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session
 
+from health_api.application.analytics_service import (
+    AnalyticsValidationError,
+    compute_ai_trend_preview,
+)
 from health_api.application.today_service import owner_today_settings
 from health_api.domain.ai import (
     AIContextEntry,
@@ -584,11 +588,26 @@ def build_ai_context(
         pack.today_summaries = _today_summaries(
             session, owner_id, pack.entries, pack.today_summary_date, timezone
         )
+    if "trends" in request.sections and request.trend_metric is not None:
+        trend_start = pack.today_summary_date - timedelta(days=request.lookback_days)
+        try:
+            pack.trend_summary = compute_ai_trend_preview(
+                session,
+                owner_id,
+                request.trend_metric,
+                trend_start,
+                pack.today_summary_date,
+                timezone,
+            )
+        except AnalyticsValidationError as exc:
+            raise ValueError(str(exc)) from exc
     counts: dict[str, int] = {}
     while True:
         counts.clear()
         for entry in pack.entries:
             counts[entry.object_type] = counts.get(entry.object_type, 0) + 1
+        if pack.trend_summary is not None:
+            counts["trends"] = 1
         pack.included_counts = counts.copy()
         final_size = _set_serialized_size(pack)
         if final_size <= MAX_CONTEXT_BYTES or not pack.entries:
@@ -612,6 +631,8 @@ def build_ai_context(
             )
     if critical_omitted:
         raise ValueError("Eligible safety constraints do not fit in the context preview budget.")
+    if _serialized_size(pack) > MAX_CONTEXT_BYTES:
+        raise ValueError("Trend context does not fit the preview budget; narrow the request.")
     if final_size > MAX_CONTEXT_BYTES:
         raise ValueError("Context preview exceeds the maximum serialized size.")
     pack.omitted_by_budget = max(eligible_total - excluded_eligible_count - len(pack.entries), 0)

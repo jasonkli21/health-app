@@ -11,6 +11,11 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
 from health_api.api.schemas import ErrorResponse, FieldError
+from health_api.application.analytics_service import (
+    AnalyticsConflict,
+    AnalyticsNotFound,
+    AnalyticsValidationError,
+)
 from health_api.application.errors import (
     ActionProposalConflict,
     ActionProposalExpired,
@@ -129,6 +134,22 @@ def _field_errors(errors: Sequence[dict[str, Any]]) -> list[FieldError]:
 
 
 def install_error_handlers(app: FastAPI) -> None:
+    @app.exception_handler(AnalyticsNotFound)
+    async def analytics_not_found_handler(
+        request: Request, _exc: AnalyticsNotFound
+    ) -> JSONResponse:
+        return _error_response(request, 404, "not_found", "Analytics item was not found.")
+
+    @app.exception_handler(AnalyticsConflict)
+    async def analytics_conflict_handler(request: Request, exc: AnalyticsConflict) -> JSONResponse:
+        return _error_response(request, 409, "analytics_conflict", str(exc))
+
+    @app.exception_handler(AnalyticsValidationError)
+    async def analytics_validation_handler(
+        request: Request, exc: AnalyticsValidationError
+    ) -> JSONResponse:
+        return _error_response(request, 422, "analytics_invalid", str(exc))
+
     @app.exception_handler(APIError)
     async def api_error_handler(request: Request, exc: APIError) -> JSONResponse:
         return _error_response(request, exc.status_code, exc.code, exc.message)

@@ -55,7 +55,7 @@ export interface components {
         | "context"
       >;
       schema_version: 1;
-      sections: Array<"entries" | "today_summaries">;
+      sections: Array<"entries" | "today_summaries" | "trends">;
       serialized_bytes: number;
       task: string;
       task_kind:
@@ -68,6 +68,7 @@ export interface components {
       today_summaries: Array<components["schemas"]["MetricSummaryV1"]>;
       today_summary_date: string;
       today_summary_scope: "included_opted_in_entries_only";
+      trend_summary?: components["schemas"]["TrendResult"] | null;
       truncated: boolean;
     };
     AIContextRequest: {
@@ -84,7 +85,7 @@ export interface components {
         | "plan"
         | "context"
       >;
-      sections?: Array<"entries" | "today_summaries">;
+      sections?: Array<"entries" | "today_summaries" | "trends">;
       task: string;
       task_kind?:
         | "general_wellness"
@@ -93,6 +94,7 @@ export interface components {
         | "consequential_medical"
         | "urgent_safety";
       timezone?: string | null;
+      trend_metric?: string | null;
     };
     AIEvidenceReference: {
       object_id: string;
@@ -142,6 +144,24 @@ export interface components {
       valid_from?: string | null;
       valid_to?: string | null;
     };
+    AnalyticsAssociationCatalogResponse: {
+      items: Array<components["schemas"]["AssociationPair"]>;
+    };
+    AnalyticsMetric:
+      | "energy"
+      | "exercise_duration"
+      | "exercise_distance"
+      | "sleep_duration"
+      | "symptom_severity"
+      | "symptom_episode_count"
+      | "weight"
+      | "temperature"
+      | "systolic_pressure"
+      | "diastolic_pressure"
+      | "pulse";
+    AnalyticsMetricCatalogResponse: {
+      items: Array<components["schemas"]["MetricDefinition"]>;
+    };
     AssistantMessageRequest: {
       message: string;
       scope: components["schemas"]["AIContextRequest"];
@@ -170,9 +190,32 @@ export interface components {
         | "health.profile"
         | "health.goals"
         | "health.plans"
+        | "health.trends"
       >;
       enabled: boolean;
       message: string;
+    };
+    AssociationPair: {
+      first: components["schemas"]["AnalyticsMetric"];
+      id: string;
+      lag_days?: 0;
+      second: components["schemas"]["AnalyticsMetric"];
+    };
+    AssociationResult: {
+      calendar_days: number;
+      evidence_refs: Array<
+        components["schemas"]["health_api__domain__analytics__EvidenceReference"]
+      >;
+      from_date: string;
+      limitation?: "Association only; confounding and reporting bias are possible.";
+      method_version: "spearman-sameday-v1";
+      missing_pair_days: number;
+      pair: components["schemas"]["AssociationPair"];
+      paired_days: number;
+      rho: number | null;
+      status: "available" | "insufficient_data" | "constant_series";
+      timezone: string;
+      to_date: string;
     };
     BooleanValue: {
       type: "boolean";
@@ -319,6 +362,14 @@ export interface components {
       observation_id: string;
       role?: "symptom_severity";
     };
+    DailyMetricPoint: {
+      date: string;
+      known_count: number;
+      logged_count: number;
+      partial: boolean;
+      total_count: number;
+      value: number | null;
+    };
     DailyObservationCreateRequest: {
       ai_use_allowed?: boolean;
       id: string;
@@ -413,9 +464,76 @@ export interface components {
       revision: number;
       title: string;
     };
-    EvidenceReference: {
+    "EvidenceReference-Input": {
       object_id: string;
       revision: number;
+    };
+    ExperimentCreateRequest: {
+      experiment: components["schemas"]["ExperimentPayloadV1"];
+      id: string;
+    };
+    ExperimentListResponse: {
+      items: Array<components["schemas"]["ExperimentResponse"]>;
+      next_cursor: string | null;
+    };
+    ExperimentPayloadV1: {
+      baseline_start: string;
+      end_date: string;
+      hypothesis: string;
+      intervention: string;
+      linked_resource?: components["schemas"]["ExperimentReference"] | null;
+      notes?: string;
+      outcome_metric: string;
+      start_date: string;
+      status?: "draft" | "active" | "completed" | "stopped" | "archived";
+    };
+    ExperimentPeriodResult: {
+      from_date: string;
+      known_days: number;
+      mean: number | null;
+      median: number | null;
+      missing_days: number;
+      to_date: string;
+    };
+    ExperimentReference: {
+      object_id: string;
+      object_type: "goal" | "plan" | "tracker_definition";
+      revision: number;
+    };
+    ExperimentResponse: {
+      created_at: string;
+      experiment: components["schemas"]["ExperimentPayloadV1"];
+      id: string;
+      revision: number;
+      source_kind?: "manual";
+      state: "draft" | "active" | "completed" | "stopped" | "archived";
+      title: string;
+      updated_at: string;
+    };
+    ExperimentResult: {
+      baseline: components["schemas"]["ExperimentPeriodResult"];
+      evidence_refs: Array<
+        components["schemas"]["health_api__domain__analytics__EvidenceReference"]
+      >;
+      intervention: components["schemas"]["ExperimentPeriodResult"];
+      limitation?: "Descriptive comparison only; this does not establish causation.";
+      mean_difference: number | null;
+      method_version: "experiment-descriptive-v1/unit-v1";
+      metric: string;
+      timezone: string;
+      unit: string;
+    };
+    ExperimentResultResponse: {
+      experiment: components["schemas"]["ExperimentResponse"];
+      result: components["schemas"]["ExperimentResult"];
+    };
+    ExperimentStateRequest: {
+      expected_revision: number;
+      state: "active" | "completed" | "stopped" | "archived";
+    };
+    ExperimentUpdateRequest: {
+      expected_revision: number;
+      experiment: components["schemas"]["ExperimentPayloadV1"];
     };
     FieldError: {
       field: string;
@@ -491,6 +609,63 @@ export interface components {
       expected_revision: number;
       goal: components["schemas"]["GoalPayloadV1"];
     };
+    health_api__domain__analytics__EvidenceReference: {
+      object_id: string;
+      object_type: "event" | "observation";
+      revision: number;
+    };
+    health_api__domain__proposals__EvidenceReference: {
+      object_id: string;
+      revision: number;
+    };
+    InsightEvidenceReference: {
+      object_id: string;
+      object_type: "derived_signal" | "event" | "observation";
+      revision: number;
+    };
+    InsightGenerateRequest: {
+      association_pairs?: Array<string>;
+      from_date: string;
+      metrics?: Array<string>;
+      timezone: string;
+      to_date: string;
+    };
+    InsightGenerateResponse: {
+      associations: Array<components["schemas"]["StoredAssociationResponse"]>;
+      insights: Array<components["schemas"]["InsightResponse"]>;
+      recommendations: Array<components["schemas"]["RecommendationResponse"]>;
+      signals: Array<components["schemas"]["StoredTrendResponse"]>;
+    };
+    InsightListResponse: {
+      items: Array<components["schemas"]["InsightResponse"]>;
+      next_cursor: string | null;
+    };
+    InsightPayloadV1: {
+      evidence_refs: Array<components["schemas"]["InsightEvidenceReference"]>;
+      expires_at: string;
+      explanation: string;
+      generated_by?: "deterministic";
+      kind: "trend" | "association" | "coverage";
+      method_version: string;
+      state: "current" | "stale" | "dismissed" | "expired";
+      title: string;
+      uncertainty: string;
+      valid_from: string;
+    };
+    InsightResponse: {
+      created_at: string;
+      id: string;
+      insight: components["schemas"]["InsightPayloadV1"];
+      revision: number;
+      source_kind?: "system";
+      state: "current" | "stale" | "dismissed" | "expired";
+      title: string;
+      updated_at: string;
+    };
+    InsightStateRequest: {
+      expected_revision: number;
+      state: "dismissed";
+    };
     InstantTimePoint: {
       occurred_at: components["schemas"]["UTCInstant"];
       precision: "instant";
@@ -540,6 +715,13 @@ export interface components {
     };
     MetadataKey: string;
     MetadataScalar: string | number | number | boolean | null;
+    MetricDefinition: {
+      aggregation: string;
+      label: string;
+      metric: string;
+      minimum_known_days: number;
+      unit: string;
+    };
     MetricKey:
       | "energy"
       | "duration"
@@ -637,12 +819,27 @@ export interface components {
       state: "unknown" | "completed" | "skipped" | "rescheduled";
       timezone: string;
     };
+    PeriodComparison: {
+      after: components["schemas"]["PeriodSummary"];
+      before: components["schemas"]["PeriodSummary"];
+      mean_difference: number | null;
+      percent_change: number | null;
+    };
+    PeriodSummary: {
+      from_date: string;
+      known_days: number;
+      mean: number | null;
+      median: number | null;
+      to_date: string;
+    };
     PlanCreateCommand: {
       action: "plan.create";
       id: string;
       notes?: string | null;
       plan: components["schemas"]["PlanPayloadV1"];
-      reference_revisions?: Array<components["schemas"]["EvidenceReference"]>;
+      reference_revisions?: Array<
+        components["schemas"]["health_api__domain__proposals__EvidenceReference"]
+      >;
     };
     PlanCreateDraft: {
       action: "plan.create";
@@ -721,12 +918,23 @@ export interface components {
       valid_from: string | null;
       valid_to: string | null;
     };
-    PlanUpdateCommand: {
+    "PlanUpdateCommand-Input": {
       action: "plan.update";
       expected_revision: number;
       object_id: string;
       plan: components["schemas"]["PlanPayloadV1"];
-      reference_revisions?: Array<components["schemas"]["EvidenceReference"]>;
+      reference_revisions?: Array<
+        components["schemas"]["EvidenceReference-Input"]
+      >;
+    };
+    "PlanUpdateCommand-Output": {
+      action: "plan.update";
+      expected_revision: number;
+      object_id: string;
+      plan: components["schemas"]["PlanPayloadV1"];
+      reference_revisions?: Array<
+        components["schemas"]["health_api__domain__proposals__EvidenceReference"]
+      >;
     };
     PlanUpdateRequest: {
       ai_use_allowed?: boolean | null;
@@ -902,11 +1110,11 @@ export interface components {
       | components["schemas"]["GoalCreateCommand"]
       | components["schemas"]["GoalUpdateCommand"]
       | components["schemas"]["PlanCreateCommand"]
-      | components["schemas"]["PlanUpdateCommand"]
+      | components["schemas"]["PlanUpdateCommand-Output"]
       | components["schemas"]["TrackerCreateCommand"];
     ProposalCreateRequest: {
       commands: Array<components["schemas"]["ProposalDraftCommand"]>;
-      evidence_refs?: Array<components["schemas"]["EvidenceReference"]>;
+      evidence_refs?: Array<components["schemas"]["EvidenceReference-Input"]>;
       id: string;
       rationale?: string;
     };
@@ -917,11 +1125,11 @@ export interface components {
       | components["schemas"]["GoalCreateDraft"]
       | components["schemas"]["GoalUpdateCommand"]
       | components["schemas"]["PlanCreateDraft"]
-      | components["schemas"]["PlanUpdateCommand"]
+      | components["schemas"]["PlanUpdateCommand-Input"]
       | components["schemas"]["TrackerCreateDraft"];
     ProposalEditRequest: {
       commands: Array<components["schemas"]["ProposalDraftCommand"]>;
-      evidence_refs?: Array<components["schemas"]["EvidenceReference"]>;
+      evidence_refs?: Array<components["schemas"]["EvidenceReference-Input"]>;
       expected_revision: number;
       rationale?: string;
     };
@@ -998,6 +1206,37 @@ export interface components {
       unit: components["schemas"]["ProfileUnit"];
       value: components["schemas"]["FiniteProfileNumber"];
     };
+    RecommendationListResponse: {
+      items: Array<components["schemas"]["RecommendationResponse"]>;
+      next_cursor: string | null;
+    };
+    RecommendationPayloadV1: {
+      created_at: string;
+      evidence_refs: Array<components["schemas"]["InsightEvidenceReference"]>;
+      expected_review_context: string;
+      expires_at: string;
+      generated_by?: "deterministic";
+      proposal_id?: null;
+      rationale: string;
+      risk_class: "low";
+      state: "proposed" | "accepted" | "dismissed" | "expired" | "stale";
+      suggestion: string;
+      title: string;
+    };
+    RecommendationResponse: {
+      created_at: string;
+      id: string;
+      recommendation: components["schemas"]["RecommendationPayloadV1"];
+      revision: number;
+      source_kind?: "system";
+      state: "proposed" | "accepted" | "dismissed" | "expired" | "stale";
+      title: string;
+      updated_at: string;
+    };
+    RecommendationStateRequest: {
+      expected_revision: number;
+      state: "accepted" | "dismissed";
+    };
     RegimenCreateRequest: {
       ai_use_allowed?: boolean;
       cross_domain_use_allowed?: boolean;
@@ -1043,6 +1282,11 @@ export interface components {
       expected_revision: number;
       regimen: components["schemas"]["RegimenPayloadV1"];
     };
+    RollingMeanPoint: {
+      date: string;
+      known_days?: 7;
+      mean: number;
+    };
     ScheduleDefinitionV1: {
       end_date?: string | null;
       interval?: number;
@@ -1068,6 +1312,20 @@ export interface components {
       kind: "sleep";
       label?: string;
       quality?: number | null;
+    };
+    StoredAssociationResponse: {
+      id: string;
+      result: components["schemas"]["AssociationResult"];
+      revision: number;
+      source_kind?: "system";
+      state: "current" | "stale";
+    };
+    StoredTrendResponse: {
+      id: string;
+      result: components["schemas"]["TrendResult"];
+      revision: number;
+      source_kind?: "system";
+      state: "current" | "stale";
     };
     SymptomEventV1: {
       kind: "symptom";
@@ -1186,6 +1444,33 @@ export interface components {
       cross_domain_use_allowed?: boolean | null;
       definition: components["schemas"]["TrackerDefinitionV1"];
       expected_revision: number;
+    };
+    TrendCoverage: {
+      calendar_days: number;
+      known_days: number;
+      logged_count: number;
+      missing_days: number;
+      partial_days: number;
+    };
+    TrendResult: {
+      comparison: components["schemas"]["PeriodComparison"] | null;
+      coverage: components["schemas"]["TrendCoverage"];
+      evidence_refs: Array<
+        components["schemas"]["health_api__domain__analytics__EvidenceReference"]
+      >;
+      from_date: string;
+      label: string;
+      mean: number | null;
+      median: number | null;
+      method_version: "trend-v1/unit-v1";
+      metric: string;
+      points: Array<components["schemas"]["DailyMetricPoint"]>;
+      rolling_7_known_day_mean: Array<
+        components["schemas"]["RollingMeanPoint"]
+      >;
+      timezone: string;
+      to_date: string;
+      unit: string;
     };
     UTCInstant: string;
     WorkoutEventV1: {
@@ -1340,6 +1625,51 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  changeExperimentState: {
+    path: {
+      experiment_id: string;
+    };
+    requestBody: components["schemas"]["ExperimentStateRequest"];
+    responses: {
+      "200": components["schemas"]["ExperimentResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  changeInsightState: {
+    path: {
+      insight_id: string;
+    };
+    requestBody: components["schemas"]["InsightStateRequest"];
+    responses: {
+      "200": components["schemas"]["InsightResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  changeRecommendationState: {
+    path: {
+      recommendation_id: string;
+    };
+    requestBody: components["schemas"]["RecommendationStateRequest"];
+    responses: {
+      "200": components["schemas"]["RecommendationResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   createActionProposal: {
     requestBody: components["schemas"]["ProposalCreateRequest"];
     responses: {
@@ -1382,6 +1712,18 @@ export interface operations {
       "200": components["schemas"]["DailyEventResponse"];
       "201": components["schemas"]["DailyEventResponse"];
       "401": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  createExperiment: {
+    requestBody: components["schemas"]["ExperimentCreateRequest"];
+    responses: {
+      "201": components["schemas"]["ExperimentResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
       "409": components["schemas"]["ErrorResponse"];
       "413": components["schemas"]["ErrorResponse"];
       "422": components["schemas"]["ErrorResponse"];
@@ -1516,6 +1858,23 @@ export interface operations {
       "401": components["schemas"]["ErrorResponse"];
     };
   };
+  getAssociations: {
+    query: {
+      pair: Array<string>;
+      from: string;
+      to: string;
+      timezone?: string | null;
+    };
+    responses: {
+      "200": Array<components["schemas"]["StoredAssociationResponse"]>;
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   getContext: {
     path: {
       context_id: string;
@@ -1541,6 +1900,37 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  getExperiment: {
+    path: {
+      experiment_id: string;
+    };
+    responses: {
+      "200": components["schemas"]["ExperimentResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  getExperimentResults: {
+    path: {
+      experiment_id: string;
+    };
+    query?: {
+      timezone?: string | null;
+    };
+    responses: {
+      "200": components["schemas"]["ExperimentResultResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   getGoal: {
     path: {
       goal_id: string;
@@ -1548,6 +1938,20 @@ export interface operations {
     responses: {
       "200": components["schemas"]["GoalResponse"];
       "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  getInsight: {
+    path: {
+      insight_id: string;
+    };
+    responses: {
+      "200": components["schemas"]["InsightResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
       "413": components["schemas"]["ErrorResponse"];
       "422": components["schemas"]["ErrorResponse"];
       "503": components["schemas"]["ErrorResponse"];
@@ -1604,6 +2008,20 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  getRecommendation: {
+    path: {
+      recommendation_id: string;
+    };
+    responses: {
+      "200": components["schemas"]["RecommendationResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   getRegimen: {
     path: {
       regimen_id: string;
@@ -1655,6 +2073,23 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  getTrend: {
+    query: {
+      metric: string;
+      from: string;
+      to: string;
+      timezone?: string | null;
+    };
+    responses: {
+      "200": components["schemas"]["StoredTrendResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   healthcheck: {
     responses: {
       "200": {
@@ -1699,6 +2134,28 @@ export interface operations {
       "404": components["schemas"]["ErrorResponse"];
       "409": components["schemas"]["ErrorResponse"];
       "410": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  listAnalyticsAssociationPairs: {
+    responses: {
+      "200": components["schemas"]["AnalyticsAssociationCatalogResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  listAnalyticsMetrics: {
+    responses: {
+      "200": components["schemas"]["AnalyticsMetricCatalogResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
       "413": components["schemas"]["ErrorResponse"];
       "422": components["schemas"]["ErrorResponse"];
       "503": components["schemas"]["ErrorResponse"];
@@ -1768,6 +2225,22 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  listExperiments: {
+    query?: {
+      state?: "draft" | "active" | "completed" | "stopped" | "archived" | null;
+      limit?: number;
+      cursor?: string | null;
+    };
+    responses: {
+      "200": components["schemas"]["ExperimentListResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   listGoalHistory: {
     path: {
       goal_id: string;
@@ -1794,6 +2267,22 @@ export interface operations {
     responses: {
       "200": components["schemas"]["PlanningListResponse"];
       "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  listInsights: {
+    query?: {
+      state?: "current" | "stale" | "dismissed" | "expired" | null;
+      limit?: number;
+      cursor?: string | null;
+    };
+    responses: {
+      "200": components["schemas"]["InsightListResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
       "413": components["schemas"]["ErrorResponse"];
       "422": components["schemas"]["ErrorResponse"];
       "503": components["schemas"]["ErrorResponse"];
@@ -1928,6 +2417,28 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  listRecommendations: {
+    query?: {
+      state?:
+        | "proposed"
+        | "accepted"
+        | "dismissed"
+        | "expired"
+        | "stale"
+        | null;
+      limit?: number;
+      cursor?: string | null;
+    };
+    responses: {
+      "200": components["schemas"]["RecommendationListResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   listRegimenHistory: {
     path: {
       regimen_id: string;
@@ -2027,6 +2538,18 @@ export interface operations {
     responses: {
       "200": components["schemas"]["AIContextPack"];
       "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  refreshInsights: {
+    requestBody: components["schemas"]["InsightGenerateRequest"];
+    responses: {
+      "201": components["schemas"]["InsightGenerateResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
       "413": components["schemas"]["ErrorResponse"];
       "422": components["schemas"]["ErrorResponse"];
       "503": components["schemas"]["ErrorResponse"];
@@ -2158,6 +2681,21 @@ export interface operations {
     requestBody: components["schemas"]["DailyEventUpdateRequest"];
     responses: {
       "200": components["schemas"]["DailyEventResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  updateExperiment: {
+    path: {
+      experiment_id: string;
+    };
+    requestBody: components["schemas"]["ExperimentUpdateRequest"];
+    responses: {
+      "200": components["schemas"]["ExperimentResponse"];
       "401": components["schemas"]["ErrorResponse"];
       "404": components["schemas"]["ErrorResponse"];
       "409": components["schemas"]["ErrorResponse"];
@@ -2403,6 +2941,42 @@ export class HealthApiClient {
     );
   }
 
+  async changeExperimentState(
+    path: operations["changeExperimentState"]["path"],
+    requestBody: operations["changeExperimentState"]["requestBody"],
+  ): Promise<components["schemas"]["ExperimentResponse"]> {
+    return this.request<components["schemas"]["ExperimentResponse"]>(
+      "PATCH",
+      `/experiments/${encodeURIComponent(path.experiment_id)}/state`,
+      undefined,
+      requestBody,
+    );
+  }
+
+  async changeInsightState(
+    path: operations["changeInsightState"]["path"],
+    requestBody: operations["changeInsightState"]["requestBody"],
+  ): Promise<components["schemas"]["InsightResponse"]> {
+    return this.request<components["schemas"]["InsightResponse"]>(
+      "PATCH",
+      `/insights/${encodeURIComponent(path.insight_id)}/state`,
+      undefined,
+      requestBody,
+    );
+  }
+
+  async changeRecommendationState(
+    path: operations["changeRecommendationState"]["path"],
+    requestBody: operations["changeRecommendationState"]["requestBody"],
+  ): Promise<components["schemas"]["RecommendationResponse"]> {
+    return this.request<components["schemas"]["RecommendationResponse"]>(
+      "PATCH",
+      `/recommendations/${encodeURIComponent(path.recommendation_id)}/state`,
+      undefined,
+      requestBody,
+    );
+  }
+
   async createActionProposal(
     requestBody: operations["createActionProposal"]["requestBody"],
   ): Promise<components["schemas"]["ProposalState"]> {
@@ -2442,6 +3016,17 @@ export class HealthApiClient {
     return this.request<components["schemas"]["DailyEventResponse"]>(
       "POST",
       `/events`,
+      undefined,
+      requestBody,
+    );
+  }
+
+  async createExperiment(
+    requestBody: operations["createExperiment"]["requestBody"],
+  ): Promise<components["schemas"]["ExperimentResponse"]> {
+    return this.request<components["schemas"]["ExperimentResponse"]>(
+      "POST",
+      `/experiments`,
       undefined,
       requestBody,
     );
@@ -2571,6 +3156,14 @@ export class HealthApiClient {
     );
   }
 
+  async getAssociations(
+    query: operations["getAssociations"]["query"],
+  ): Promise<Array<components["schemas"]["StoredAssociationResponse"]>> {
+    return this.request<
+      Array<components["schemas"]["StoredAssociationResponse"]>
+    >("GET", `/associations`, query, undefined);
+  }
+
   async getContext(
     path: operations["getContext"]["path"],
   ): Promise<components["schemas"]["ContextResponse"]> {
@@ -2593,12 +3186,46 @@ export class HealthApiClient {
     );
   }
 
+  async getExperiment(
+    path: operations["getExperiment"]["path"],
+  ): Promise<components["schemas"]["ExperimentResponse"]> {
+    return this.request<components["schemas"]["ExperimentResponse"]>(
+      "GET",
+      `/experiments/${encodeURIComponent(path.experiment_id)}`,
+      undefined,
+      undefined,
+    );
+  }
+
+  async getExperimentResults(
+    path: operations["getExperimentResults"]["path"],
+    query?: operations["getExperimentResults"]["query"],
+  ): Promise<components["schemas"]["ExperimentResultResponse"]> {
+    return this.request<components["schemas"]["ExperimentResultResponse"]>(
+      "GET",
+      `/experiments/${encodeURIComponent(path.experiment_id)}/results`,
+      query,
+      undefined,
+    );
+  }
+
   async getGoal(
     path: operations["getGoal"]["path"],
   ): Promise<components["schemas"]["GoalResponse"]> {
     return this.request<components["schemas"]["GoalResponse"]>(
       "GET",
       `/goals/${encodeURIComponent(path.goal_id)}`,
+      undefined,
+      undefined,
+    );
+  }
+
+  async getInsight(
+    path: operations["getInsight"]["path"],
+  ): Promise<components["schemas"]["InsightResponse"]> {
+    return this.request<components["schemas"]["InsightResponse"]>(
+      "GET",
+      `/insights/${encodeURIComponent(path.insight_id)}`,
       undefined,
       undefined,
     );
@@ -2648,6 +3275,17 @@ export class HealthApiClient {
     );
   }
 
+  async getRecommendation(
+    path: operations["getRecommendation"]["path"],
+  ): Promise<components["schemas"]["RecommendationResponse"]> {
+    return this.request<components["schemas"]["RecommendationResponse"]>(
+      "GET",
+      `/recommendations/${encodeURIComponent(path.recommendation_id)}`,
+      undefined,
+      undefined,
+    );
+  }
+
   async getRegimen(
     path: operations["getRegimen"]["path"],
   ): Promise<components["schemas"]["RegimenResponse"]> {
@@ -2692,6 +3330,17 @@ export class HealthApiClient {
     );
   }
 
+  async getTrend(
+    query: operations["getTrend"]["query"],
+  ): Promise<components["schemas"]["StoredTrendResponse"]> {
+    return this.request<components["schemas"]["StoredTrendResponse"]>(
+      "GET",
+      `/trends`,
+      query,
+      undefined,
+    );
+  }
+
   async healthcheck(): Promise<{
     [key: string]: string;
   }> {
@@ -2721,6 +3370,22 @@ export class HealthApiClient {
       query,
       undefined,
     );
+  }
+
+  async listAnalyticsAssociationPairs(): Promise<
+    components["schemas"]["AnalyticsAssociationCatalogResponse"]
+  > {
+    return this.request<
+      components["schemas"]["AnalyticsAssociationCatalogResponse"]
+    >("GET", `/analytics/associations/catalog`, undefined, undefined);
+  }
+
+  async listAnalyticsMetrics(): Promise<
+    components["schemas"]["AnalyticsMetricCatalogResponse"]
+  > {
+    return this.request<
+      components["schemas"]["AnalyticsMetricCatalogResponse"]
+    >("GET", `/analytics/catalog`, undefined, undefined);
   }
 
   async listContextHistory(
@@ -2769,6 +3434,17 @@ export class HealthApiClient {
     );
   }
 
+  async listExperiments(
+    query?: operations["listExperiments"]["query"],
+  ): Promise<components["schemas"]["ExperimentListResponse"]> {
+    return this.request<components["schemas"]["ExperimentListResponse"]>(
+      "GET",
+      `/experiments`,
+      query,
+      undefined,
+    );
+  }
+
   async listGoalHistory(
     path: operations["listGoalHistory"]["path"],
     query?: operations["listGoalHistory"]["query"],
@@ -2787,6 +3463,17 @@ export class HealthApiClient {
     return this.request<components["schemas"]["PlanningListResponse"]>(
       "GET",
       `/goals`,
+      query,
+      undefined,
+    );
+  }
+
+  async listInsights(
+    query?: operations["listInsights"]["query"],
+  ): Promise<components["schemas"]["InsightListResponse"]> {
+    return this.request<components["schemas"]["InsightListResponse"]>(
+      "GET",
+      `/insights`,
       query,
       undefined,
     );
@@ -2885,6 +3572,17 @@ export class HealthApiClient {
     );
   }
 
+  async listRecommendations(
+    query?: operations["listRecommendations"]["query"],
+  ): Promise<components["schemas"]["RecommendationListResponse"]> {
+    return this.request<components["schemas"]["RecommendationListResponse"]>(
+      "GET",
+      `/recommendations`,
+      query,
+      undefined,
+    );
+  }
+
   async listRegimenHistory(
     path: operations["listRegimenHistory"]["path"],
     query?: operations["listRegimenHistory"]["query"],
@@ -2963,6 +3661,17 @@ export class HealthApiClient {
     return this.request<components["schemas"]["AIContextPack"]>(
       "POST",
       `/ai/context`,
+      undefined,
+      requestBody,
+    );
+  }
+
+  async refreshInsights(
+    requestBody: operations["refreshInsights"]["requestBody"],
+  ): Promise<components["schemas"]["InsightGenerateResponse"]> {
+    return this.request<components["schemas"]["InsightGenerateResponse"]>(
+      "POST",
+      `/insights/refresh`,
       undefined,
       requestBody,
     );
@@ -3081,6 +3790,18 @@ export class HealthApiClient {
     return this.request<components["schemas"]["DailyEventResponse"]>(
       "PATCH",
       `/events/${encodeURIComponent(path.event_id)}`,
+      undefined,
+      requestBody,
+    );
+  }
+
+  async updateExperiment(
+    path: operations["updateExperiment"]["path"],
+    requestBody: operations["updateExperiment"]["requestBody"],
+  ): Promise<components["schemas"]["ExperimentResponse"]> {
+    return this.request<components["schemas"]["ExperimentResponse"]>(
+      "PATCH",
+      `/experiments/${encodeURIComponent(path.experiment_id)}`,
       undefined,
       requestBody,
     );

@@ -34,3 +34,14 @@ count, evidence, revision, expiry, and confirmation bounds. Proposal commands
 reuse the existing Profile, Event/Observation, goal, plan, and tracker schemas;
 they are never generic JSON patches. Permission changes and destructive
 commands are outside this registry.
+
+`analytics.py` freezes the Phase 7 metric catalog, derived result schemas, and
+method versions. `trend-v1/unit-v1` reuses `summarize_today` and its `unit-v1`
+conversions, retains nulls for missing days, labels rolling means over seven
+known samples, and compares calendar-window halves only with five known days in
+each. `spearman-sameday-v1` uses average ranks for ties and same-day lag 0 for
+five predefined pairs; it requires 14 paired days over at least 21 calendar
+days and reports constant/insufficient data without a statistic. Numerical
+tracker analysis is limited to number/quantity fields and an exact immutable
+schema version. These are descriptive software methods, not clinical
+thresholds or causal estimates.

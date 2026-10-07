@@ -45,3 +45,18 @@ the external Personal AI identity, delegation, callback, and retention
 contract is reviewed. Focused API coverage lives in
 `services/api/tests/test_ai_context_api.py`; PostgreSQL-specific cases still
 require the documented disposable test database.
+
+`analytics_service.py` loads owner-scoped active Event/Observation inputs once
+per multi-metric request, with a 366-day window, 10,000 total source-row cap,
+and PostgreSQL statement timeout. It delegates daily units/time overlap to the
+Phase 2 rollup, persists signals and user-reviewed artifacts in the canonical
+Health object/history system, and links exact source revisions through
+`analytics_evidence`. Daily edits and archives invalidate dependent snapshots
+inside their write transaction; new daily input conservatively stales current
+analytics so an on-demand recompute cannot miss it. Insight/recommendation
+expiry is enforced on reads and actions. Recommendation acceptance records
+interest only; the sole v1 suggestion is to continue logging and creates no
+health write or action proposal. Experiments are user-authored, revisioned,
+editable as drafts; once started, the outcome design stays fixed while notes
+remain editable. Starting requires a known baseline value. Lifecycle changes
+are manual, and results are descriptive baseline/intervention summaries.

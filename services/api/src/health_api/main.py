@@ -10,6 +10,7 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from health_api.api.ai import router as ai_router
+from health_api.api.analytics import router as analytics_router
 from health_api.api.daily import router as daily_router
 from health_api.api.errors import install_error_handlers
 from health_api.api.middleware import RequestBoundaryMiddleware
@@ -79,6 +80,7 @@ def create_app(
     app.include_router(planning_router)
     app.include_router(ai_router)
     app.include_router(proposals_router)
+    app.include_router(analytics_router)
 
     @app.get("/healthz", tags=["system"], operation_id="healthcheck")
     def healthcheck() -> dict[str, str]:

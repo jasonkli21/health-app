@@ -44,6 +44,13 @@ export default function HomeScreen() {
         <Link
           accessibilityRole="button"
           style={styles.secondaryLink}
+          href="/insights"
+        >
+          Open Insights
+        </Link>
+        <Link
+          accessibilityRole="button"
+          style={styles.secondaryLink}
           href="/add"
         >
           Add an entry

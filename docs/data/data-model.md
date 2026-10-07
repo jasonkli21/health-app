@@ -82,6 +82,37 @@ permission-grant, or arbitrary patch commands. Provider messaging and
 AI-originated proposals must remain disabled until the actual
 identity/delegation/tool contract is reviewed.
 
+## Phase 7 analytical artifacts
+
+Derived signals, insights, recommendations, and manual experiments use the
+canonical `health_objects` envelope with the `analytics` domain and typed
+`analytics_artifacts` rows. `analytics_evidence` links each artifact to exact
+owner/object/revision history rows, including derived-signal revisions cited
+by insights and recommendations. Foreign keys retain historical evidence;
+source edits or archives advance the affected artifact revision and mark its
+current dependents stale rather than rewriting their former explanation.
+
+`trend-v1/unit-v1` reuses Phase 2 unit conversion and local-day overlap rules.
+Its response has one row for every selected calendar date, with null for a day
+without a known value, explicit coverage, median/mean, and a rolling mean over
+seven known samples. The optional half-window comparison requires five known
+days in both halves. Predefined same-day association pairs use
+`spearman-sameday-v1`, deterministic average ranks for ties, and the stated
+14-pair/21-calendar-day display gate; they do not compute significance or
+causality. Custom tracker numeric and quantity fields use an ID containing the
+tracker UUID, field ID, and immutable schema version. Boolean, enum, text, and
+date fields are not analyzed.
+
+Experiments are user-authored analytics objects. Drafts may be edited; starting
+and terminal transitions are manual and revisioned. Starting requires at least
+one known baseline value in the owner's local timezone and rechecks the daily
+generation before committing the start. A result reports its requested
+timezone, known and missing days, and baseline/intervention means, with no
+causal claim. Optional links retain a specific owner planning-resource
+revision. HealthKit imports do not exist yet; Phase 8 ingestion must call the
+analytics invalidation hook in the same owner transaction when it changes
+canonical daily data.
+
 ## Phase 1 Profile v1 contract
 
 Phase 1 registers only `profile_item` schema version 1. Its payload has `kind`, `category`, stable lower-case `key`, display `label`, and a required `value`. A JSON `null` value means unknown. Tagged values are `text`, `boolean`, finite `number`, finite `quantity` with a supported unit, and a bounded `text_list`. `false` and `0` remain known values. Extra payload fields and unregistered type/version pairs are rejected. Category and kind must agree: fact/background, constraint/constraints, preference/preferences.
