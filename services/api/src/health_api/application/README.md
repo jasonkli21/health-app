@@ -64,8 +64,11 @@ are manual, and results are descriptive baseline/intervention summaries.
 `healthkit_import_service.py` validates one bounded type-specific batch before
 entering an owner-locked unit of work. Batch receipts and canonical daily
 Event/Observation writes commit together; source identities make retries and
-changed samples deterministic. Device imports stay unconfirmed and AI use
-disabled. Tombstones archive only unchanged device-origin rows, so a manual
-correction survives later reads/deletions. Daily writes call the shared
-analytics invalidation path, and aggregate source-selection changes invalidate
-derived results in the same transaction.
+changed samples deterministic. Aggregate revisions reject stale updates and
+allow recomputation only after a newer revision follows deletion. Sample
+tombstones persist even before a sample is first imported. Device imports stay
+unconfirmed and AI use disabled; user archives and manual corrections remain
+protected from source updates. Shared daily rollups apply the same aggregate,
+sleep, and manual-precedence rules to Today, analytics, and consent-filtered
+context. Today holds a shared owner lock across cursor validation and snapshot
+loading while preference changes take the conflicting update lock.

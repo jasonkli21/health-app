@@ -69,6 +69,7 @@ describe("HealthKit normalization", () => {
       installationId: "4bcf0eac-f815-4a88-bb6d-d10c477b8eab",
       count: 8000,
       methodVersion: "hk-steps-source-v1",
+      sourceRevision: 1,
     });
     const heartRate = mapHeartRateSummary({
       localDate: "2026-10-01",
@@ -81,6 +82,7 @@ describe("HealthKit normalization", () => {
       coverageStart: "2026-10-01T08:00:00Z",
       coverageEnd: "2026-10-01T22:00:00Z",
       methodVersion: "hk-heart-rate-v1",
+      sourceRevision: 1,
     });
     expect(steps.sourceSampleId).toContain("daily:2026-10-01");
     expect(observationValue(steps.record)).toMatchObject({
@@ -96,6 +98,21 @@ describe("HealthKit normalization", () => {
     expect(JSON.stringify(toImportEntry(heartRate))).not.toContain(
       "raw_samples",
     );
+  });
+
+  it("rejects invalid or unbounded step aggregates before upload", () => {
+    const aggregate = {
+      localDate: "2026-10-01",
+      timezone: "UTC",
+      count: 10,
+      installationId: "4bcf0eac-f815-4a88-bb6d-d10c477b8eab",
+      methodVersion: "hk-steps-source-v1",
+      sourceRevision: 1,
+    };
+    expect(() => mapSteps({ ...aggregate, count: Number.NaN })).toThrow(
+      /bounded/,
+    );
+    expect(() => mapSteps({ ...aggregate, count: 1e301 })).toThrow(/bounded/);
   });
 
   it("maps weight to the original supported unit", () => {

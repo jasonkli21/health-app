@@ -26,6 +26,66 @@ installation/date/timezone/policy scoped; an owner preference selects one
 installation for analytics. PostgreSQL concurrency and device behavior remain
 acceptance gates, not claims from mocks or offline generation.
 
+### Independent-review reconciliation — October 7, 2026
+
+The independent review found that the initial implementation does not yet
+meet the local correctness gate. The follow-up keeps native HealthKit disabled
+and adopts these contract rules before the fixes:
+
+- Sleep summary method `sleep-segment-selected-v1` partitions intervals at
+  their boundaries, excludes `awake` segments, prefers detailed stage records
+  over generic sleep intervals, and counts each covered instant at most once.
+  Among equally specific competing sources, a stable source/object ordering
+  selects one. Manual sleep intervals remain generic asleep intervals unless a
+  detailed stage covers the same time. History and source records are retained.
+- Every steps or heart-rate-summary entry and aggregate tombstone carries a
+  positive JavaScript-safe integer `source_revision` (at most
+  `9,007,199,254,740,991`), monotonically increasing per installation,
+  resource type, and local date across timezone variants. A changed payload at
+  the same revision conflicts; lower revisions are stale and ignored; a
+  greater revision can update or recompute a deleted daily aggregate. Receipts
+  still provide batch-ID retry idempotency. This is client-reported ordering,
+  not device-authenticated freshness.
+- Aggregate identity continues to retain timezone. For a preferred
+  installation, summaries choose one timezone variant per local date by
+  greatest source revision, then lexicographically by timezone and source ID.
+  Heart-rate summaries additionally select non-overlapping coverage windows
+  by greatest source revision, then stable coverage start and object ID.
+  Manual-confirmed corrections take precedence over device preference for the
+  same metric/day. Timeline visibility is independent of aggregate selection.
+  AI summary selection runs only over entries that already passed item-level
+  permission and scope filtering.
+- Unknown sample tombstones persist an owner/type/source identity without a
+  fabricated health object. Sample tombstones are terminal. Aggregate
+  tombstones retain a recomputable identity and require a newer source revision
+  for later data. User-archived imports remain inactive; later source changes
+  or deletions are idempotently recorded and never restore the row or abort an
+  otherwise valid batch.
+- Confirmed manual observations win only exact metric/instant ties; later
+  samples continue to win by time. Editing an aggregate produces a manual
+  representative regardless of device preference and does not add its value
+  to another aggregate for that day.
+- SecureStore keys encode each arbitrary owner/scope component as fixed-width
+  UTF-16 hexadecimal, using only the supported key alphabet. The coordinator
+  binds work to the authenticated session epoch and current type consent,
+  checks the anchor it prepared from, serializes by owner/installation/type/
+  policy, and blocks new work in that scope until an acknowledged checkpoint
+  is durably recovered.
+- The public Observation contract bounds step counts at `1e300` and requires
+  date-only time for steps. HealthKit workout imports require an end or an
+  explicit duration; imported weight and resting-heart-rate samples are exact
+  instants without intervals. The general manual workout contract remains
+  unchanged.
+- Today reads hold a shared owner lock through cursor validation and snapshot
+  loading. Preference writes already take the conflicting owner update lock,
+  so a page set observes one selection generation or receives the existing
+  `422 invalid_cursor` contract and restarts.
+
+The changes to source revision, tombstone shape, and selection semantics are
+additive schema/API changes and must be reflected in migration, OpenAPI, client,
+release evidence, and Phase 9 erasure requirements. PostgreSQL-backed races and
+native/device behavior remain distinct acceptance gates.
+
 ## User outcome / scope
 
 **Deliver:** optional, user-controlled first-wave import of workouts, sleep, steps, weight, resting heart rate and heart-rate summaries. Fine-grained type selection, source/provenance, selective retention, dedupe, correction/deletion processing, checkpoints and Today/Insights integration.

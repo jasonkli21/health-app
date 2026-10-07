@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
+from itertools import pairwise
 from math import fsum, isfinite
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -48,6 +51,168 @@ class MetricSummaryV1(StrictModel):
     partial: bool
 
 
+@dataclass(frozen=True)
+class DailyProvenance:
+    """Minimal source details needed to select safe daily representatives."""
+
+    source_kind: str | None = None
+    confirmation_status: str | None = None
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+    revision: int = 1
+
+
+def _healthkit_aggregate_selection(
+    rows: list[tuple[UUID, ObservationSchemaV1]],
+    provenance: Mapping[UUID, DailyProvenance],
+    preferred_installations: Mapping[str, UUID],
+) -> set[UUID]:
+    """Choose one permitted imported aggregate per metric/day/window."""
+    selected: set[UUID] = set()
+    for resource_type, metric in (
+        ("steps", MetricKey.STEPS),
+        ("heart_rate_summary", MetricKey.HEART_RATE_SUMMARY),
+    ):
+        candidates: list[tuple[UUID, ObservationSchemaV1, DailyProvenance]] = []
+        for object_id, observation in rows:
+            source = provenance.get(object_id)
+            if (
+                source is not None
+                and source.metadata.get("healthkit_resource_type") == resource_type
+                and observation.payload.value.metric == metric
+            ):
+                candidates.append((object_id, observation, source))
+        if not candidates:
+            continue
+
+        by_day: dict[date, list[tuple[UUID, ObservationSchemaV1, DailyProvenance]]] = defaultdict(
+            list
+        )
+        for row in candidates:
+            if isinstance(row[1].time, DateOnlyTimePoint):
+                by_day[row[1].time.local_date].append(row)
+
+        day_representatives: list[tuple[UUID, ObservationSchemaV1, DailyProvenance]] = []
+        for variants in by_day.values():
+            corrections = [
+                row
+                for row in variants
+                if row[2].source_kind == "manual" and row[2].confirmation_status == "user_confirmed"
+            ]
+            if corrections:
+                # A deliberate edit to an imported aggregate remains the one
+                # analytical value for its local day, independent of device choice.
+                winner = max(corrections, key=lambda row: (row[2].revision, str(row[0])))
+            else:
+                preferred = preferred_installations.get(resource_type)
+                eligible = (
+                    [
+                        row
+                        for row in variants
+                        if row[2].metadata.get("healthkit_device_installation_id") == str(preferred)
+                    ]
+                    if preferred is not None
+                    else []
+                )
+                if not eligible:
+                    continue
+                winner = min(
+                    eligible,
+                    key=lambda row: (
+                        -int(row[2].metadata.get("healthkit_source_revision", 0)),
+                        row[1].time.timezone if isinstance(row[1].time, DateOnlyTimePoint) else "",
+                        str(row[0]),
+                    ),
+                )
+            day_representatives.append(winner)
+
+        if resource_type == "heart_rate_summary":
+            # A daily summary is indivisible. If timezone changes produced
+            # overlapping windows, keep the newest whole window and omit the
+            # overlapping older summary instead of adding both.
+            ranked = sorted(
+                day_representatives,
+                key=lambda row: (
+                    -int(row[2].metadata.get("healthkit_source_revision", 0)),
+                    str(row[2].metadata.get("healthkit_coverage_start", "")),
+                    str(row[0]),
+                ),
+            )
+            accepted_windows: list[tuple[datetime, datetime]] = []
+            for object_id, _, source in ranked:
+                start_raw = source.metadata.get("healthkit_coverage_start")
+                end_raw = source.metadata.get("healthkit_coverage_end")
+                if not isinstance(start_raw, str) or not isinstance(end_raw, str):
+                    # Non-HealthKit observations do not enter this candidate
+                    # set; imported summaries require validated coverage.
+                    continue
+                try:
+                    start = datetime.fromisoformat(start_raw)
+                    end = datetime.fromisoformat(end_raw)
+                except ValueError:
+                    continue
+                if any(
+                    start < existing_end and end > existing_start
+                    for existing_start, existing_end in accepted_windows
+                ):
+                    continue
+                accepted_windows.append((start, end))
+                selected.add(object_id)
+        else:
+            selected.update(row[0] for row in day_representatives)
+    return selected
+
+
+def _sleep_duration_minutes(
+    rows: list[tuple[UUID, EventSchemaV1]],
+    provenance: Mapping[UUID, DailyProvenance],
+    day_start: datetime,
+    day_end: datetime,
+) -> float | None:
+    intervals: list[tuple[UUID, datetime, datetime, str | None, DailyProvenance | None]] = []
+    boundaries: set[datetime] = set()
+    for object_id, event in rows:
+        if event.ended_at is None or not isinstance(event.time, InstantTimePoint):
+            continue
+        start = max(event.time.occurred_at.astimezone(UTC), day_start)
+        end = min(event.ended_at.astimezone(UTC), day_end)
+        if start >= end:
+            continue
+        source = provenance.get(object_id)
+        stage = source.metadata.get("healthkit_sleep_stage") if source is not None else None
+        intervals.append((object_id, start, end, stage if isinstance(stage, str) else None, source))
+        boundaries.update((start, end))
+    if not intervals:
+        return None
+
+    asleep_seconds = 0.0
+    points = sorted(boundaries)
+    for start, end in pairwise(points):
+        active = [row for row in intervals if row[1] < end and row[2] > start]
+        if not active:
+            continue
+        staged = [row for row in active if row[3] in {"awake", "core", "deep", "rem"}]
+        choices = staged or active
+        choices.sort(
+            key=lambda row: (
+                0
+                if row[4] is not None
+                and row[4].source_kind == "manual"
+                and row[4].confirmation_status == "user_confirmed"
+                else 1,
+                str(
+                    (row[4].metadata if row[4] else {}).get(
+                        "healthkit_source_bundle_identifier", ""
+                    )
+                ),
+                str(row[0]),
+            )
+        )
+        stage = choices[0][3]
+        if stage != "awake":
+            asleep_seconds += (end - start).total_seconds()
+    return asleep_seconds / 60.0
+
+
 def _event_on_day(
     event: EventSchemaV1,
     local_date: date,
@@ -82,12 +247,18 @@ def _observation_order(
     local_date: date,
     timezone: str,
     object_id: UUID,
-) -> tuple[date, int, datetime, str]:
+    provenance: DailyProvenance | None = None,
+) -> tuple[date, int, datetime, int, str]:
     """Order by observed calendar date, then exact instant when one was supplied, then ID."""
     if isinstance(observation.time, DateOnlyTimePoint):
-        return observation.time.local_date, 0, datetime.min.replace(tzinfo=UTC), str(object_id)
+        return observation.time.local_date, 0, datetime.min.replace(tzinfo=UTC), 0, str(object_id)
     instant = observation.time.occurred_at.astimezone(ZoneInfo(timezone))
-    return instant.date(), 1, instant.astimezone(UTC), str(object_id)
+    manual_confirmed = (
+        provenance is not None
+        and provenance.source_kind == "manual"
+        and provenance.confirmation_status == "user_confirmed"
+    )
+    return instant.date(), 1, instant.astimezone(UTC), int(manual_confirmed), str(object_id)
 
 
 def _summary(
@@ -145,8 +316,13 @@ def summarize_today(
     observations: list[tuple[UUID, ObservationSchemaV1]],
     local_date: date,
     timezone: str,
+    *,
+    provenance: Mapping[UUID, DailyProvenance] | None = None,
+    preferred_installations: Mapping[str, UUID] | None = None,
 ) -> list[MetricSummaryV1]:
     """Compute fixed metric summaries; absent values stay null and explicit zero stays zero."""
+    source_info = provenance or {}
+    preferred = preferred_installations or {}
     day_events = [
         (object_id, event)
         for object_id, event in events
@@ -209,6 +385,16 @@ def summarize_today(
                     event.payload.distance.unit,
                 )
             )
+    sleep_minutes = _sleep_duration_minutes(
+        [
+            (object_id, event)
+            for object_id, event in day_events
+            if event.domain == DailyDomain.SLEEP
+        ],
+        source_info,
+        day_start,
+        day_end,
+    )
     result.extend(
         [
             _summary(
@@ -228,16 +414,9 @@ def summarize_today(
             _summary(
                 DailyDomain.SLEEP,
                 MetricKey.DURATION,
-                [
-                    interval_overlap_seconds(
-                        event.time.occurred_at, event.ended_at, day_start, day_end
-                    )
-                    / 60.0
-                    for event in by_domain[DailyDomain.SLEEP]
-                    if event.ended_at is not None and isinstance(event.time, InstantTimePoint)
-                ],
+                [sleep_minutes] if sleep_minutes is not None else [],
                 len(by_domain[DailyDomain.SLEEP]),
-                "sum-overlap-v1",
+                "sleep-segment-selected-v1",
             ),
         ]
     )
@@ -265,7 +444,11 @@ def summarize_today(
     )
 
     symptom_rows = metric_observations[MetricKey.SYMPTOM_SEVERITY]
-    symptom_rows.sort(key=lambda row: _observation_order(row[1], local_date, timezone, row[0]))
+    symptom_rows.sort(
+        key=lambda row: _observation_order(
+            row[1], local_date, timezone, row[0], source_info.get(row[0])
+        )
+    )
     result.append(
         _summary(
             DailyDomain.SYMPTOMS,
@@ -278,7 +461,23 @@ def summarize_today(
         )
     )
 
-    step_rows = metric_observations[MetricKey.STEPS]
+    aggregate_rows = [
+        (object_id, observation)
+        for object_id, observation in observations
+        if observation.payload.value.metric in (MetricKey.STEPS, MetricKey.HEART_RATE_SUMMARY)
+    ]
+    selected_aggregates = _healthkit_aggregate_selection(
+        aggregate_rows,
+        source_info,
+        preferred,
+    )
+    step_rows = [
+        row
+        for row in metric_observations[MetricKey.STEPS]
+        if source_info.get(row[0], DailyProvenance()).metadata.get("healthkit_resource_type")
+        != "steps"
+        or row[0] in selected_aggregates
+    ]
     result.append(
         _summary(
             DailyDomain.EXERCISE,
@@ -299,7 +498,21 @@ def summarize_today(
         MetricKey.HEART_RATE_SUMMARY,
     ):
         rows = metric_observations[metric]
-        rows.sort(key=lambda row: _observation_order(row[1], local_date, timezone, row[0]))
+        if metric == MetricKey.HEART_RATE_SUMMARY:
+            rows = [
+                row
+                for row in rows
+                if source_info.get(row[0], DailyProvenance()).metadata.get(
+                    "healthkit_resource_type"
+                )
+                != "heart_rate_summary"
+                or row[0] in selected_aggregates
+            ]
+        rows.sort(
+            key=lambda row: _observation_order(
+                row[1], local_date, timezone, row[0], source_info.get(row[0])
+            )
+        )
         result.append(
             _summary(
                 DailyDomain.MEASUREMENTS,

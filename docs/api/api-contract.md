@@ -260,7 +260,10 @@ total entries/tombstones, one device installation ID, and the fixed
 raw HealthKit objects/arrays, notes, wrong type/domain/unit combinations, and
 noncanonical aggregate identities are rejected before writes. The service
 computes a content hash; the client does not provide authorization anchors or
-owner IDs.
+owner IDs. Workout imports require an end time or an explicit duration, and
+weight/resting-heart-rate imports require exact non-interval measurements.
+Steps use a bounded integer and the canonical date-only Observation shape; the
+general manual workout schema remains unchanged.
 
 | Method and path                             | Operation                      | Behavior                                                                                                                                                                                       |
 | ------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -276,7 +279,15 @@ page set never mixes two source selections.
 Accepted low-frequency records use the source-sample UUID identity across
 installations. Step and heart-rate summaries use one date-only Observation per
 installation/local date/timezone/policy, with only one declared aggregate
-installation selected for Today/trends. Steps are an integer count; the
+installation selected for Today/trends. Each aggregate entry and aggregate
+tombstone carries a positive, JavaScript-safe `source_revision` that increases
+per installation/type/local date across timezone variants. Stale revisions
+are ignored, changed content at the same identity/revision conflicts, and a
+newer revision can recompute a deleted aggregate. Timezone variants resolve to
+one daily representative; heart-rate coverage windows cannot overlap in a
+summary. Confirmed manual corrections take precedence independently of source
+preference, while timeline visibility remains independent from aggregate
+selection. Steps are date-only integer counts bounded at `1e300`; the
 heart-rate summary stores its mean as BPM and keeps min/max/count/coverage and
 aggregation method in allowlisted metadata. Sleep stage and source labels also
 use allowlisted metadata until a later typed schema decision. A source choice
@@ -288,8 +299,14 @@ remain unconfirmed device data. A deliberate user edit changes current source
 to manual and confirmation to `user_confirmed`; later sync updates are counted
 as corrections and do not overwrite it. Low-frequency tombstones archive only
 an unconfirmed device row, preserve its history, and retain the identity to
-block a repeat from restoring it. Imported create/update/archive operations
+block a repeat from restoring it, including when deletion arrives before the
+first sample. Aggregate tombstones retain a recomputable day identity, while
+sample tombstones are terminal. User archives remain inactive when later
+source updates/deletions arrive. Imported create/update/archive operations
 reuse the daily transaction and invalidate Phase 7 analytics in that same
-owner transaction. No HealthKit anchor is stored by the server. Native query,
+owner transaction. Today reads hold a shared owner lock across cursor
+validation and snapshot loading; a preference change takes the conflicting
+owner update lock. Invalidated cursors retain the public 422 `invalid_cursor`
+response. No HealthKit anchor is stored by the server. Native query,
 permission, aggregation, and deletion behavior remain unverified until an iOS
 development build and real-device evidence are available.

@@ -65,6 +65,8 @@ receipts, status, and aggregate source preferences. The route accepts no
 caller owner ID or native anchor; all transaction and dedupe behavior stays in
 the application service. Batch bodies have a 1 MiB route limit and strict
 schema/resource bounds. The server accepts minimal allowlisted normalized
-metadata only; it does not accept raw HealthKit samples or grant AI-use
-permission. See the root API contract and Phase 8 evidence for the incomplete
-native/device gates.
+metadata only; daily aggregates require a bounded source revision, step counts
+are date-only, and source deletion identities can precede health-object
+creation. It does not accept raw HealthKit samples or grant AI-use permission.
+See the root API contract and Phase 8 evidence for the incomplete native/device
+gates.

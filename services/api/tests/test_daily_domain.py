@@ -6,13 +6,15 @@ from pathlib import Path
 from uuid import UUID
 
 import pytest
+from pydantic import ValidationError
+
 from health_api.domain.daily import (
     UNIT_CONVERSION_VERSION,
     convert_value,
     interval_overlap_seconds,
     local_day_bounds,
 )
-from health_api.domain.daily_rollups import _summary, summarize_today
+from health_api.domain.daily_rollups import DailyProvenance, _summary, summarize_today
 from health_api.domain.schemas import (
     DailyDomain,
     EventPayloadSchemaV1,
@@ -24,7 +26,6 @@ from health_api.domain.schemas import (
     ProfileSchemaRegistry,
     validate_iana_timezone,
 )
-from pydantic import ValidationError
 
 ROOT = Path(__file__).resolve().parent
 
@@ -407,3 +408,328 @@ def test_symptom_severity_coverage_uses_all_logged_episodes() -> None:
     assert summary.coverage.known_count == 1
     assert summary.coverage.total_count == 2
     assert summary.partial
+
+
+def test_sleep_rollup_excludes_awake_and_counts_overlapping_sources_once() -> None:
+    object_ids = [UUID(int=value) for value in (31, 32, 33, 34)]
+    intervals = [
+        ("2026-10-01T07:00:00Z", "2026-10-01T10:00:00Z", "asleep"),
+        ("2026-10-01T07:00:00Z", "2026-10-01T08:00:00Z", "core"),
+        ("2026-10-01T08:00:00Z", "2026-10-01T08:30:00Z", "awake"),
+        ("2026-10-01T08:30:00Z", "2026-10-01T09:00:00Z", "rem"),
+    ]
+    events = [
+        (
+            object_id,
+            EventSchemaV1.model_validate(
+                {
+                    "domain": "sleep",
+                    "time": {
+                        "precision": "instant",
+                        "occurred_at": start,
+                        "timezone": "UTC",
+                    },
+                    "ended_at": end,
+                    "payload": {"kind": "sleep"},
+                }
+            ),
+        )
+        for object_id, (start, end, _) in zip(object_ids, intervals, strict=True)
+    ]
+    provenance = {
+        object_id: DailyProvenance(
+            source_kind="device",
+            confirmation_status="unconfirmed",
+            metadata={"healthkit_sleep_stage": stage},
+        )
+        for object_id, (_, _, stage) in zip(object_ids, intervals, strict=True)
+    }
+    duration = next(
+        row
+        for row in summarize_today(events, [], date(2026, 10, 1), "UTC", provenance=provenance)
+        if row.domain == DailyDomain.SLEEP and row.metric == MetricKey.DURATION
+    )
+    # Detailed stages replace the generic interval where they overlap; the
+    # generic source supplies the final uncovered hour without double-counting.
+    assert duration.known_value == 150
+    assert duration.method_version == "today-v1/sleep-segment-selected-v1/unit-v1"
+
+
+def test_sleep_rollup_handles_awake_only_and_cross_midnight_fall_back() -> None:
+    awake = EventSchemaV1.model_validate(
+        {
+            "domain": "sleep",
+            "time": {
+                "precision": "instant",
+                "occurred_at": "2026-11-01T08:00:00Z",
+                "timezone": "America/Los_Angeles",
+            },
+            "ended_at": "2026-11-01T09:00:00Z",
+            "payload": {"kind": "sleep"},
+        }
+    )
+    overnight = EventSchemaV1.model_validate(
+        {
+            "domain": "sleep",
+            "time": {
+                "precision": "instant",
+                "occurred_at": "2026-11-01T06:30:00Z",
+                "timezone": "America/Los_Angeles",
+            },
+            "ended_at": "2026-11-01T09:30:00Z",
+            "payload": {"kind": "sleep"},
+        }
+    )
+    awake_summary = next(
+        row
+        for row in summarize_today(
+            [(UUID(int=41), awake)],
+            [],
+            date(2026, 11, 1),
+            "America/Los_Angeles",
+            provenance={UUID(int=41): DailyProvenance(metadata={"healthkit_sleep_stage": "awake"})},
+        )
+        if row.domain == DailyDomain.SLEEP and row.metric == MetricKey.DURATION
+    )
+    overnight_summary = next(
+        row
+        for row in summarize_today(
+            [(UUID(int=42), overnight)], [], date(2026, 11, 1), "America/Los_Angeles"
+        )
+        if row.domain == DailyDomain.SLEEP and row.metric == MetricKey.DURATION
+    )
+    assert awake_summary.known_value == 0
+    assert overnight_summary.known_value == 150
+
+
+def test_manual_confirmed_measurement_wins_only_an_equal_instant_tie() -> None:
+    manual_id, imported_id, later_id = UUID(int=1), UUID(int=2), UUID(int=3)
+    manual = ObservationSchemaV1.model_validate(
+        {
+            "domain": "measurements",
+            "time": {
+                "precision": "instant",
+                "occurred_at": "2026-01-01T12:00:00+00:00",
+                "timezone": "UTC",
+            },
+            "payload": {"value": {"metric": "weight", "value": 70, "unit": "kg"}},
+        }
+    )
+    imported = ObservationSchemaV1.model_validate(
+        {
+            "domain": "measurements",
+            "time": {
+                "precision": "instant",
+                "occurred_at": "2026-01-01T07:00:00-05:00",
+                "timezone": "America/New_York",
+            },
+            "payload": {"value": {"metric": "weight", "value": 176.37, "unit": "lb"}},
+        }
+    )
+    later = ObservationSchemaV1.model_validate(
+        {
+            "domain": "measurements",
+            "time": {
+                "precision": "instant",
+                "occurred_at": "2026-01-01T13:00:00Z",
+                "timezone": "UTC",
+            },
+            "payload": {"value": {"metric": "weight", "value": 80, "unit": "kg"}},
+        }
+    )
+    provenance = {
+        manual_id: DailyProvenance("manual", "user_confirmed"),
+        imported_id: DailyProvenance("device", "unconfirmed"),
+        later_id: DailyProvenance("device", "unconfirmed"),
+    }
+    for order in (
+        [(manual_id, manual), (imported_id, imported)],
+        [(imported_id, imported), (manual_id, manual)],
+    ):
+        summary = next(
+            row
+            for row in summarize_today([], order, date(2026, 1, 1), "UTC", provenance=provenance)
+            if row.metric == MetricKey.WEIGHT
+        )
+        assert summary.known_value == 70
+    later_summary = next(
+        row
+        for row in summarize_today(
+            [],
+            [(manual_id, manual), (imported_id, imported), (later_id, later)],
+            date(2026, 1, 1),
+            "UTC",
+            provenance=provenance,
+        )
+        if row.metric == MetricKey.WEIGHT
+    )
+    assert later_summary.known_value == 80
+
+
+def test_step_aggregate_representative_uses_preference_revision_and_correction() -> None:
+    preferred = UUID(int=51)
+    other_installation = UUID(int=52)
+
+    def steps(identity: int, installation: UUID, timezone: str, value: int, revision: int):
+        return (
+            UUID(int=identity),
+            ObservationSchemaV1.model_validate(
+                {
+                    "domain": "exercise",
+                    "time": {
+                        "precision": "date_only",
+                        "local_date": "2026-10-01",
+                        "timezone": timezone,
+                    },
+                    "payload": {"value": {"metric": "steps", "value": value, "unit": "steps"}},
+                }
+            ),
+            DailyProvenance(
+                "device",
+                "unconfirmed",
+                {
+                    "healthkit_resource_type": "steps",
+                    "healthkit_device_installation_id": str(installation),
+                    "healthkit_source_revision": revision,
+                },
+            ),
+        )
+
+    first = steps(61, preferred, "America/Los_Angeles", 8000, 1)
+    alias = steps(62, preferred, "US/Pacific", 9000, 2)
+    unselected = steps(63, other_installation, "UTC", 12000, 9)
+    observations = [(row[0], row[1]) for row in (first, alias, unselected)]
+    provenance = {row[0]: row[2] for row in (first, alias, unselected)}
+    summary = next(
+        row
+        for row in summarize_today(
+            [],
+            observations,
+            date(2026, 10, 1),
+            "UTC",
+            provenance=provenance,
+            preferred_installations={"steps": preferred},
+        )
+        if row.metric == MetricKey.STEPS
+    )
+    assert summary.known_value == 9000
+    no_preference = next(
+        row
+        for row in summarize_today(
+            [], observations, date(2026, 10, 1), "UTC", provenance=provenance
+        )
+        if row.metric == MetricKey.STEPS
+    )
+    assert no_preference.known_value is None
+    corrected = DailyProvenance("manual", "user_confirmed", alias[2].metadata, revision=2)
+    corrected_summary = next(
+        row
+        for row in summarize_today(
+            [],
+            observations,
+            date(2026, 10, 1),
+            "UTC",
+            provenance={**provenance, alias[0]: corrected},
+            preferred_installations={"steps": other_installation},
+        )
+        if row.metric == MetricKey.STEPS
+    )
+    assert corrected_summary.known_value == 9000
+
+
+def test_observation_steps_are_bounded_and_date_only() -> None:
+    body = {
+        "domain": "exercise",
+        "time": {"precision": "date_only", "local_date": "2026-01-01", "timezone": "UTC"},
+        "payload": {"value": {"metric": "steps", "value": 0, "unit": "steps"}},
+    }
+    assert ObservationSchemaV1.model_validate(body).payload.value.value == 0  # type: ignore[union-attr]
+    boundary = {
+        **body,
+        "payload": {"value": {"metric": "steps", "value": 10**300, "unit": "steps"}},
+    }
+    assert ObservationSchemaV1.model_validate(boundary).payload.value.value == 10**300  # type: ignore[union-attr]
+    with pytest.raises(ValidationError):
+        ObservationSchemaV1.model_validate(
+            {
+                **body,
+                "time": {
+                    "precision": "instant",
+                    "occurred_at": "2026-01-01T12:00:00Z",
+                    "timezone": "UTC",
+                },
+            }
+        )
+    with pytest.raises(ValidationError):
+        ObservationSchemaV1.model_validate(
+            {
+                **body,
+                "payload": {"value": {"metric": "steps", "value": 10**301, "unit": "steps"}},
+            }
+        )
+
+
+def test_overlapping_heart_rate_windows_select_newest_complete_window() -> None:
+    installation = UUID(int=71)
+
+    def summary(identity: int, local_date: str, value: float, revision: int, start: str, end: str):
+        object_id = UUID(int=identity)
+        observation = ObservationSchemaV1.model_validate(
+            {
+                "domain": "measurements",
+                "time": {"precision": "date_only", "local_date": local_date, "timezone": "UTC"},
+                "payload": {
+                    "value": {"metric": "heart_rate_summary", "value": value, "unit": "bpm"}
+                },
+            }
+        )
+        return (
+            object_id,
+            observation,
+            DailyProvenance(
+                "device",
+                "unconfirmed",
+                {
+                    "healthkit_resource_type": "heart_rate_summary",
+                    "healthkit_device_installation_id": str(installation),
+                    "healthkit_source_revision": revision,
+                    "healthkit_coverage_start": start,
+                    "healthkit_coverage_end": end,
+                },
+            ),
+        )
+
+    older = summary(
+        72, "2026-10-01", 70, 1, "2026-10-01T08:00:00+00:00", "2026-10-01T10:00:00+00:00"
+    )
+    newer = summary(
+        73, "2026-10-02", 80, 2, "2026-10-01T09:30:00+00:00", "2026-10-01T11:00:00+00:00"
+    )
+    all_observations = [(older[0], older[1]), (newer[0], newer[1])]
+    provenance = {older[0]: older[2], newer[0]: newer[2]}
+    old_day = next(
+        row
+        for row in summarize_today(
+            [],
+            all_observations,
+            date(2026, 10, 1),
+            "UTC",
+            provenance=provenance,
+            preferred_installations={"heart_rate_summary": installation},
+        )
+        if row.metric == MetricKey.HEART_RATE_SUMMARY
+    )
+    new_day = next(
+        row
+        for row in summarize_today(
+            [],
+            all_observations,
+            date(2026, 10, 2),
+            "UTC",
+            provenance=provenance,
+            preferred_installations={"heart_rate_summary": installation},
+        )
+        if row.metric == MetricKey.HEART_RATE_SUMMARY
+    )
+    assert old_day.known_value is None
+    assert new_day.known_value == 80

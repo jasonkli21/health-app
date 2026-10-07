@@ -29,7 +29,13 @@ function tsType(schema) {
     return schema.type.map((type) => tsType({ ...schema, type })).join(" | ");
   if (schema.oneOf) return schema.oneOf.map(tsType).join(" | ");
   if (schema.anyOf) return schema.anyOf.map(tsType).join(" | ");
-  if (schema.allOf) return schema.allOf.map(tsType).join(" & ");
+  if (schema.allOf) {
+    const { allOf, ...base } = schema;
+    const members = allOf.map(tsType).filter((member) => member !== "unknown");
+    if (base.type || base.properties || base.additionalProperties)
+      members.unshift(tsType(base));
+    return members.length ? members.join(" & ") : "unknown";
+  }
   if (schema.enum)
     return schema.enum.map((value) => JSON.stringify(value)).join(" | ");
   if (schema.const !== undefined) return JSON.stringify(schema.const);

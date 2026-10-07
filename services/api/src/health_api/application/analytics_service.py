@@ -14,12 +14,15 @@ from uuid import UUID, uuid5
 from zoneinfo import ZoneInfo
 
 from pydantic import ValidationError
-from sqlalchemy import and_, exists, or_, select, text
+from sqlalchemy import and_, or_, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from health_api.application.envelope_service import manual_source, unit_of_work
-from health_api.application.today_service import owner_today_settings
+from health_api.application.today_service import (
+    healthkit_preferred_installations,
+    owner_today_settings,
+)
 from health_api.domain.analytics import (
     ASSOCIATION_PAIRS,
     INSIGHT_TEMPLATE_VERSION,
@@ -43,7 +46,7 @@ from health_api.domain.analytics import (
     build_trend_result,
 )
 from health_api.domain.daily import local_day_bounds
-from health_api.domain.daily_rollups import summarize_today
+from health_api.domain.daily_rollups import DailyProvenance, summarize_today
 from health_api.domain.planning import TrackerDefinitionV1, TrackerFieldKind
 from health_api.domain.schemas import (
     CustomTrackerValueV1,
@@ -57,7 +60,6 @@ from health_api.persistence.models import (
     AnalyticsEvidence,
     EventItem,
     EventObservationLink,
-    HealthKitImportIdentity,
     HealthObject,
     HealthObjectRevision,
     ObservationItem,
@@ -377,7 +379,12 @@ def _load_inputs(
     ai_permitted_only: bool = False,
     excluded_object_ids: set[UUID] | None = None,
     as_of: datetime | None = None,
-) -> tuple[list[EventInput], list[ObservationInput], dict[UUID, set[UUID]]]:
+) -> tuple[
+    list[EventInput],
+    list[ObservationInput],
+    dict[UUID, set[UUID]],
+    dict[UUID, DailyProvenance],
+]:
     days = (to_date - from_date).days + 1
     if from_date > to_date or days > MAX_ANALYSIS_DAYS or to_date == date.max:
         raise AnalyticsValidationError("The selected range is too large or invalid.")
@@ -414,24 +421,20 @@ def _load_inputs(
         event_query_end = end_at
         observation_query_end = end_at
     event_query = (
-        select(HealthObject, EventItem)
+        select(HealthObject, EventItem, Source.source_kind)
         .join(
             EventItem,
             and_(
                 EventItem.owner_id == HealthObject.owner_id, EventItem.object_id == HealthObject.id
             ),
         )
+        .join(
+            Source,
+            and_(Source.owner_id == HealthObject.owner_id, Source.id == HealthObject.source_id),
+        )
         .where(
             *owner_conditions,
             HealthObject.object_type == "event",
-            ~exists(
-                select(1).where(
-                    HealthKitImportIdentity.owner_id == HealthObject.owner_id,
-                    HealthKitImportIdentity.object_id == HealthObject.id,
-                    HealthKitImportIdentity.is_aggregate.is_(True),
-                    HealthKitImportIdentity.analytics_selected.is_(False),
-                )
-            ),
             or_(
                 and_(
                     EventItem.time_precision == "date_only",
@@ -458,7 +461,7 @@ def _load_inputs(
         )
     remaining = MAX_ANALYSIS_ROWS - len(event_rows)
     observation_query = (
-        select(HealthObject, ObservationItem)
+        select(HealthObject, ObservationItem, Source.source_kind)
         .join(
             ObservationItem,
             and_(
@@ -466,17 +469,13 @@ def _load_inputs(
                 ObservationItem.object_id == HealthObject.id,
             ),
         )
+        .join(
+            Source,
+            and_(Source.owner_id == HealthObject.owner_id, Source.id == HealthObject.source_id),
+        )
         .where(
             *owner_conditions,
             HealthObject.object_type == "observation",
-            ~exists(
-                select(1).where(
-                    HealthKitImportIdentity.owner_id == HealthObject.owner_id,
-                    HealthKitImportIdentity.object_id == HealthObject.id,
-                    HealthKitImportIdentity.is_aggregate.is_(True),
-                    HealthKitImportIdentity.analytics_selected.is_(False),
-                )
-            ),
             or_(
                 and_(
                     ObservationItem.time_precision == "date_only",
@@ -508,7 +507,14 @@ def _load_inputs(
             "The selected range contains too many health records; narrow it."
         )
     events: list[EventInput] = []
-    for obj, item in event_rows:
+    provenance: dict[UUID, DailyProvenance] = {}
+    for obj, item, source_kind in event_rows:
+        provenance[obj.id] = DailyProvenance(
+            source_kind=source_kind,
+            confirmation_status=obj.confirmation_status,
+            metadata=obj.metadata_json,
+            revision=obj.revision,
+        )
         time_point: dict[str, Any]
         if item.time_precision == "date_only":
             time_point = {
@@ -538,7 +544,13 @@ def _load_inputs(
             raise RuntimeError("stored Event schema is invalid") from exc
         events.append((obj, item, schema))
     observations: list[ObservationInput] = []
-    for observation_obj, observation_item in observation_rows:
+    for observation_obj, observation_item, source_kind in observation_rows:
+        provenance[observation_obj.id] = DailyProvenance(
+            source_kind=source_kind,
+            confirmation_status=observation_obj.confirmation_status,
+            metadata=observation_obj.metadata_json,
+            revision=observation_obj.revision,
+        )
         if observation_item.time_precision == "date_only":
             observation_time_point = {
                 "precision": "date_only",
@@ -577,14 +589,14 @@ def _load_inputs(
         if event_ids:
             link_conditions.append(EventObservationLink.event_object_id.in_(event_ids))
         else:
-            return events, observations, {}
+            return events, observations, {}, provenance
         for event_id, observation_id in session.execute(
             select(
                 EventObservationLink.event_object_id, EventObservationLink.observation_object_id
             ).where(*link_conditions)
         ).all():
             links.setdefault(event_id, set()).add(observation_id)
-    return events, observations, links
+    return events, observations, links, provenance
 
 
 def _tracker_metric_parts(metric: str) -> tuple[UUID, str, int] | None:
@@ -820,6 +832,8 @@ def _standard_points(
     from_date: date,
     to_date: date,
     timezone: str,
+    provenance: dict[UUID, DailyProvenance],
+    preferred_installations: dict[str, UUID],
 ) -> tuple[list[DailyMetricPoint], list[EvidenceReference]]:
     relevant_events = _event_metric_rows(metric, events)
     relevant_observations = _observation_metric_rows(metric, observations)
@@ -869,7 +883,14 @@ def _standard_points(
     points: list[DailyMetricPoint] = []
     current = from_date
     while current <= to_date:
-        summaries = summarize_today(full_events, full_observations, current, timezone)
+        summaries = summarize_today(
+            full_events,
+            full_observations,
+            current,
+            timezone,
+            provenance=provenance,
+            preferred_installations=preferred_installations,
+        )
         summary = next(
             (
                 row
@@ -904,6 +925,8 @@ def _series_from_inputs(
     events: list[EventInput],
     observations: list[ObservationInput],
     links: dict[UUID, set[UUID]],
+    provenance: dict[UUID, DailyProvenance],
+    preferred_installations: dict[str, UUID],
 ) -> MetricSeries:
     if _tracker_metric_parts(metric) is not None:
         points, refs = _tracker_points(
@@ -911,7 +934,15 @@ def _series_from_inputs(
         )
     else:
         points, refs = _standard_points(
-            metric, events, observations, links, from_date, to_date, timezone
+            metric,
+            events,
+            observations,
+            links,
+            from_date,
+            to_date,
+            timezone,
+            provenance,
+            preferred_installations,
         )
     return definition, points, refs, generation
 
@@ -934,7 +965,7 @@ def _series(
     if generation is None:
         raise AnalyticsNotFound
     definition = metric_definition(session, owner_id, metric)
-    events, observations, links = _load_inputs(
+    events, observations, links, provenance = _load_inputs(
         session,
         owner_id,
         from_date,
@@ -954,6 +985,8 @@ def _series(
         events,
         observations,
         links,
+        provenance,
+        healthkit_preferred_installations(session, owner_id),
     )
 
 
@@ -1240,7 +1273,10 @@ def compute_associations(
         )
         if generation is None:
             raise AnalyticsNotFound
-        events, observations, links = _load_inputs(session, owner_id, from_date, to_date, timezone)
+        events, observations, links, provenance = _load_inputs(
+            session, owner_id, from_date, to_date, timezone
+        )
+        preferred_installations = healthkit_preferred_installations(session, owner_id)
         series_by_metric = {
             metric: _series_from_inputs(
                 metric,
@@ -1252,6 +1288,8 @@ def compute_associations(
                 events,
                 observations,
                 links,
+                provenance,
+                preferred_installations,
             )
             for metric in metric_names
         }
@@ -1722,7 +1760,10 @@ def generate_insights(
     )
     if generation is None:
         raise AnalyticsNotFound
-    events, observations, links = _load_inputs(session, owner_id, from_date, to_date, timezone)
+    events, observations, links, provenance = _load_inputs(
+        session, owner_id, from_date, to_date, timezone
+    )
+    preferred_installations = healthkit_preferred_installations(session, owner_id)
     prepared_series = {
         metric: _series_from_inputs(
             metric,
@@ -1734,6 +1775,8 @@ def generate_insights(
             events,
             observations,
             links,
+            provenance,
+            preferred_installations,
         )
         for metric in sorted(needed_metrics)
     }

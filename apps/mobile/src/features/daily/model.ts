@@ -486,6 +486,8 @@ export function buildDailyUpdateRecord(
         throw new Error("Enter a step count; zero is a recorded value.");
       if (!Number.isInteger(count))
         throw new Error("Step count must be a whole number.");
+      if (count > 1e300)
+        throw new Error("Step count exceeds the supported numeric range.");
       if (draft.precision !== "date_only")
         throw new Error("Daily step counts must use a local calendar date.");
       if (draft.notes.length > 2000)

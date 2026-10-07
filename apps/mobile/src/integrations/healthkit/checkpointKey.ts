@@ -1,4 +1,5 @@
 import type { HealthKitResourceType } from "./types";
+import { secureKeySegment } from "./secureKey";
 
 export function checkpointKey(
   ownerId: string,
@@ -8,9 +9,9 @@ export function checkpointKey(
 ): string {
   return [
     "healthkit",
-    ownerId,
-    deviceInstallationId,
+    secureKeySegment(ownerId),
+    secureKeySegment(deviceInstallationId),
     resourceType,
-    policyVersion,
-  ].join(":");
+    secureKeySegment(policyVersion),
+  ].join(".");
 }

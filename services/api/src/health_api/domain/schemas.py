@@ -28,6 +28,7 @@ from pydantic import (
 )
 
 MAX_DAILY_QUANTITY = 1e300
+MAX_DAILY_STEP_COUNT = 10**300
 
 
 def reject_unaggregatable_daily_number(value: float) -> float:
@@ -428,7 +429,7 @@ class MeasurementValueV1(StrictModel):
 
 class StepCountValueV1(StrictModel):
     metric: Literal[MetricKey.STEPS]
-    value: Annotated[StrictInt, Field(ge=0)]
+    value: Annotated[StrictInt, Field(ge=0, le=MAX_DAILY_STEP_COUNT)]
     unit: Literal[MeasurementUnit.STEPS] = MeasurementUnit.STEPS
 
 
@@ -502,6 +503,29 @@ class EventSchemaV1(StrictModel):
 
 
 class ObservationSchemaV1(StrictModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "payload": {
+                                "properties": {
+                                    "value": {"properties": {"metric": {"const": "steps"}}}
+                                }
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "time": {"properties": {"precision": {"const": "date_only"}}}
+                        }
+                    },
+                }
+            ]
+        }
+    )
+
     domain: DailyDomain
     time: DailyTimePoint
     interval_end: UTCInstant | None = None
@@ -524,6 +548,8 @@ class ObservationSchemaV1(StrictModel):
         )
         if self.domain != expected:
             raise ValueError("observation metric does not match its domain")
+        if metric == MetricKey.STEPS and not isinstance(self.time, DateOnlyTimePoint):
+            raise ValueError("daily steps require a date-only local calendar date")
         if self.interval_end is not None:
             if not isinstance(self.time, InstantTimePoint):
                 raise ValueError("an interval requires an exact observation instant")

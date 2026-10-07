@@ -42,14 +42,14 @@ phase acceptance criteria.
 
 ## Mappings and retention
 
-| Health type        | Local normalized representation                                                           | What the server accepts                                                                        |
-| ------------------ | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Workouts           | Exercise Event v1 with exact start and either end or explicit duration; optional distance | Source UUID and supported Event fields; no route/location series                               |
-| Sleep              | Sleep Event v1 with exact interval                                                        | Source UUID and optional allowlisted stage metadata; no raw HealthKit object                   |
-| Steps              | Date-only Exercise Observation using nonnegative integer `StepCountValueV1`               | Local date, timezone, count, source installation, and aggregation method version               |
-| Weight             | Measurement Observation v1                                                                | Exact time, source UUID, value, and original kg/lb unit                                        |
-| Resting heart rate | Measurement Observation v1 in BPM                                                         | Exact time and source UUID; no derived diagnosis                                               |
-| Heart-rate summary | Date-only Measurement Observation v1 with mean BPM                                        | Mean plus bounded min/max/count/coverage and aggregation method version; no underlying samples |
+| Health type        | Local normalized representation                                                           | What the server accepts                                                                           |
+| ------------------ | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Workouts           | Exercise Event v1 with exact start and either end or explicit duration; optional distance | Source UUID and supported Event fields; no route/location series                                  |
+| Sleep              | Sleep Event v1 with exact interval                                                        | Source UUID and optional allowlisted stage metadata; no raw HealthKit object                      |
+| Steps              | Date-only Exercise Observation using bounded nonnegative integer `StepCountValueV1`       | Local date, timezone, count, source installation, aggregation method version, and source revision |
+| Weight             | Measurement Observation v1                                                                | Exact time, source UUID, value, and original kg/lb unit                                           |
+| Resting heart rate | Measurement Observation v1 in BPM                                                         | Exact time and source UUID; no derived diagnosis                                                  |
+| Heart-rate summary | Date-only Measurement Observation v1 with mean BPM                                        | Mean plus bounded min/max/count/coverage and aggregation method version; no underlying samples    |
 
 The sleep stage remains envelope metadata rather than a new Event payload
 version. A future typed stage or coverage payload must receive a new schema
@@ -63,10 +63,13 @@ sample.
   `health_api.domain.healthkit_imports`.
 - Generated artifacts: `contracts/openapi/openapi.json` and
   `packages/api-client/src/generated.ts`.
-- Alembic revision `c8d9e0f1a2b3` is the single head after
-  `f7c8d9e0a1b2`. It adds batch receipts, import identities, source
-  preferences, and the additive Observation metric/unit checks. Downgrade
-  refuses while receipts or import identities exist.
+- Alembic revision `20261007a0b1` is the single head after
+  `c8d9e0f1a2b3`. It adds aggregate source revisions, tombstone-only identity
+  rows, user-archive protection, and step shape/range checks declared
+  `NOT VALID`: PostgreSQL enforces them for new or updated rows without rejecting
+  legacy step rows that predate the date-only and numeric-bound contract.
+  Downgrade refuses when receipts, identity history, or source revisions would
+  be lost.
 - Receipt data contains IDs, content hash, policy, timestamp, and change
   counts. Server-side anchors and uploaded sample bodies are not retained.
 - Source selection changes stale dependent analytical artifacts in the same
@@ -117,6 +120,56 @@ connected to a HealthKit query because no query adapter is installed.
 | Prettier check on changed sources and documentation                                                   | Passed                                   | Formatting only                                                                                                     |
 | Relative Markdown links in changed documentation                                                      | 68 checked, 0 broken                     | Existence check; does not validate external links                                                                   |
 | `xcodebuild -version`                                                                                 | Unavailable                              | Active developer path is Command Line Tools, not full Xcode                                                         |
+
+## Independent-review follow-up
+
+The follow-up fixes the findings in the [independent review](phase-8-independent-review.md)
+without enabling native HealthKit. Sleep duration now partitions overlapping
+intervals, prefers detailed stages over generic sleep, excludes `awake`, and
+counts each instant once. Aggregate entries and tombstones carry bounded,
+monotonic per-installation/type/local-day source revisions across timezone
+variants; stale updates are ignored, sample tombstones are terminal, and a
+newer aggregate revision can recompute a deleted day. Today, trends, and
+consented Today summaries share the representative selection rules. Confirmed
+manual corrections remain the day representative regardless of device
+preference, while imported timeline rows remain visible independently from
+selection.
+
+Deletion-before-create is stored as an owner/type/source identity without a
+fabricated health object. User archives are explicitly recorded and remain
+inactive across source changes and deletions. The mobile coordinator encodes
+SecureStore key components into the supported alphabet, binds sync work to the
+current session epoch/type consent, serializes each scope, compares prepared
+opaque anchors by equality, and recovers an acknowledged checkpoint before
+accepting another batch in that scope. The public Observation contract bounds
+step counts at `1e300` and requires date-only steps; imported workouts require
+an end or duration, and low-frequency weight/resting-heart-rate imports are
+exact instants. Today reads hold a shared owner lock through cursor validation
+and snapshot loading; invalidated page cursors remain `422 invalid_cursor`.
+
+OpenAPI and the generated TypeScript client include the source revision and
+step contract. The generated-client script preserves object fields when
+schemas combine them with `allOf` constraints. The migration also adds
+database checks for new date-only, bounded step rows. Its downgrade refuses to
+discard deletion identities or accepted source revisions.
+
+### Follow-up checks
+
+| Check                                            | Result                                           | Limit                                                                                                                         |
+| ------------------------------------------------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Changed API Python lint                          | Passed                                           | Ruff on changed service, schema, model, migration, and test files                                                             |
+| Daily rollup and HealthKit import contract tests | 34 passed after review fixes                     | In-process domain/contract coverage; does not replace PostgreSQL integration                                                  |
+| Focused API mypy                                 | Passed                                           | Four changed application/domain files                                                                                         |
+| Mobile TypeScript check                          | Passed                                           | Generated client refreshed for this follow-up                                                                                 |
+| Mobile Vitest suite                              | 115 passed                                       | Mocks do not exercise native SecureStore or HealthKit                                                                         |
+| Changed mobile ESLint                            | Passed                                           | No warnings or errors                                                                                                         |
+| PostgreSQL HealthKit API/race suite              | 7 skipped; `TEST_DATABASE_URL` is not configured | Database lifecycle/concurrency behavior remains an open acceptance gate; race coverage is checked in for PostgreSQL execution |
+| Alembic/OpenAPI/generated-client checks          | Passed; `20261007a0b1` is the single head        | Offline SQL generation and client typing do not establish live database behavior                                              |
+| Prettier, Markdown links, and whitespace checks  | Passed; 22 relative links checked                | Formatting/link existence only                                                                                                |
+
+The native permission, aggregation, deletion, and device gates remain open.
+The mobile checks verify local serialization and synchronization contracts
+only.
 
 ## Phase 9 erasure requirements
 

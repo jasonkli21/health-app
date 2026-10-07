@@ -4,15 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import and_, exists, or_, select, text
+from sqlalchemy import and_, or_, select, text
 from sqlalchemy.orm import Session, aliased
 from sqlalchemy.sql.elements import ColumnElement
 
 from health_api.application.errors import DailyNotFound, DailySnapshotLimitExceeded
 from health_api.domain.daily import local_day_bounds
-from health_api.domain.daily_rollups import MetricSummaryV1, summarize_today
+from health_api.domain.daily_rollups import DailyProvenance, MetricSummaryV1, summarize_today
 from health_api.domain.schemas import (
     DailyDomain,
     EventKind,
@@ -22,7 +23,7 @@ from health_api.domain.schemas import (
 )
 from health_api.persistence.models import (
     DailySnapshotMarker,
-    HealthKitImportIdentity,
+    HealthKitSourcePreference,
     HealthObject,
     HealthObjectRevision,
     ProfileItem,
@@ -43,16 +44,31 @@ class TodayReadSnapshot:
     profile_context_truncated: bool
 
 
-def owner_today_settings(session: Session, owner_id: UUID) -> tuple[int, str]:
-    row = session.execute(
-        select(User.daily_sequence, User.display_timezone).where(
-            User.id == owner_id,
-            User.lifecycle == "active",
-        )
-    ).one_or_none()
+def owner_today_settings(
+    session: Session, owner_id: UUID, *, lock_for_read: bool = False
+) -> tuple[int, str]:
+    statement = select(User.daily_sequence, User.display_timezone).where(
+        User.id == owner_id,
+        User.lifecycle == "active",
+    )
+    if lock_for_read:
+        statement = statement.with_for_update(read=True)
+    row = session.execute(statement).one_or_none()
     if row is None:
         raise DailyNotFound("owner does not exist")
     return row[0], row[1]
+
+
+def healthkit_preferred_installations(session: Session, owner_id: UUID) -> dict[str, UUID]:
+    return {
+        resource_type: installation_id
+        for resource_type, installation_id in session.execute(
+            select(
+                HealthKitSourcePreference.resource_type,
+                HealthKitSourcePreference.device_installation_id,
+            ).where(HealthKitSourcePreference.owner_id == owner_id)
+        ).all()
+    }
 
 
 def is_today_snapshot_boundary(session: Session, owner_id: UUID, sequence: int) -> bool:
@@ -119,14 +135,6 @@ def load_today_snapshot(
                 revision.daily_sequence.is_not(None),
                 revision.daily_sequence <= as_of_sequence,
                 day_condition,
-                ~exists(
-                    select(1).where(
-                        HealthKitImportIdentity.owner_id == revision.owner_id,
-                        HealthKitImportIdentity.object_id == revision.object_id,
-                        HealthKitImportIdentity.is_aggregate.is_(True),
-                        HealthKitImportIdentity.analytics_selected.is_(False),
-                    )
-                ),
             )
             .distinct()
             .order_by(revision.object_id)
@@ -205,13 +213,26 @@ def summarize_today_snapshot(
     revisions: tuple[HealthObjectRevision, ...],
     local_date: date,
     timezone: str,
+    preferred_installations: dict[str, UUID] | None = None,
 ) -> list[MetricSummaryV1]:
     """Build the domain read model from the same resolved revisions as the timeline."""
     events: list[tuple[UUID, EventSchemaV1]] = []
     observations: list[tuple[UUID, ObservationSchemaV1]] = []
     linked_severity_ids: set[UUID] = set()
+    provenance: dict[UUID, DailyProvenance] = {}
     for revision in revisions:
         snapshot = revision.snapshot
+        source = snapshot.get("source")
+        raw_metadata = snapshot.get("metadata")
+        metadata: dict[str, Any] = {}
+        if isinstance(raw_metadata, dict):
+            metadata = raw_metadata
+        provenance[revision.object_id] = DailyProvenance(
+            source_kind=source.get("kind") if isinstance(source, dict) else None,
+            confirmation_status=snapshot.get("confirmation_status"),
+            metadata=metadata,
+            revision=int(snapshot.get("revision", 1)),
+        )
         if snapshot["object_type"] != "event":
             continue
         event = EventSchemaV1.model_validate(
@@ -249,4 +270,11 @@ def summarize_today_snapshot(
         if metric != MetricKey.SYMPTOM_SEVERITY or revision.object_id in linked_severity_ids:
             observations.append((revision.object_id, observation))
 
-    return summarize_today(events, observations, local_date, timezone)
+    return summarize_today(
+        events,
+        observations,
+        local_date,
+        timezone,
+        provenance=provenance,
+        preferred_installations=preferred_installations,
+    )

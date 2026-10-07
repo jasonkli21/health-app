@@ -1,5 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 
+import { secureKeySegment } from "./secureKey";
 import type { HealthKitResourceType } from "./types";
 
 const DEFAULT_LOOKBACK_DAYS = 30;
@@ -8,14 +9,24 @@ function consentKey(
   ownerId: string,
   resourceType: HealthKitResourceType,
 ): string {
-  return `healthkit:consent:${ownerId}:${resourceType}:healthkit-v1`;
+  return `hk.c.${secureKeySegment(ownerId)}.${resourceType}.healthkit-v1`;
 }
 
 function lookbackKey(ownerId: string): string {
-  return `healthkit:lookback:${ownerId}:healthkit-v1`;
+  return `hk.l.${secureKeySegment(ownerId)}.healthkit-v1`;
 }
 
 export class HealthKitConsentStore {
+  private static readonly versions = new Map<string, number>();
+
+  version(ownerId: string, resourceType: HealthKitResourceType): number {
+    return (
+      HealthKitConsentStore.versions.get(
+        `${secureKeySegment(ownerId)}.${resourceType}`,
+      ) ?? 0
+    );
+  }
+
   async isEnabled(
     ownerId: string,
     resourceType: HealthKitResourceType,
@@ -32,6 +43,11 @@ export class HealthKitConsentStore {
     enabled: boolean,
   ): Promise<void> {
     const key = consentKey(ownerId, resourceType);
+    const scope = `${secureKeySegment(ownerId)}.${resourceType}`;
+    HealthKitConsentStore.versions.set(
+      scope,
+      (HealthKitConsentStore.versions.get(scope) ?? 0) + 1,
+    );
     if (enabled) await SecureStore.setItemAsync(key, "enabled");
     else await SecureStore.deleteItemAsync(key);
   }

@@ -32,7 +32,10 @@ from health_api.application.analytics_service import (
     AnalyticsValidationError,
     compute_ai_trend_preview,
 )
-from health_api.application.today_service import owner_today_settings
+from health_api.application.today_service import (
+    healthkit_preferred_installations,
+    owner_today_settings,
+)
 from health_api.domain.ai import (
     AIContextEntry,
     AIContextPack,
@@ -41,7 +44,7 @@ from health_api.domain.ai import (
     AISearchResult,
 )
 from health_api.domain.daily import local_day_bounds
-from health_api.domain.daily_rollups import summarize_today
+from health_api.domain.daily_rollups import DailyProvenance, summarize_today
 from health_api.domain.schemas import (
     EventSchemaV1,
     ObservationSchemaV1,
@@ -253,6 +256,7 @@ def _candidate_branch(
             Source.source_kind.label("source_kind"),
             HealthObject.confirmation_status.label("confirmation_status"),
             HealthObject.revision.label("revision"),
+            HealthObject.metadata_json.label("health_metadata"),
             HealthObject.notes.label("notes"),
             payload.label("payload"),
             *extra_values,
@@ -350,6 +354,23 @@ def _context_entry(row: Any) -> AIContextEntry:
         relevance_reason = "Recent health entry"
 
     content: dict[str, Any] = {"payload": row.payload, "notes": row.notes}
+    metadata = row.health_metadata if isinstance(row.health_metadata, dict) else {}
+    healthkit_interpretation = {
+        key.removeprefix("healthkit_"): metadata[key]
+        for key in (
+            "healthkit_resource_type",
+            "healthkit_sleep_stage",
+            "healthkit_aggregation_method_version",
+            "healthkit_sample_count",
+            "healthkit_minimum",
+            "healthkit_maximum",
+            "healthkit_coverage_start",
+            "healthkit_coverage_end",
+        )
+        if key in metadata
+    }
+    if healthkit_interpretation:
+        content["healthkit_interpretation"] = healthkit_interpretation
     if row.time_precision is not None:
         time_data: dict[str, Any] = {
             "precision": row.time_precision,
@@ -445,6 +466,29 @@ def _today_summaries(
                 )
             ).all()
         )
+    selection_rows = session.execute(
+        select(
+            HealthObject.id,
+            Source.source_kind,
+            HealthObject.confirmation_status,
+            HealthObject.metadata_json,
+            HealthObject.revision,
+        )
+        .join(
+            Source,
+            and_(Source.owner_id == HealthObject.owner_id, Source.id == HealthObject.source_id),
+        )
+        .where(HealthObject.owner_id == owner_id, HealthObject.id.in_(included_ids))
+    ).all()
+    provenance = {
+        object_id: DailyProvenance(
+            source_kind=source_kind,
+            confirmation_status=confirmation_status,
+            metadata=metadata if isinstance(metadata, dict) else {},
+            revision=revision,
+        )
+        for object_id, source_kind, confirmation_status, metadata, revision in selection_rows
+    }
     for entry in entries:
         time_data = entry.content.get("time")
         if not isinstance(time_data, dict):
@@ -470,7 +514,14 @@ def _today_summaries(
                 continue
             body["interval_end"] = time_data.get("ended_at")
             observations.append((entry.object_id, ObservationSchemaV1.model_validate(body)))
-    return summarize_today(events, observations, local_date, timezone)
+    return summarize_today(
+        events,
+        observations,
+        local_date,
+        timezone,
+        provenance=provenance,
+        preferred_installations=healthkit_preferred_installations(session, owner_id),
+    )
 
 
 def build_ai_context(

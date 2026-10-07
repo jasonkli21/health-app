@@ -6,6 +6,26 @@ import { assertApiRequestUrl, apiBaseUrl } from "./apiConfig";
 
 export type TokenProvider = (forceRefresh: boolean) => Promise<string>;
 export type ExpiredSession = { epoch: number; userId: string };
+export type HealthKitGuardedRequestInit = NonNullable<
+  Parameters<FetchLike>[1]
+> & {
+  healthkitGuard?: () => Promise<void>;
+};
+
+function requestGuard(
+  init?: Parameters<FetchLike>[1],
+): (() => Promise<void>) | undefined {
+  return (init as HealthKitGuardedRequestInit | undefined)?.healthkitGuard;
+}
+
+function withoutRequestGuard(
+  init?: Parameters<FetchLike>[1],
+): Parameters<FetchLike>[1] | undefined {
+  if (init === undefined) return undefined;
+  const { healthkitGuard: _healthkitGuard, ...requestInit } =
+    init as HealthKitGuardedRequestInit;
+  return requestInit;
+}
 
 const definitiveAuthCodes = new Set([
   "auth/user-disabled",
@@ -49,8 +69,12 @@ export function createAuthenticatedFetch(
   configuredBaseUrl = apiBaseUrl,
 ): FetchLike {
   return async (input, init) => {
+    const guard = requestGuard(init);
     const session = store.getSnapshot();
-    if (session.mode === "dev") return fetcher(input, init);
+    if (session.mode === "dev") {
+      await guard?.();
+      return fetcher(input, withoutRequestGuard(init) ?? { method: "GET" });
+    }
     if (session.status !== "signed_in") throw new SignedOutError();
     assertApiRequestUrl(input, configuredBaseUrl);
 
@@ -77,21 +101,29 @@ export function createAuthenticatedFetch(
         throw error;
       }
       assertCurrent();
+      await guard?.();
+      assertCurrent();
       if (!token || token.length > 8192) throw new SignedOutError();
       const headers = { ...init?.headers, authorization: `Bearer ${token}` };
       const response = await fetcher(input, {
-        ...(init ?? { method: "GET" }),
+        ...(withoutRequestGuard(init) ?? { method: "GET" }),
         headers,
       });
+      assertCurrent();
+      await guard?.();
       assertCurrent();
       return {
         ok: response.ok,
         status: response.status,
         json: async () => {
           assertCurrent();
+          await guard?.();
+          assertCurrent();
           try {
             return await response.json();
           } finally {
+            assertCurrent();
+            await guard?.();
             assertCurrent();
           }
         },

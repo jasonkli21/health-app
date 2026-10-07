@@ -678,6 +678,7 @@ export interface components {
         | "unspecified"
         | null;
       source_bundle_identifier?: string | null;
+      source_revision?: number | null;
     };
     HealthKitImportStatusResponse: {
       installations: Array<
@@ -688,6 +689,7 @@ export interface components {
       types: Array<components["schemas"]["HealthKitImportTypeStatus"]>;
     };
     HealthKitImportTombstone: {
+      source_revision?: number | null;
       source_sample_id: string;
     };
     HealthKitImportTypeStatus: {

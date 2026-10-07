@@ -47,8 +47,11 @@ schema version. These are descriptive software methods, not clinical
 thresholds or causal estimates.
 
 `healthkit_imports.py` defines the closed normalized batch, tombstone,
-receipt, status, and aggregate source-preference contracts. `StepCountValueV1`
-and the resting-heart-rate/heart-rate-summary Observation metrics are additive
-Phase 8 values. Sleep stage, source labels, and bounded aggregate method/count/
-range/coverage fields are allowlisted metadata; native HealthKit objects and
-raw high-frequency arrays are not accepted.
+receipt, status, and aggregate source-preference contracts. Aggregate batches
+carry a bounded source revision for each installation/type/local day, including
+timezone variants. `StepCountValueV1` is bounded at `1e300` and requires a
+date-only Observation. Sleep stage, source labels, and bounded aggregate
+method/count/range/coverage fields are allowlisted metadata; native HealthKit
+objects and raw high-frequency arrays are not accepted. Daily rollups select
+one aggregate representative, prefer confirmed manual corrections, and count
+sleep intervals by selected non-overlapping segments with awake stages excluded.

@@ -110,7 +110,14 @@ def _batch_content_hash(batch: HealthKitImportBatchRequest) -> str:
             (_canonical_entry(item) for item in batch.entries), key=lambda x: x["source_sample_id"]
         ),
         "tombstones": sorted(
-            _canonical_sample_id(item.source_sample_id) for item in batch.tombstones
+            (
+                {
+                    "source_sample_id": _canonical_sample_id(item.source_sample_id),
+                    "source_revision": item.source_revision,
+                }
+                for item in batch.tombstones
+            ),
+            key=lambda item: str(item["source_sample_id"]),
         ),
     }
     encoded = json.dumps(content, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
@@ -121,6 +128,7 @@ def _metadata_for_object(
     resource_type: str,
     source_sample_id: str,
     policy_version: str,
+    installation_id: UUID,
     metadata: HealthKitImportMetadata,
 ) -> dict[str, Any]:
     normalized = _metadata_dict(metadata)
@@ -132,6 +140,7 @@ def _metadata_for_object(
         "healthkit_resource_type": resource_type,
         "healthkit_source_sample_id": source_sample_id,
         "healthkit_policy_version": policy_version,
+        "healthkit_device_installation_id": str(installation_id),
         **{f"healthkit_{key}": value for key, value in normalized.items()},
     }
     try:
@@ -169,6 +178,10 @@ def _validate_entry(
             raise HealthKitImportValidationError("workout imports require a workout Event")
         if record.domain != DailyDomain.EXERCISE or not isinstance(record.time, InstantTimePoint):
             raise HealthKitImportValidationError("workouts require an exact start time")
+        if record.ended_at is None and record.payload.duration is None:
+            raise HealthKitImportValidationError(
+                "workouts require an end time or an explicit duration"
+            )
         try:
             UUID(entry.source_sample_id)
         except ValueError as exc:
@@ -196,6 +209,7 @@ def _validate_entry(
             or not isinstance(record.payload.value, MeasurementValueV1)
             or record.payload.value.metric != metric
             or not isinstance(record.time, InstantTimePoint)
+            or record.interval_end is not None
         ):
             raise HealthKitImportValidationError(
                 f"{resource_type} imports require a matching exact Observation"
@@ -207,13 +221,14 @@ def _validate_entry(
                 f"{resource_type} source identity must be a UUID"
             ) from exc
     elif resource_type == "steps":
-        specific_fields = {"aggregation_method_version", "sample_count"}
+        specific_fields = {"aggregation_method_version", "sample_count", "source_revision"}
         if (
             not isinstance(record, ObservationSchemaV1)
             or not isinstance(record.payload.value, StepCountValueV1)
             or record.domain != DailyDomain.EXERCISE
             or not isinstance(record.time, DateOnlyTimePoint)
             or metadata.aggregation_method_version is None
+            or metadata.source_revision is None
         ):
             raise HealthKitImportValidationError(
                 "step imports require a dated daily aggregate and method version"
@@ -236,6 +251,7 @@ def _validate_entry(
             "maximum",
             "coverage_start",
             "coverage_end",
+            "source_revision",
         }
         if (
             not isinstance(record, ObservationSchemaV1)
@@ -249,6 +265,7 @@ def _validate_entry(
             or metadata.maximum is None
             or metadata.coverage_start is None
             or metadata.coverage_end is None
+            or metadata.source_revision is None
         ):
             raise HealthKitImportValidationError(
                 "heart-rate summaries require mean, range, count, coverage, and method version"
@@ -303,10 +320,17 @@ def _result_from_row(row: HealthKitImportBatch, *, replayed: bool) -> HealthKitI
 
 
 def _daily_record_for_resource(
-    owner_id: UUID, resource_type: str, source_sample_id: str, entry: HealthKitImportEntry
+    owner_id: UUID,
+    resource_type: str,
+    source_sample_id: str,
+    installation_id: UUID,
+    policy_version: str,
+    entry: HealthKitImportEntry,
 ) -> tuple[UUID, CreateDailyEntry]:
     object_id = uuid5(owner_id, f"healthkit:{resource_type}:{source_sample_id}")
-    metadata = _metadata_for_object(resource_type, source_sample_id, "healthkit-v1", entry.metadata)
+    metadata = _metadata_for_object(
+        resource_type, source_sample_id, policy_version, installation_id, entry.metadata
+    )
     record = entry.record
     if isinstance(record, EventSchemaV1):
         command = CreateDailyEntry(events=(CreateDailyEvent(object_id, record, False, metadata),))
@@ -360,8 +384,13 @@ def process_healthkit_import_batch(
     }
 
     canonical_tombstones: list[str] = []
+    aggregate_tombstone_bounds: dict[str, tuple[date, str, int]] = {}
     for tombstone in batch.tombstones:
         if batch.resource_type in AGGREGATE_TYPES:
+            if tombstone.source_revision is None:
+                raise HealthKitImportValidationError(
+                    "aggregate tombstones require a source revision"
+                )
             suffix = f":{batch.policy_version}:{batch.device_installation_id}"
             if not tombstone.source_sample_id.startswith(
                 "daily:"
@@ -381,7 +410,16 @@ def process_healthkit_import_batch(
             ):
                 raise HealthKitImportValidationError("aggregate tombstone identity is invalid")
             canonical_tombstones.append(tombstone.source_sample_id)
+            aggregate_tombstone_bounds[tombstone.source_sample_id] = (
+                tombstone_day,
+                tombstone_timezone,
+                tombstone.source_revision,
+            )
         else:
+            if tombstone.source_revision is not None:
+                raise HealthKitImportValidationError(
+                    "sample tombstones cannot contain an aggregate source revision"
+                )
             try:
                 canonical_tombstones.append(str(UUID(tombstone.source_sample_id)))
             except ValueError as exc:
@@ -423,6 +461,15 @@ def process_healthkit_import_batch(
             for entry in batch.entries:
                 source_sample_id = _canonical_sample_id(entry.source_sample_id)
                 aggregate_day, aggregate_timezone = aggregate_bounds[entry.source_sample_id]
+                is_aggregate = _is_aggregate_record(entry, batch.resource_type)
+                source_revision = 0
+                if is_aggregate:
+                    aggregate_source_revision = entry.metadata.source_revision
+                    if aggregate_source_revision is None:
+                        raise HealthKitImportValidationError(
+                            "aggregate imports require a source revision"
+                        )
+                    source_revision = aggregate_source_revision
                 content_hash = hashlib.sha256(
                     json.dumps(
                         _canonical_entry(entry),
@@ -435,16 +482,66 @@ def process_healthkit_import_batch(
                     HealthKitImportIdentity,
                     (owner_id, "apple_healthkit", batch.resource_type, source_sample_id),
                 )
-                if identity is not None and identity.tombstoned_at is not None:
+                if is_aggregate:
+                    sibling_rows = list(
+                        session.scalars(
+                            select(HealthKitImportIdentity)
+                            .where(
+                                HealthKitImportIdentity.owner_id == owner_id,
+                                HealthKitImportIdentity.resource_type == batch.resource_type,
+                                HealthKitImportIdentity.device_installation_id
+                                == batch.device_installation_id,
+                                HealthKitImportIdentity.aggregate_date == aggregate_day,
+                                HealthKitImportIdentity.is_aggregate.is_(True),
+                            )
+                            .with_for_update()
+                        )
+                    )
+                    sibling_floor = max((row.source_revision for row in sibling_rows), default=0)
+                    deleted_revision = max(
+                        (
+                            row.source_revision
+                            for row in sibling_rows
+                            if row.tombstoned_at is not None
+                        ),
+                        default=0,
+                    )
+                    if (
+                        source_revision < sibling_floor
+                        or source_revision <= deleted_revision
+                        or (
+                            identity is not None
+                            and identity.tombstoned_at is not None
+                            and source_revision <= identity.source_revision
+                        )
+                    ):
+                        counts["unchanged_count"] += 1
+                        continue
+                    if identity is not None and source_revision == identity.source_revision:
+                        if identity.content_hash == content_hash and identity.tombstoned_at is None:
+                            counts["unchanged_count"] += 1
+                            continue
+                        if identity.tombstoned_at is not None:
+                            counts["unchanged_count"] += 1
+                            continue
+                        raise HealthKitImportConflict(
+                            "aggregate content changed without advancing its source revision"
+                        )
+                elif identity is not None and identity.tombstoned_at is not None:
+                    # Low-frequency sample deletions are terminal, including
+                    # tombstones accepted before a sample was first observed.
                     counts["unchanged_count"] += 1
                     continue
+
                 object_id, daily_command = _daily_record_for_resource(
                     owner_id,
                     batch.resource_type,
                     source_sample_id,
+                    batch.device_installation_id,
+                    batch.policy_version,
                     entry.model_copy(update={"source_sample_id": source_sample_id}),
                 )
-                if identity is None:
+                if identity is None or identity.object_id is None:
                     collision = session.get(HealthObject, object_id)
                     if collision is not None:
                         raise HealthKitImportConflict("source identity is already in use")
@@ -454,7 +551,6 @@ def process_healthkit_import_batch(
                     imported_object_id = (
                         result.events[0][0].id if result.events else result.observations[0][0].id
                     )
-                    is_aggregate = _is_aggregate_record(entry, batch.resource_type)
                     selected = True
                     if is_aggregate:
                         preference = _ensure_preference(
@@ -465,52 +561,83 @@ def process_healthkit_import_batch(
                             source,
                         )
                         selected = preference.device_installation_id == batch.device_installation_id
-                    identity = HealthKitImportIdentity(
-                        owner_id=owner_id,
-                        platform="apple_healthkit",
-                        resource_type=batch.resource_type,
-                        source_sample_id=source_sample_id,
-                        object_id=imported_object_id,
-                        device_installation_id=batch.device_installation_id,
-                        content_hash=content_hash,
-                        is_aggregate=is_aggregate,
-                        aggregate_date=aggregate_day,
-                        aggregate_timezone=aggregate_timezone,
-                        policy_version=batch.policy_version,
-                        analytics_selected=selected,
-                    )
-                    session.add(identity)
+                    if identity is None:
+                        identity = HealthKitImportIdentity(
+                            owner_id=owner_id,
+                            platform="apple_healthkit",
+                            resource_type=batch.resource_type,
+                            source_sample_id=source_sample_id,
+                            object_id=imported_object_id,
+                            device_installation_id=batch.device_installation_id,
+                            content_hash=content_hash,
+                            is_aggregate=is_aggregate,
+                            aggregate_date=aggregate_day,
+                            aggregate_timezone=aggregate_timezone,
+                            source_revision=source_revision or 0,
+                            policy_version=batch.policy_version,
+                            analytics_selected=selected,
+                        )
+                        session.add(identity)
+                    else:
+                        identity.object_id = imported_object_id
+                        identity.content_hash = content_hash
+                        identity.device_installation_id = batch.device_installation_id
+                        identity.source_revision = source_revision or 0
+                        identity.tombstoned_at = None
                     counts["created_count"] += 1
                     continue
 
+                assert identity is not None
                 if identity.content_hash == content_hash:
+                    if is_aggregate and source_revision is not None:
+                        identity.source_revision = source_revision
+                        identity.tombstoned_at = None
                     counts["unchanged_count"] += 1
                     continue
 
                 aggregate = get_daily_item(session, owner_id, identity.object_id)
                 obj = aggregate[0]
-                if aggregate[2].source_kind != "device" or obj.confirmation_status != "unconfirmed":
+                is_user_archived = identity.user_archived or (
+                    obj.status == "archived" and identity.tombstoned_at is None
+                )
+                if (
+                    is_user_archived
+                    or aggregate[2].source_kind != "device"
+                    or obj.confirmation_status != "unconfirmed"
+                ):
+                    if obj.status == "archived" and aggregate[2].source_kind == "device":
+                        identity.user_archived = True
                     identity.content_hash = content_hash
+                    identity.device_installation_id = batch.device_installation_id
+                    if is_aggregate and source_revision is not None:
+                        identity.source_revision = source_revision
+                        identity.tombstoned_at = None
                     counts["correction_count"] += 1
                     continue
-                record = entry.record
                 update_daily_item(
                     session,
                     owner_id,
                     identity.object_id,
                     obj.revision,
-                    record,
+                    entry.record,
                     ai_use_allowed=False,
                     metadata=_metadata_for_object(
                         batch.resource_type,
                         source_sample_id,
                         batch.policy_version,
+                        batch.device_installation_id,
                         entry.metadata,
                     ),
                     write_source=source,
+                    restore_archived=(
+                        identity.tombstoned_at is not None and not identity.user_archived
+                    ),
                 )
                 identity.content_hash = content_hash
                 identity.device_installation_id = batch.device_installation_id
+                if is_aggregate and source_revision is not None:
+                    identity.source_revision = source_revision
+                    identity.tombstoned_at = None
                 counts["updated_count"] += 1
 
             for source_sample_id in canonical_tombstones:
@@ -518,16 +645,182 @@ def process_healthkit_import_batch(
                     HealthKitImportIdentity,
                     (owner_id, "apple_healthkit", batch.resource_type, source_sample_id),
                 )
-                if identity is None or identity.tombstoned_at is not None:
+                now = datetime.now(UTC)
+                if batch.resource_type in AGGREGATE_TYPES:
+                    aggregate_day, aggregate_timezone, source_revision = aggregate_tombstone_bounds[
+                        source_sample_id
+                    ]
+                    sibling_rows = list(
+                        session.scalars(
+                            select(HealthKitImportIdentity)
+                            .where(
+                                HealthKitImportIdentity.owner_id == owner_id,
+                                HealthKitImportIdentity.resource_type == batch.resource_type,
+                                HealthKitImportIdentity.device_installation_id
+                                == batch.device_installation_id,
+                                HealthKitImportIdentity.aggregate_date == aggregate_day,
+                                HealthKitImportIdentity.is_aggregate.is_(True),
+                            )
+                            .with_for_update()
+                        )
+                    )
+                    sibling_floor = max((row.source_revision for row in sibling_rows), default=0)
+                    same_revision_deleted = any(
+                        row.source_revision == source_revision and row.tombstoned_at is not None
+                        for row in sibling_rows
+                    )
+                    if (
+                        identity is not None
+                        and identity.tombstoned_at is not None
+                        and source_revision <= identity.source_revision
+                    ):
+                        counts["unchanged_count"] += 1
+                        continue
+                    if source_revision < sibling_floor:
+                        counts["unchanged_count"] += 1
+                        continue
+                    if (
+                        source_revision == sibling_floor
+                        and not same_revision_deleted
+                        and (identity is None or identity.tombstoned_at is None)
+                    ):
+                        raise HealthKitImportConflict(
+                            "aggregate deletion must advance its source revision"
+                        )
+                    if identity is None:
+                        identity = HealthKitImportIdentity(
+                            owner_id=owner_id,
+                            platform="apple_healthkit",
+                            resource_type=batch.resource_type,
+                            source_sample_id=source_sample_id,
+                            object_id=None,
+                            device_installation_id=batch.device_installation_id,
+                            content_hash=hashlib.sha256(
+                                f"deleted:{source_sample_id}:{source_revision}".encode()
+                            ).hexdigest(),
+                            is_aggregate=True,
+                            aggregate_date=aggregate_day,
+                            aggregate_timezone=aggregate_timezone,
+                            source_revision=source_revision,
+                            policy_version=batch.policy_version,
+                            analytics_selected=True,
+                            tombstoned_at=now,
+                        )
+                        session.add(identity)
+                    else:
+                        identity.source_revision = source_revision
+                        identity.tombstoned_at = now
+                        identity.content_hash = hashlib.sha256(
+                            f"deleted:{source_sample_id}:{source_revision}".encode()
+                        ).hexdigest()
+                    for sibling in sibling_rows:
+                        if sibling.source_revision >= source_revision:
+                            continue
+                        sibling.source_revision = source_revision
+                        sibling.tombstoned_at = now
+                        if sibling.object_id is not None:
+                            sibling_item = get_daily_item(session, owner_id, sibling.object_id)
+                            sibling_obj = sibling_item[0]
+                            if (
+                                sibling_obj.status == "archived"
+                                and sibling_item[2].source_kind == "device"
+                                and sibling_obj.confirmation_status == "unconfirmed"
+                            ):
+                                sibling.user_archived = True
+                            if (
+                                sibling_obj.status == "active"
+                                and sibling_item[2].source_kind == "device"
+                                and sibling_obj.confirmation_status == "unconfirmed"
+                            ):
+                                archive_daily_item(
+                                    session,
+                                    owner_id,
+                                    sibling.object_id,
+                                    sibling_obj.revision,
+                                    source_deletion=True,
+                                )
+                    if identity.object_id is not None:
+                        aggregate = get_daily_item(session, owner_id, identity.object_id)
+                        obj = aggregate[0]
+                        if (
+                            obj.status == "archived"
+                            and aggregate[2].source_kind == "device"
+                            and obj.confirmation_status == "unconfirmed"
+                        ):
+                            identity.user_archived = True
+                        if (
+                            obj.status == "active"
+                            and aggregate[2].source_kind == "device"
+                            and obj.confirmation_status == "unconfirmed"
+                        ):
+                            archive_daily_item(
+                                session,
+                                owner_id,
+                                identity.object_id,
+                                obj.revision,
+                                source_deletion=True,
+                            )
+                        elif (
+                            aggregate[2].source_kind != "device"
+                            or obj.confirmation_status != "unconfirmed"
+                        ):
+                            counts["correction_count"] += 1
+                    counts["tombstoned_count"] += 1
+                    continue
+
+                if identity is None:
+                    identity = HealthKitImportIdentity(
+                        owner_id=owner_id,
+                        platform="apple_healthkit",
+                        resource_type=batch.resource_type,
+                        source_sample_id=source_sample_id,
+                        object_id=None,
+                        device_installation_id=batch.device_installation_id,
+                        content_hash=hashlib.sha256(
+                            f"deleted:{source_sample_id}".encode()
+                        ).hexdigest(),
+                        is_aggregate=False,
+                        aggregate_date=None,
+                        aggregate_timezone=None,
+                        source_revision=0,
+                        policy_version=batch.policy_version,
+                        analytics_selected=True,
+                        tombstoned_at=now,
+                    )
+                    session.add(identity)
+                    counts["tombstoned_count"] += 1
+                    continue
+                if identity.tombstoned_at is not None:
                     counts["unchanged_count"] += 1
+                    continue
+                identity.tombstoned_at = now
+                if identity.object_id is None:
+                    counts["tombstoned_count"] += 1
                     continue
                 aggregate = get_daily_item(session, owner_id, identity.object_id)
                 obj = aggregate[0]
-                identity.tombstoned_at = datetime.now(UTC)
-                if aggregate[2].source_kind != "device" or obj.confirmation_status != "unconfirmed":
+                if (
+                    obj.status == "archived"
+                    and aggregate[2].source_kind == "device"
+                    and obj.confirmation_status == "unconfirmed"
+                ):
+                    identity.user_archived = True
+                if (
+                    obj.status == "active"
+                    and aggregate[2].source_kind == "device"
+                    and obj.confirmation_status == "unconfirmed"
+                ):
+                    archive_daily_item(
+                        session,
+                        owner_id,
+                        identity.object_id,
+                        obj.revision,
+                        source_deletion=True,
+                    )
+                elif (
+                    aggregate[2].source_kind != "device" or obj.confirmation_status != "unconfirmed"
+                ):
                     counts["correction_count"] += 1
-                    continue
-                archive_daily_item(session, owner_id, identity.object_id, obj.revision)
                 counts["tombstoned_count"] += 1
 
             receipt = HealthKitImportBatch(
@@ -638,6 +931,7 @@ def set_healthkit_source_preference(
                     HealthKitImportIdentity.device_installation_id
                     == request.device_installation_id,
                     HealthKitImportIdentity.is_aggregate.is_(True),
+                    HealthKitImportIdentity.object_id.is_not(None),
                 )
                 .limit(1)
             )

@@ -49,6 +49,7 @@ type StepsAggregate = SourceDetails & {
   count: number;
   installationId: string;
   methodVersion: string;
+  sourceRevision: number;
   sampleCount?: number;
 };
 
@@ -63,6 +64,7 @@ type HeartRateSummary = SourceDetails & {
   coverageStart: string;
   coverageEnd: string;
   methodVersion: string;
+  sourceRevision: number;
 };
 
 function sourceMetadata(source: SourceDetails): HealthKitImportMetadata {
@@ -82,9 +84,32 @@ function dailyAggregateId(
   return `daily:${localDate}:${timezone}:healthkit-v1:${installationId}`;
 }
 
+function validateSourceRevision(value: number): void {
+  if (!Number.isSafeInteger(value) || value < 1)
+    throw new Error(
+      "Aggregate source revision must be a positive safe integer.",
+    );
+}
+
+function validateStepCount(value: number): void {
+  if (
+    !Number.isFinite(value) ||
+    !Number.isInteger(value) ||
+    value < 0 ||
+    value > 1e300
+  )
+    throw new Error(
+      "HealthKit step count must be a bounded nonnegative integer.",
+    );
+}
+
 export function mapWorkout(sample: WorkoutSample): NormalizedHealthSample {
   const hasEnd = sample.endedAt !== undefined;
   const duration = hasEnd ? undefined : sample.durationMinutes;
+  if (!hasEnd && duration === undefined)
+    throw new Error(
+      "Workout imports require an end time or an explicit duration.",
+    );
   return {
     sourceSampleId: sample.id,
     record: {
@@ -179,6 +204,8 @@ export function mapRestingHeartRate(
 }
 
 export function mapSteps(aggregate: StepsAggregate): NormalizedHealthSample {
+  validateSourceRevision(aggregate.sourceRevision);
+  validateStepCount(aggregate.count);
   return {
     sourceSampleId: dailyAggregateId(
       aggregate.localDate,
@@ -201,6 +228,7 @@ export function mapSteps(aggregate: StepsAggregate): NormalizedHealthSample {
     metadata: {
       ...sourceMetadata(aggregate),
       aggregation_method_version: aggregate.methodVersion,
+      source_revision: aggregate.sourceRevision,
       ...(aggregate.sampleCount === undefined
         ? {}
         : { sample_count: aggregate.sampleCount }),
@@ -211,6 +239,7 @@ export function mapSteps(aggregate: StepsAggregate): NormalizedHealthSample {
 export function mapHeartRateSummary(
   aggregate: HeartRateSummary,
 ): NormalizedHealthSample {
+  validateSourceRevision(aggregate.sourceRevision);
   return {
     sourceSampleId: dailyAggregateId(
       aggregate.localDate,
@@ -237,6 +266,7 @@ export function mapHeartRateSummary(
     metadata: {
       ...sourceMetadata(aggregate),
       aggregation_method_version: aggregate.methodVersion,
+      source_revision: aggregate.sourceRevision,
       sample_count: aggregate.sampleCount,
       minimum: aggregate.minimumBpm,
       maximum: aggregate.maximumBpm,

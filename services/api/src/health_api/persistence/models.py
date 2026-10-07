@@ -7,6 +7,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    BigInteger,
     CheckConstraint,
     Date,
     DateTime,
@@ -357,15 +358,17 @@ class HealthKitImportIdentity(Base):
     )
     resource_type: Mapped[str] = mapped_column(String(32), primary_key=True)
     source_sample_id: Mapped[str] = mapped_column(String(256), primary_key=True)
-    object_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    object_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
     device_installation_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     is_aggregate: Mapped[bool] = mapped_column(nullable=False, server_default=text("false"))
     aggregate_date: Mapped[date | None] = mapped_column(Date)
     aggregate_timezone: Mapped[str | None] = mapped_column(String(64))
+    source_revision: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
     policy_version: Mapped[str] = mapped_column(String(32), nullable=False)
     analytics_selected: Mapped[bool] = mapped_column(nullable=False, server_default=text("true"))
     tombstoned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    user_archived: Mapped[bool] = mapped_column(nullable=False, server_default=text("false"))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
@@ -389,9 +392,17 @@ class HealthKitImportIdentity(Base):
         CheckConstraint("length(content_hash) = 64", name="ck_healthkit_identity_hash"),
         CheckConstraint("policy_version = 'healthkit-v1'", name="ck_healthkit_identity_policy"),
         CheckConstraint(
+            "source_revision BETWEEN 0 AND 9007199254740991",
+            name="ck_healthkit_identity_source_revision",
+        ),
+        CheckConstraint(
             "(is_aggregate AND aggregate_date IS NOT NULL AND aggregate_timezone IS NOT NULL) OR "
             "(NOT is_aggregate AND aggregate_date IS NULL AND aggregate_timezone IS NULL AND analytics_selected)",
             name="ck_healthkit_identity_aggregate_shape",
+        ),
+        CheckConstraint(
+            "object_id IS NOT NULL OR tombstoned_at IS NOT NULL",
+            name="ck_healthkit_identity_object_or_tombstone",
         ),
         UniqueConstraint("owner_id", "object_id", name="uq_healthkit_identity_object"),
         Index(
@@ -791,6 +802,14 @@ class ObservationItem(Base):
             "(metric_key <> 'symptom_severity' OR "
             "(numeric_value >= 0 AND numeric_value <= 10 AND numeric_value = trunc(numeric_value))))",
             name="ck_observations_numeric_value",
+        ),
+        CheckConstraint(
+            "metric_key <> 'steps' OR (time_precision = 'date_only' AND interval_end IS NULL)",
+            name="ck_observations_steps_date_only",
+        ),
+        CheckConstraint(
+            "metric_key <> 'steps' OR (numeric_value >= 0 AND numeric_value <= 1e300)",
+            name="ck_observations_steps_numeric_bound",
         ),
         CheckConstraint(
             "(time_precision = 'instant' AND observed_at IS NOT NULL AND local_date IS NULL) OR "

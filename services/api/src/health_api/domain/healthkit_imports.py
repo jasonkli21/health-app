@@ -39,6 +39,7 @@ class HealthKitImportMetadata(StrictModel):
     maximum: FiniteDailyNumber | None = None
     coverage_start: AwareDatetime | None = None
     coverage_end: AwareDatetime | None = None
+    source_revision: Annotated[StrictInt, Field(ge=1, le=9_007_199_254_740_991)] | None = None
 
     @model_validator(mode="after")
     def coverage_is_ordered(self) -> HealthKitImportMetadata:
@@ -63,6 +64,7 @@ class HealthKitImportEntry(StrictModel):
 
 class HealthKitImportTombstone(StrictModel):
     source_sample_id: Annotated[StrictStr, StringConstraints(min_length=1, max_length=256)]
+    source_revision: Annotated[StrictInt, Field(ge=1, le=9_007_199_254_740_991)] | None = None
 
 
 class HealthKitImportBatchRequest(StrictModel):

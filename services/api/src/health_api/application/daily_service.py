@@ -34,6 +34,7 @@ from health_api.domain.schemas import (
 from health_api.persistence.models import (
     EventItem,
     EventObservationLink,
+    HealthKitImportIdentity,
     HealthObject,
     HealthObjectRevision,
     ObservationItem,
@@ -857,6 +858,7 @@ def update_daily_item(
     *,
     write_source: Source | None = None,
     proposal_id: UUID | None = None,
+    restore_archived: bool = False,
 ) -> DailyAggregate:
     try:
         with unit_of_work(session):
@@ -873,12 +875,14 @@ def update_daily_item(
             expected_type = "event" if isinstance(record, EventSchemaV1) else "observation"
             if obj.object_type != expected_type:
                 raise DailyNotFound
-            if obj.status != "active":
+            if obj.status != "active" and not (restore_archived and obj.status == "archived"):
                 raise DailyConflict("archived daily entries cannot be edited")
             if obj.revision != expected_revision:
                 raise DailyConflict("daily entry has changed; reload before saving")
             aggregate = _daily_aggregate(session, owner_id, object_id)
             source = write_source or manual_source(session, owner_id)
+            if restore_archived:
+                obj.status = "active"
             obj.source_id = source.id
             obj.confirmation_status = (
                 "unconfirmed" if source.source_kind == "device" else "user_confirmed"
@@ -1004,6 +1008,7 @@ def archive_daily_item(
     expected_revision: int,
     *,
     expected_object_type: str | None = None,
+    source_deletion: bool = False,
 ) -> DailyAggregate:
     with unit_of_work(session):
         owner = session.scalar(select(User).where(User.id == owner_id).with_for_update())
@@ -1028,6 +1033,17 @@ def archive_daily_item(
         source = aggregate[2]
         obj.status = "archived"
         obj.revision += 1
+        if not source_deletion:
+            import_identity = session.scalar(
+                select(HealthKitImportIdentity)
+                .where(
+                    HealthKitImportIdentity.owner_id == owner_id,
+                    HealthKitImportIdentity.object_id == object_id,
+                )
+                .with_for_update()
+            )
+            if import_identity is not None:
+                import_identity.user_archived = True
         sequence = next_daily_sequence(session, owner_id)
         session.flush()
         if _is_event_aggregate(aggregate):

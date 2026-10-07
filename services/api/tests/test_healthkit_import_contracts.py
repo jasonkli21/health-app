@@ -57,6 +57,36 @@ def test_workout_contract_requires_exercise_domain_and_no_notes() -> None:
             workout_entry(notes="private note"), "workouts", INSTALLATION_ID, POLICY_VERSION
         )
 
+    incomplete = workout_entry().model_dump(mode="python")
+    incomplete["record"]["payload"]["duration"] = None
+    entry = HealthKitImportEntry.model_validate(incomplete)
+    with pytest.raises(HealthKitImportValidationError, match="end time or an explicit duration"):
+        _validate_entry(entry, "workouts", INSTALLATION_ID, POLICY_VERSION)
+
+
+@pytest.mark.parametrize(
+    ("resource_type", "metric", "unit"),
+    [("weight", "weight", "kg"), ("resting_heart_rate", "resting_heart_rate", "bpm")],
+)
+def test_low_frequency_imports_reject_intervals(resource_type: str, metric: str, unit: str) -> None:
+    entry = HealthKitImportEntry.model_validate(
+        {
+            "source_sample_id": str(uuid4()),
+            "record": {
+                "domain": "measurements",
+                "time": {
+                    "precision": "instant",
+                    "occurred_at": "2026-10-01T16:00:00Z",
+                    "timezone": "UTC",
+                },
+                "interval_end": "2026-10-01T16:01:00Z",
+                "payload": {"value": {"metric": metric, "value": 70, "unit": unit}},
+            },
+        }
+    )
+    with pytest.raises(HealthKitImportValidationError, match="exact Observation"):
+        _validate_entry(entry, resource_type, INSTALLATION_ID, POLICY_VERSION)
+
 
 def test_step_aggregate_requires_integer_count_and_canonical_installation_key() -> None:
     source_sample_id = f"daily:2026-10-01:America/Los_Angeles:healthkit-v1:{INSTALLATION_ID}"
@@ -74,7 +104,10 @@ def test_step_aggregate_requires_integer_count_and_canonical_installation_key() 
                 "payload": {"value": {"metric": "steps", "value": 0, "unit": "steps"}},
                 "notes": None,
             },
-            "metadata": {"aggregation_method_version": "hk-steps-source-v1"},
+            "metadata": {
+                "aggregation_method_version": "hk-steps-source-v1",
+                "source_revision": 1,
+            },
         }
     )
     assert _validate_entry(entry, "steps", INSTALLATION_ID, POLICY_VERSION) == (
@@ -115,6 +148,7 @@ def test_heart_rate_summary_requires_in_day_coverage_and_mean_in_range() -> None
             },
             "metadata": {
                 "aggregation_method_version": "hk-heart-rate-v1",
+                "source_revision": 1,
                 "sample_count": 360,
                 "minimum": 52,
                 "maximum": 116,

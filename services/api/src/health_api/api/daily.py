@@ -52,6 +52,7 @@ from health_api.application.daily_service import (
 from health_api.application.errors import DailyNotFound
 from health_api.application.planning_service import load_today_planning
 from health_api.application.today_service import (
+    healthkit_preferred_installations,
     is_today_snapshot_boundary,
     load_today_snapshot,
     owner_today_settings,
@@ -864,7 +865,7 @@ def get_today(
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     cursor: Annotated[str | None, Query(max_length=2048)] = None,
 ) -> TodayResponse:
-    current_sequence, display_timezone = owner_today_settings(session, owner_id)
+    current_sequence, display_timezone = owner_today_settings(session, owner_id, lock_for_read=True)
     try:
         effective_timezone = validate_iana_timezone(timezone or display_timezone)
     except ValueError as exc:
@@ -906,7 +907,12 @@ def get_today(
             _today_key(page[-1], effective_timezone),
         )
 
-    summaries = summarize_today_snapshot(snapshot.revisions, effective_date, effective_timezone)
+    summaries = summarize_today_snapshot(
+        snapshot.revisions,
+        effective_date,
+        effective_timezone,
+        healthkit_preferred_installations(session, owner_id),
+    )
     plan_items, active_contexts = (
         load_today_planning(session, owner_id, effective_date, effective_timezone)
         if cursor is None

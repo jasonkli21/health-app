@@ -454,6 +454,9 @@ describe("daily entry builders", () => {
         payload: { value: { metric: "steps", value: 9000, unit: "steps" } },
       },
     });
+    expect(
+      buildDailyUpdateRecord(steps, { ...draft, measurementValue: "1e301" }),
+    ).toMatchObject({ ok: false });
   });
 
   it("round trips event and Observation interval bounds, original units, and microseconds", () => {

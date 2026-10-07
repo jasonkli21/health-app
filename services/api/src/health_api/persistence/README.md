@@ -12,8 +12,12 @@ stale current derived artifacts without rewriting their original snapshots.
 Phase 8 adds `healthkit_import_batches`, `healthkit_import_identities`, and
 `healthkit_source_preferences`. They retain receipt/identity/preference
 metadata only; native query anchors and raw HealthKit samples stay on the
-device. Import identity rows reference the canonical owner-scoped health
-object and are removed by the future owner-erasure workflow.
+device. Follow-up migration `20261007a0b1` allows tombstone identities without
+a fabricated health object, tracks a bounded aggregate source revision and
+user-archive state, and enforces date-only bounded step rows for new writes.
+Object-linked import identities and tombstone-only identities are removed by
+the future owner-erasure workflow. See the migration README for downgrade
+limits.
 JSON health payloads use PostgreSQL JSONB and are validated through typed
 domain schemas before writes. Composite foreign keys include `owner_id` for
 source, subtype, revision, proposal, receipt, and relationship references;

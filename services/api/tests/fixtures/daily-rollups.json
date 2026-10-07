@@ -201,7 +201,7 @@
       "known_count": 1,
       "total_count": 1,
       "partial": false,
-      "method_version": "today-v1/sum-overlap-v1/unit-v1"
+      "method_version": "today-v1/sleep-segment-selected-v1/unit-v1"
     },
     "symptoms/symptom_episode_count": {
       "known_value": 2,
