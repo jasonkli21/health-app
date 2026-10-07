@@ -76,6 +76,13 @@ export default function HomeScreen() {
         >
           Open Assistant
         </Link>
+        <Link
+          accessibilityRole="button"
+          style={styles.secondaryLink}
+          href="/healthkit"
+        >
+          Health connections
+        </Link>
       </View>
     </SafeAreaView>
   );

@@ -109,9 +109,40 @@ one known baseline value in the owner's local timezone and rechecks the daily
 generation before committing the start. A result reports its requested
 timezone, known and missing days, and baseline/intervention means, with no
 causal claim. Optional links retain a specific owner planning-resource
-revision. HealthKit imports do not exist yet; Phase 8 ingestion must call the
-analytics invalidation hook in the same owner transaction when it changes
-canonical daily data.
+revision. Phase 8 HealthKit ingestion calls the analytics invalidation hook in
+the same owner transaction when it changes canonical daily data.
+
+## Phase 8 selective HealthKit imports
+
+`healthkit_import_batches` stores owner-scoped batch IDs, server-computed
+content hashes, policy version, device installation, receipt counts, and
+creation time; it does not store uploaded sample bodies or native anchors.
+`healthkit_import_identities` maps `(owner, platform, resource type, source
+sample ID)` to one canonical Event or Observation. Low-frequency sample IDs
+dedupe across installations. Daily step and heart-rate aggregates use a
+stable installation/date/timezone/policy identity so independent device
+totals are never summed. `healthkit_source_preferences` records an
+owner-selected installation and optimistic revision for each aggregate type.
+
+Imported daily rows use the existing canonical Event/Observation envelope,
+revision history, and device provenance. They start `unconfirmed`, with both
+AI-use and cross-domain-use disabled. The closed API metadata allowlist stores
+source identifiers, sleep stage, aggregate method version, and bounded
+summary count/range/coverage fields in envelope metadata. High-frequency raw
+heart-rate samples and HealthKit anchors remain on the device. Daily steps are
+a typed date-only `StepCountValueV1`; resting heart rate and daily heart-rate
+mean use additive Observation metrics and BPM units. The current sleep Event
+keeps stage in allowlisted metadata; changing this to a typed stage payload
+requires a new schema version and migration policy.
+
+Tombstones archive only the corresponding device-sourced, unconfirmed row and
+retain its identity so a repeated read cannot resurrect it. A user edit
+changes the current source to manual and `user_confirmed`; later source
+updates/deletions do not overwrite or archive that correction. Source
+preference changes invalidate derived analytics in their transaction, and
+Today/trend inputs ignore unselected aggregate installations. Phase 9 erasure
+must remove owner-scoped import receipts/identities/preferences, secure local
+checkpoints, and local consent before preventing automatic re-import.
 
 ## Phase 1 Profile v1 contract
 

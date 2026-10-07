@@ -278,12 +278,25 @@ def summarize_today(
         )
     )
 
+    step_rows = metric_observations[MetricKey.STEPS]
+    result.append(
+        _summary(
+            DailyDomain.EXERCISE,
+            MetricKey.STEPS,
+            [row[2] for row in step_rows],
+            len(step_rows),
+            "sum-selected-device-day-v1",
+        )
+    )
+
     for metric in (
         MetricKey.WEIGHT,
         MetricKey.TEMPERATURE,
         MetricKey.SYSTOLIC_PRESSURE,
         MetricKey.DIASTOLIC_PRESSURE,
         MetricKey.PULSE,
+        MetricKey.RESTING_HEART_RATE,
+        MetricKey.HEART_RATE_SUMMARY,
     ):
         rows = metric_observations[metric]
         rows.sort(key=lambda row: _observation_order(row[1], local_date, timezone, row[0]))

@@ -36,6 +36,9 @@ class AnalyticsMetric(StrEnum):
     SYSTOLIC_PRESSURE = "systolic_pressure"
     DIASTOLIC_PRESSURE = "diastolic_pressure"
     PULSE = "pulse"
+    STEPS = "steps"
+    RESTING_HEART_RATE = "resting_heart_rate"
+    HEART_RATE_SUMMARY = "heart_rate_summary"
 
 
 AnalysisMetricId = Annotated[
@@ -44,6 +47,7 @@ AnalysisMetricId = Annotated[
         pattern=(
             r"^(energy|exercise_duration|exercise_distance|sleep_duration|symptom_severity|"
             r"symptom_episode_count|weight|temperature|systolic_pressure|diastolic_pressure|pulse|"
+            r"steps|resting_heart_rate|heart_rate_summary|"
             r"tracker:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:"
             r"[a-z][a-z0-9_]{0,31}:v[1-9][0-9]*)$"
         )
@@ -135,6 +139,27 @@ METRIC_CATALOG: dict[AnalyticsMetric, MetricDefinition] = {
         label="Latest pulse",
         unit="bpm",
         aggregation="latest known observation per local date",
+        minimum_known_days=5,
+    ),
+    AnalyticsMetric.STEPS: MetricDefinition(
+        metric=AnalyticsMetric.STEPS,
+        label="Daily steps",
+        unit="steps",
+        aggregation="selected device daily aggregate; independent device totals are never summed",
+        minimum_known_days=5,
+    ),
+    AnalyticsMetric.RESTING_HEART_RATE: MetricDefinition(
+        metric=AnalyticsMetric.RESTING_HEART_RATE,
+        label="Latest resting heart rate",
+        unit="bpm",
+        aggregation="latest reported resting heart rate per local date",
+        minimum_known_days=5,
+    ),
+    AnalyticsMetric.HEART_RATE_SUMMARY: MetricDefinition(
+        metric=AnalyticsMetric.HEART_RATE_SUMMARY,
+        label="Daily heart-rate summary mean",
+        unit="bpm",
+        aggregation="selected source summary mean per local date; sample coverage remains linked metadata",
         minimum_known_days=5,
     ),
 }

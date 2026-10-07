@@ -23,7 +23,7 @@ curl --fail http://127.0.0.1:8000/healthz
 EXPO_PUBLIC_API_URL=http://127.0.0.1:8000 pnpm mobile:start
 ```
 
-The shell uses Expo Go; it does not require an already-built development client. Use a compatible Expo Go simulator/device installation. `pnpm --filter @personal-health/mobile ios` builds the native shell locally if Xcode is installed. Phase 8 will introduce a development build for HealthKit. A Metro bundle check alone does not verify rendering on a device.
+The shell uses Expo Go; it does not require an already-built development client. Use a compatible Expo Go simulator/device installation. `pnpm --filter @personal-health/mobile ios` builds the native shell locally if Xcode is installed. The current Phase 8 implementation does not install a HealthKit native module or enable permissions; HealthKit settings remain informational until a compatible development build and native adapter are verified. A Metro bundle check alone does not verify rendering or HealthKit behavior on a device.
 
 `EXPO_PUBLIC_API_URL` is compiled into the mobile app and may contain only the API address, never credentials or principal IDs. The default is `http://127.0.0.1:8000` for the local iOS simulator. For an Android emulator use `http://10.0.2.2:8000`; for a physical device, use an approved secure endpoint reachable on a private network and configure the local API/network accordingly. Do not expose this unauthenticated local-dev API to the public internet. Rebuild/restart Metro after changing the variable.
 
@@ -37,7 +37,7 @@ When `EXPO_PUBLIC_AUTH_MODE=firebase`, the mobile app uses Firebase Authenticati
 
 Firebase mode additionally requires `EXPO_PUBLIC_FIREBASE_API_KEY`, `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN`, `EXPO_PUBLIC_FIREBASE_PROJECT_ID` and `EXPO_PUBLIC_FIREBASE_APP_ID`. These values identify the client app and are not authentication credentials. Firebase refresh tokens are persisted by the SDK through Expo SecureStore. The API obtains ownership only from a verified bearer ID token and the additive provider-identity mapping; it never trusts a client-supplied owner ID or merges identities by email.
 
-Profile requests are limited to 65,536 bytes and errors do not include submitted values. Responses include a server-generated `X-Request-ID`. Lists are owner/filter/as-of scoped with a 100-item maximum; preserve the returned `as_of` when following its cursor. Unknown values use explicit `null` in the required typed payload value; `false` and `0` remain known values.
+Most request bodies are limited to 65,536 bytes. The normalized HealthKit batch route is limited to 1,048,576 bytes and 200 total changes per request. Errors do not include submitted health values. Responses include a server-generated `X-Request-ID`. Lists are owner/filter/as-of scoped with a 100-item maximum; preserve the returned `as_of` when following its cursor. Unknown values use explicit `null` in the required typed payload value; `false` and `0` remain known values.
 
 ## Migrations and database tests
 

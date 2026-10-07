@@ -55,6 +55,9 @@ def canonical_unit(metric: MetricKey) -> MeasurementUnit:
         MetricKey.SYSTOLIC_PRESSURE: MeasurementUnit.MMHG,
         MetricKey.DIASTOLIC_PRESSURE: MeasurementUnit.MMHG,
         MetricKey.PULSE: MeasurementUnit.BPM,
+        MetricKey.STEPS: MeasurementUnit.STEPS,
+        MetricKey.RESTING_HEART_RATE: MeasurementUnit.BPM,
+        MetricKey.HEART_RATE_SUMMARY: MeasurementUnit.BPM,
         MetricKey.SYMPTOM_SEVERITY: MeasurementUnit.SCORE,
         MetricKey.SYMPTOM_EPISODE_COUNT: MeasurementUnit.EPISODES,
     }[metric]
@@ -81,6 +84,9 @@ def convert_value(
         MetricKey.SYSTOLIC_PRESSURE: {MeasurementUnit.MMHG},
         MetricKey.DIASTOLIC_PRESSURE: {MeasurementUnit.MMHG},
         MetricKey.PULSE: {MeasurementUnit.BPM},
+        MetricKey.STEPS: {MeasurementUnit.STEPS},
+        MetricKey.RESTING_HEART_RATE: {MeasurementUnit.BPM},
+        MetricKey.HEART_RATE_SUMMARY: {MeasurementUnit.BPM},
         MetricKey.SYMPTOM_SEVERITY: {MeasurementUnit.SCORE},
         MetricKey.SYMPTOM_EPISODE_COUNT: {MeasurementUnit.EPISODES},
     }

@@ -11,9 +11,12 @@ their NULL reference target. Phase 5 adds full-text retrieval indexes at
 the planning migration branch. `20261006b1a2` merges both histories and drops
 the per-proposal-revision receipt uniqueness constraint so each accepted retry
 key can bind to the one canonical applied result. Phase 7 revision
-`f7c8d9e0a1b2` adds analytics artifact/evidence storage and is the current head.
-Its downgrade refuses when alternate receipt keys have already been accepted
-for one proposal revision.
+`f7c8d9e0a1b2` adds analytics artifact/evidence storage. Phase 8 revision
+`c8d9e0f1a2b3` adds bounded HealthKit batch receipts, source identities,
+aggregate source preferences, and additive Observation metrics; it is the
+current head. Its downgrade refuses when imported identities or batch history
+exist. Phase 7 downgrade refuses when alternate receipt keys have already
+been accepted for one proposal revision.
 The API never calls `metadata.create_all()` and never runs migrations during a
 request or startup.
 

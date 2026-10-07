@@ -25,6 +25,8 @@ export type MeasurementMetric =
   | "systolic_pressure"
   | "diastolic_pressure"
   | "pulse"
+  | "resting_heart_rate"
+  | "heart_rate_summary"
   | "blood_pressure";
 
 export type DailyDraft = {
@@ -478,6 +480,31 @@ export function buildDailyUpdateRecord(
           "Custom tracker entries use their saved schema and cannot be edited with the standard daily form.",
       };
     }
+    if (metric === "steps") {
+      const count = finiteOptional(draft.measurementValue, "Step count", 0);
+      if (count === null)
+        throw new Error("Enter a step count; zero is a recorded value.");
+      if (!Number.isInteger(count))
+        throw new Error("Step count must be a whole number.");
+      if (draft.precision !== "date_only")
+        throw new Error("Daily step counts must use a local calendar date.");
+      if (draft.notes.length > 2000)
+        throw new Error("Notes can be at most 2,000 characters.");
+      return {
+        ok: true,
+        value: {
+          domain: "exercise",
+          time: {
+            precision: "date_only",
+            local_date: calendarDate(draft.localDate, "Date"),
+            timezone: validTimezone(draft.timezone),
+          },
+          interval_end: null,
+          payload: { value: { metric: "steps", value: count, unit: "steps" } },
+          notes: draft.notes.trim() || null,
+        },
+      };
+    }
     if (metric === "symptom_severity") {
       return {
         ok: true,
@@ -564,6 +591,8 @@ export function draftFromDailyItem(item: DailyItem): DailyDraft {
     const value = item.observation.payload.value;
     if (value.metric === "custom") {
       draft.label = "Custom tracker entry";
+    } else if (value.metric === "steps") {
+      draft.measurementValue = String(value.value);
     } else if (value.metric === "symptom_severity") {
       draft.severity = String(value.value);
     } else {
@@ -587,6 +616,9 @@ export function metricLabel(
     systolic_pressure: "Systolic pressure",
     diastolic_pressure: "Diastolic pressure",
     pulse: "Pulse",
+    steps: "Steps",
+    resting_heart_rate: "Resting heart rate",
+    heart_rate_summary: "Daily heart-rate summary",
     symptom_severity: "Symptom severity",
     symptom_episode_count: "Symptom episodes",
   };
@@ -629,6 +661,25 @@ export function itemTimeLabel(item: DailyItem, timezone: string): string {
     timeStyle: "short",
     timeZone: timezone,
   }).format(new Date(record.time.occurred_at));
+}
+
+export function itemOriginLabel(item: DailyItem): string | null {
+  const wasHealthKitImported =
+    typeof item.metadata.healthkit_resource_type === "string";
+  if (item.source.kind === "device") {
+    return `${item.source.name} · ${wasHealthKitImported ? "imported" : "device data"}, unconfirmed`;
+  }
+  if (wasHealthKitImported) {
+    return "Manual correction · originally imported from Apple Health";
+  }
+  return null;
+}
+
+export function itemCoverageLabel(item: DailyItem): string | null {
+  const start = item.metadata.healthkit_coverage_start;
+  const end = item.metadata.healthkit_coverage_end;
+  if (typeof start !== "string" || typeof end !== "string") return null;
+  return `HealthKit source coverage: ${start} – ${end} (UTC)`;
 }
 
 export function itemValue(

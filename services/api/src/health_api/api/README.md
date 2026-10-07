@@ -57,3 +57,14 @@ verified owner dependency. Apply requires the exact proposal revision and
 content hash plus `confirmation: explicit_user_save`; retries replay a durable
 owner-scoped command receipt. See the root API contract and Phase 6 release
 evidence for all fields and current external gates.
+
+## Optional HealthKit import
+
+`healthkit_imports.py` exposes owner-authenticated normalized batches,
+receipts, status, and aggregate source preferences. The route accepts no
+caller owner ID or native anchor; all transaction and dedupe behavior stays in
+the application service. Batch bodies have a 1 MiB route limit and strict
+schema/resource bounds. The server accepts minimal allowlisted normalized
+metadata only; it does not accept raw HealthKit samples or grant AI-use
+permission. See the root API contract and Phase 8 evidence for the incomplete
+native/device gates.

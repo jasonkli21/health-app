@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import and_, or_, select, text
+from sqlalchemy import and_, exists, or_, select, text
 from sqlalchemy.orm import Session, aliased
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -22,6 +22,7 @@ from health_api.domain.schemas import (
 )
 from health_api.persistence.models import (
     DailySnapshotMarker,
+    HealthKitImportIdentity,
     HealthObject,
     HealthObjectRevision,
     ProfileItem,
@@ -118,6 +119,14 @@ def load_today_snapshot(
                 revision.daily_sequence.is_not(None),
                 revision.daily_sequence <= as_of_sequence,
                 day_condition,
+                ~exists(
+                    select(1).where(
+                        HealthKitImportIdentity.owner_id == revision.owner_id,
+                        HealthKitImportIdentity.object_id == revision.object_id,
+                        HealthKitImportIdentity.is_aggregate.is_(True),
+                        HealthKitImportIdentity.analytics_selected.is_(False),
+                    )
+                ),
             )
             .distinct()
             .order_by(revision.object_id)

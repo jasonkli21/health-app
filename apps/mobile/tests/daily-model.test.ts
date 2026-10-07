@@ -5,6 +5,8 @@ import {
   buildDailyUpdateRecord,
   draftFromDailyItem,
   emptyDailyDraft,
+  itemCoverageLabel,
+  itemOriginLabel,
   summaryPresentation,
 } from "../src/features/daily/model";
 import type {
@@ -399,6 +401,57 @@ describe("daily entry builders", () => {
         payload: {
           value: { metric: "symptom_severity", value: 0, unit: "score" },
         },
+      },
+    });
+  });
+
+  it("keeps imported daily steps date-only and shows source coverage", () => {
+    const steps: DailyObservation = {
+      id: IDS.observation,
+      object_type: "observation",
+      domain: "exercise",
+      status: "active",
+      title: "Steps",
+      valid_from: null,
+      valid_to: null,
+      recorded_at: "2026-05-01T16:00:00Z",
+      created_at: "2026-05-01T16:00:00Z",
+      updated_at: "2026-05-01T16:00:00Z",
+      source: { id: IDS.event, kind: "device", name: "Apple Health" },
+      confirmation_status: "unconfirmed",
+      schema_version: 1,
+      revision: 1,
+      notes: null,
+      metadata: {
+        healthkit_resource_type: "steps",
+        healthkit_coverage_start: "2026-05-01T07:00:00+00:00",
+        healthkit_coverage_end: "2026-05-02T07:00:00+00:00",
+      },
+      permissions: { ai_use_allowed: false, cross_domain_use_allowed: false },
+      observation: {
+        domain: "exercise",
+        time: {
+          precision: "date_only",
+          local_date: "2026-05-01",
+          timezone: "America/Los_Angeles",
+        },
+        interval_end: null,
+        notes: null,
+        payload: { value: { metric: "steps", value: 8000, unit: "steps" } },
+      },
+    };
+    const draft = draftFromDailyItem(steps);
+    expect(draft.measurementValue).toBe("8000");
+    expect(itemOriginLabel(steps)).toBe("Apple Health · imported, unconfirmed");
+    expect(itemCoverageLabel(steps)).toContain("2026-05-01T07:00:00+00:00");
+    expect(
+      buildDailyUpdateRecord(steps, { ...draft, measurementValue: "9000" }),
+    ).toMatchObject({
+      ok: true,
+      value: {
+        domain: "exercise",
+        time: { precision: "date_only", local_date: "2026-05-01" },
+        payload: { value: { metric: "steps", value: 9000, unit: "steps" } },
       },
     });
   });

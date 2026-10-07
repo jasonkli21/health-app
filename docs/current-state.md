@@ -2,23 +2,25 @@
 
 Updated October 7, 2026. This page is the single living summary of delivered
 scope, current work boundaries, and open acceptance gates. It is reconciled
-from the latest code and release/review evidence through Phase 7.
+from the latest code and release/review evidence through the Phase 8 local
+implementation.
 
 ## Delivered locally
 
-| Capability                                         | Current boundary                                                                                                                                                                                                                                   | Evidence                                                                                                                                                                                                            |
-| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Profile and canonical health records               | Owner-scoped Profile facts, provenance, revision history, and generated API client are implemented. External and device acceptance remains open.                                                                                                   | [Phase 1 release](implementation/evidence/phase-1-release.md), [review](implementation/evidence/phase-1-review.md)                                                                                                  |
-| Daily state and Today                              | Typed Events/Observations, manual Add, and deterministic Today summaries/paging are implemented. PostgreSQL integration acceptance remains open.                                                                                                   | [Phase 2 release](implementation/evidence/phase-2-release.md), [review](implementation/evidence/phase-2-review.md)                                                                                                  |
-| Identity and cloud foundation                      | Firebase verification, owner mapping, private GCS/Neon configuration, and deployment artifacts exist. No live cloud deployment or parity acceptance is recorded.                                                                                   | [Phase 3 release](implementation/evidence/phase-3-release.md), [review](implementation/evidence/phase-3-review.md)                                                                                                  |
-| Planning and trackers                              | Goals, regimens, plans, active contexts, custom trackers, schedules, and occurrence history are implemented locally. Database, cloud, and device gates remain open.                                                                                | [Phase 4 release](implementation/evidence/phase-4-release.md), [follow-up audit](implementation/evidence/phase-4-audit.md)                                                                                          |
-| Health context and search                          | Consent-scoped context preview and search are available locally. Phase 7 adds an explicitly selected trend summary over AI-permitted inputs; custom tracker entry details remain excluded from context/search results.                             | [Phase 5 release](implementation/evidence/phase-5-release.md), [Phase 7 release](implementation/evidence/phase-7-release.md)                                                                                        |
-| Typed action proposals                             | Owner-authored typed proposals can be reviewed, applied, rejected, and replayed idempotently. AI-originated proposal submission is unavailable. PostgreSQL concurrency and device acceptance remain open.                                          | [Phase 6 release](implementation/evidence/phase-6-release.md), [initial review findings](implementation/evidence/phase-6-independent-review-initial.md), [ADR 0006](architecture/adr/0006-ai-mutation-proposals.md) |
-| Trends, insights, recommendations, and experiments | Deterministic bounded analysis, exact revision evidence, expiring insight/recommendation history, manual experiments, and mobile Insights/Today surfaces are implemented locally. Automated and PostgreSQL-backed Phase 7 acceptance remains open. | [Phase 7 release](implementation/evidence/phase-7-release.md), [Phase 7 plan](implementation/phases/phase-7-implementation-plan.md)                                                                                 |
+| Capability                                         | Current boundary                                                                                                                                                                                                                                                                                                                           | Evidence                                                                                                                                                                                                            |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Profile and canonical health records               | Owner-scoped Profile facts, provenance, revision history, and generated API client are implemented. External and device acceptance remains open.                                                                                                                                                                                           | [Phase 1 release](implementation/evidence/phase-1-release.md), [review](implementation/evidence/phase-1-review.md)                                                                                                  |
+| Daily state and Today                              | Typed Events/Observations, manual Add, and deterministic Today summaries/paging are implemented. PostgreSQL integration acceptance remains open.                                                                                                                                                                                           | [Phase 2 release](implementation/evidence/phase-2-release.md), [review](implementation/evidence/phase-2-review.md)                                                                                                  |
+| Identity and cloud foundation                      | Firebase verification, owner mapping, private GCS/Neon configuration, and deployment artifacts exist. No live cloud deployment or parity acceptance is recorded.                                                                                                                                                                           | [Phase 3 release](implementation/evidence/phase-3-release.md), [review](implementation/evidence/phase-3-review.md)                                                                                                  |
+| Planning and trackers                              | Goals, regimens, plans, active contexts, custom trackers, schedules, and occurrence history are implemented locally. Database, cloud, and device gates remain open.                                                                                                                                                                        | [Phase 4 release](implementation/evidence/phase-4-release.md), [follow-up audit](implementation/evidence/phase-4-audit.md)                                                                                          |
+| Health context and search                          | Consent-scoped context preview and search are available locally. Phase 7 adds an explicitly selected trend summary over AI-permitted inputs; custom tracker entry details remain excluded from context/search results.                                                                                                                     | [Phase 5 release](implementation/evidence/phase-5-release.md), [Phase 7 release](implementation/evidence/phase-7-release.md)                                                                                        |
+| Typed action proposals                             | Owner-authored typed proposals can be reviewed, applied, rejected, and replayed idempotently. AI-originated proposal submission is unavailable. PostgreSQL concurrency and device acceptance remain open.                                                                                                                                  | [Phase 6 release](implementation/evidence/phase-6-release.md), [initial review findings](implementation/evidence/phase-6-independent-review-initial.md), [ADR 0006](architecture/adr/0006-ai-mutation-proposals.md) |
+| Trends, insights, recommendations, and experiments | Deterministic bounded analysis, exact revision evidence, expiring insight/recommendation history, manual experiments, and mobile Insights/Today surfaces are implemented locally. Automated and PostgreSQL-backed Phase 7 acceptance remains open.                                                                                         | [Phase 7 release](implementation/evidence/phase-7-release.md), [Phase 7 plan](implementation/phases/phase-7-implementation-plan.md)                                                                                 |
+| Selective HealthKit import foundation              | Owner-scoped batch contract, source identities/preferences, additive daily metrics, normalized mobile mappings, secure per-account consent/checkpoints, and a settings surface are implemented. The native adapter stays unavailable pending a compatible iOS build and real-device verification; PostgreSQL acceptance also remains open. | [Phase 8 release](implementation/evidence/phase-8-release.md), [Phase 8 plan](implementation/phases/phase-8-implementation-plan.md)                                                                                 |
 
-Phase 8 HealthKit import, Phase 9 records and hardening, and a web client are
-planned. Phase 7 source delivery does not establish clinical validity, live
-database behavior, device accessibility, or provider behavior.
+Phase 9 records and hardening and a web client are planned. Phase 8 source
+delivery does not establish clinical validity, live database behavior,
+HealthKit permission or query behavior, or device accessibility.
 
 ## AI, authorization, and private data
 
@@ -41,14 +43,20 @@ database behavior, device accessibility, or provider behavior.
 ## Mobile and web boundary
 
 The product is mobile-first with Expo/React Native and a shared generated API
-client. No web client is implemented. HealthKit remains planned and any future
-native imports must stay behind mobile-specific adapters. Web architecture
-documents are routed only for web/shared-client work.
+client. No web client is implemented. HealthKit mappings and sync coordination
+stay behind mobile-specific adapters; this build has no verified native
+HealthKit adapter and does not request Apple permissions or start a sync. Web
+architecture documents are routed only for web/shared-client work.
 
 ## Open acceptance gates
 
 - PostgreSQL-backed migration lifecycle, drift, query plans, ownership,
   transaction, and concurrency checks remain open across the relevant phases.
+- Phase 8 still needs a compatible iOS development build, a selected and
+  verified native HealthKit library, entitlement and permission behavior, and
+  real-device reads/deletes for every enabled type. The transactional import
+  API and preference behavior also need PostgreSQL-backed migration and
+  concurrency verification; see the Phase 8 release record.
 - Phase 7 now has focused snapshot, linked-severity, tracker-label, and
   experiment-boundary regression fixtures. The complete numerical goldens,
   AI permission/`as_of` integration coverage, PostgreSQL invalidation and race
@@ -70,9 +78,10 @@ source presence or a plan.
 
 ## Current scope
 
-Phase 7 is implemented locally and its release evidence records the verified
-checks and remaining acceptance gates. Phase 8 is the next planned capability;
-use its plan and current authorization before starting native import work.
+Phase 8's normalized import foundation is implemented locally and its release
+evidence records the verified checks and open native/database acceptance
+gates. Phase 9 is the next planned capability; reconcile its erasure work with
+the retained HealthKit identities, receipts, consent, and secure checkpoints.
 
 ## High-context code areas
 

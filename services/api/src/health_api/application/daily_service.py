@@ -61,6 +61,7 @@ class CreateDailyEvent:
     id: UUID
     event: EventSchemaV1
     ai_use_allowed: bool = False
+    metadata: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -68,6 +69,7 @@ class CreateDailyObservation:
     id: UUID
     observation: ObservationSchemaV1
     ai_use_allowed: bool = False
+    metadata: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -275,6 +277,7 @@ def _manual_create_object(
     source: Source,
     fingerprint: str,
     ai_use_allowed: bool = False,
+    metadata: dict[str, Any] | None = None,
 ) -> HealthObject:
     return HealthObject(
         id=object_id,
@@ -284,10 +287,11 @@ def _manual_create_object(
         status="active",
         title=title,
         source_id=source.id,
-        confirmation_status="user_confirmed",
+        confirmation_status="unconfirmed" if source.source_kind == "device" else "user_confirmed",
         schema_version=1,
         revision=1,
         notes=notes,
+        metadata_json=metadata or {},
         ai_use_allowed=ai_use_allowed,
         cross_domain_use_allowed=False,
         create_fingerprint=fingerprint,
@@ -734,6 +738,7 @@ def create_daily_entry(
                     source=source,
                     fingerprint=expected_fingerprints[event_entry.id],
                     ai_use_allowed=event_entry.ai_use_allowed,
+                    metadata=event_entry.metadata,
                 )
                 event_subtype = EventItem(
                     owner_id=owner_id,
@@ -769,6 +774,7 @@ def create_daily_entry(
                     source=source,
                     fingerprint=expected_fingerprints[observation_entry.id],
                     ai_use_allowed=observation_entry.ai_use_allowed,
+                    metadata=observation_entry.metadata,
                 )
                 observation_subtype = ObservationItem(
                     owner_id=owner_id,
@@ -847,6 +853,7 @@ def update_daily_item(
     expected_revision: int,
     record: DailyRecord,
     ai_use_allowed: bool | None = None,
+    metadata: dict[str, Any] | None = None,
     *,
     write_source: Source | None = None,
     proposal_id: UUID | None = None,
@@ -871,10 +878,13 @@ def update_daily_item(
             if obj.revision != expected_revision:
                 raise DailyConflict("daily entry has changed; reload before saving")
             aggregate = _daily_aggregate(session, owner_id, object_id)
-            source = write_source or aggregate[2]
-            if write_source is not None:
-                obj.source_id = write_source.id
-                obj.confirmation_status = "user_confirmed"
+            source = write_source or manual_source(session, owner_id)
+            obj.source_id = source.id
+            obj.confirmation_status = (
+                "unconfirmed" if source.source_kind == "device" else "user_confirmed"
+            )
+            if metadata is not None:
+                obj.metadata_json = metadata
             if isinstance(record, EventSchemaV1):
                 if not _is_event_aggregate(aggregate):
                     raise RuntimeError("Event aggregate is invalid")
@@ -995,7 +1005,7 @@ def archive_daily_item(
     *,
     expected_object_type: str | None = None,
 ) -> DailyAggregate:
-    with session.begin():
+    with unit_of_work(session):
         owner = session.scalar(select(User).where(User.id == owner_id).with_for_update())
         if owner is None or owner.lifecycle != "active":
             raise DailyNotFound("owner does not exist")

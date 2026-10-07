@@ -407,7 +407,7 @@
           "trend_metric": {
             "anyOf": [
               {
-                "pattern": "^(energy|exercise_duration|exercise_distance|sleep_duration|symptom_severity|symptom_episode_count|weight|temperature|systolic_pressure|diastolic_pressure|pulse|tracker:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:[a-z][a-z0-9_]{0,31}:v[1-9][0-9]*)$",
+                "pattern": "^(energy|exercise_duration|exercise_distance|sleep_duration|symptom_severity|symptom_episode_count|weight|temperature|systolic_pressure|diastolic_pressure|pulse|steps|resting_heart_rate|heart_rate_summary|tracker:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:[a-z][a-z0-9_]{0,31}:v[1-9][0-9]*)$",
                 "type": "string"
               },
               {
@@ -730,7 +730,10 @@
           "temperature",
           "systolic_pressure",
           "diastolic_pressure",
-          "pulse"
+          "pulse",
+          "steps",
+          "resting_heart_rate",
+          "heart_rate_summary"
         ],
         "title": "AnalyticsMetric",
         "type": "string"
@@ -2553,7 +2556,7 @@
             "type": "string"
           },
           "outcome_metric": {
-            "pattern": "^(energy|exercise_duration|exercise_distance|sleep_duration|symptom_severity|symptom_episode_count|weight|temperature|systolic_pressure|diastolic_pressure|pulse|tracker:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:[a-z][a-z0-9_]{0,31}:v[1-9][0-9]*)$",
+            "pattern": "^(energy|exercise_duration|exercise_distance|sleep_duration|symptom_severity|symptom_episode_count|weight|temperature|systolic_pressure|diastolic_pressure|pulse|steps|resting_heart_rate|heart_rate_summary|tracker:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:[a-z][a-z0-9_]{0,31}:v[1-9][0-9]*)$",
             "title": "Outcome Metric",
             "type": "string"
           },
@@ -2776,7 +2779,7 @@
             "type": "string"
           },
           "metric": {
-            "pattern": "^(energy|exercise_duration|exercise_distance|sleep_duration|symptom_severity|symptom_episode_count|weight|temperature|systolic_pressure|diastolic_pressure|pulse|tracker:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:[a-z][a-z0-9_]{0,31}:v[1-9][0-9]*)$",
+            "pattern": "^(energy|exercise_duration|exercise_distance|sleep_duration|symptom_severity|symptom_episode_count|weight|temperature|systolic_pressure|diastolic_pressure|pulse|steps|resting_heart_rate|heart_rate_summary|tracker:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:[a-z][a-z0-9_]{0,31}:v[1-9][0-9]*)$",
             "title": "Metric",
             "type": "string"
           },
@@ -3312,6 +3315,486 @@
         "title": "GoalUpdateRequest",
         "type": "object"
       },
+      "HealthKitImportBatchRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "batch_id": {
+            "format": "uuid",
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "device_installation_id": {
+            "format": "uuid",
+            "title": "Device Installation Id",
+            "type": "string"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/HealthKitImportEntry"
+            },
+            "maxItems": 200,
+            "title": "Entries",
+            "type": "array"
+          },
+          "policy_version": {
+            "const": "healthkit-v1",
+            "title": "Policy Version",
+            "type": "string"
+          },
+          "resource_type": {
+            "enum": [
+              "workouts",
+              "sleep",
+              "steps",
+              "weight",
+              "resting_heart_rate",
+              "heart_rate_summary"
+            ],
+            "title": "Resource Type",
+            "type": "string"
+          },
+          "tombstones": {
+            "items": {
+              "$ref": "#/components/schemas/HealthKitImportTombstone"
+            },
+            "maxItems": 200,
+            "title": "Tombstones",
+            "type": "array"
+          }
+        },
+        "required": [
+          "batch_id",
+          "device_installation_id",
+          "resource_type",
+          "policy_version"
+        ],
+        "title": "HealthKitImportBatchRequest",
+        "type": "object"
+      },
+      "HealthKitImportBatchResult": {
+        "additionalProperties": false,
+        "properties": {
+          "batch_id": {
+            "format": "uuid",
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "conflict_count": {
+            "minimum": 0.0,
+            "title": "Conflict Count",
+            "type": "integer"
+          },
+          "correction_count": {
+            "minimum": 0.0,
+            "title": "Correction Count",
+            "type": "integer"
+          },
+          "created_count": {
+            "minimum": 0.0,
+            "title": "Created Count",
+            "type": "integer"
+          },
+          "replayed": {
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "tombstoned_count": {
+            "minimum": 0.0,
+            "title": "Tombstoned Count",
+            "type": "integer"
+          },
+          "unchanged_count": {
+            "minimum": 0.0,
+            "title": "Unchanged Count",
+            "type": "integer"
+          },
+          "updated_count": {
+            "minimum": 0.0,
+            "title": "Updated Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "batch_id",
+          "replayed",
+          "created_count",
+          "updated_count",
+          "unchanged_count",
+          "tombstoned_count",
+          "correction_count",
+          "conflict_count"
+        ],
+        "title": "HealthKitImportBatchResult",
+        "type": "object"
+      },
+      "HealthKitImportEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "metadata": {
+            "$ref": "#/components/schemas/HealthKitImportMetadata"
+          },
+          "record": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventSchemaV1"
+              },
+              {
+                "$ref": "#/components/schemas/ObservationSchemaV1"
+              }
+            ],
+            "title": "Record"
+          },
+          "source_sample_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Source Sample Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_sample_id",
+          "record"
+        ],
+        "title": "HealthKitImportEntry",
+        "type": "object"
+      },
+      "HealthKitImportMetadata": {
+        "additionalProperties": false,
+        "description": "Allowlisted display/aggregation fields; raw HealthKit metadata is not accepted.",
+        "properties": {
+          "aggregation_method_version": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aggregation Method Version"
+          },
+          "coverage_end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage End"
+          },
+          "coverage_start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage Start"
+          },
+          "device_label": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Label"
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FiniteDailyNumber"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FiniteDailyNumber"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sample_count": {
+            "anyOf": [
+              {
+                "maximum": 10000000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Count"
+          },
+          "sleep_stage": {
+            "anyOf": [
+              {
+                "enum": [
+                  "awake",
+                  "asleep",
+                  "core",
+                  "deep",
+                  "rem",
+                  "unspecified"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sleep Stage"
+          },
+          "source_bundle_identifier": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Bundle Identifier"
+          }
+        },
+        "title": "HealthKitImportMetadata",
+        "type": "object"
+      },
+      "HealthKitImportStatusResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "installations": {
+            "items": {
+              "$ref": "#/components/schemas/HealthKitSourceInstallation"
+            },
+            "title": "Installations",
+            "type": "array"
+          },
+          "policy_version": {
+            "const": "healthkit-v1",
+            "title": "Policy Version",
+            "type": "string"
+          },
+          "server_ingest_enabled": {
+            "const": true,
+            "title": "Server Ingest Enabled",
+            "type": "boolean"
+          },
+          "types": {
+            "items": {
+              "$ref": "#/components/schemas/HealthKitImportTypeStatus"
+            },
+            "title": "Types",
+            "type": "array"
+          }
+        },
+        "required": [
+          "server_ingest_enabled",
+          "policy_version",
+          "types",
+          "installations"
+        ],
+        "title": "HealthKitImportStatusResponse",
+        "type": "object"
+      },
+      "HealthKitImportTombstone": {
+        "additionalProperties": false,
+        "properties": {
+          "source_sample_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Source Sample Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_sample_id"
+        ],
+        "title": "HealthKitImportTombstone",
+        "type": "object"
+      },
+      "HealthKitImportTypeStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "imported_count": {
+            "minimum": 0.0,
+            "title": "Imported Count",
+            "type": "integer"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "preference_revision": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preference Revision"
+          },
+          "preferred_installation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Installation Id"
+          },
+          "resource_type": {
+            "enum": [
+              "workouts",
+              "sleep",
+              "steps",
+              "weight",
+              "resting_heart_rate",
+              "heart_rate_summary"
+            ],
+            "title": "Resource Type",
+            "type": "string"
+          },
+          "tombstoned_count": {
+            "minimum": 0.0,
+            "title": "Tombstoned Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "resource_type",
+          "imported_count",
+          "tombstoned_count",
+          "last_success_at",
+          "preferred_installation_id",
+          "preference_revision"
+        ],
+        "title": "HealthKitImportTypeStatus",
+        "type": "object"
+      },
+      "HealthKitSourceInstallation": {
+        "additionalProperties": false,
+        "properties": {
+          "device_installation_id": {
+            "format": "uuid",
+            "title": "Device Installation Id",
+            "type": "string"
+          },
+          "source_name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Source Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "device_installation_id",
+          "source_name"
+        ],
+        "title": "HealthKitSourceInstallation",
+        "type": "object"
+      },
+      "HealthKitSourcePreferenceRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "device_installation_id": {
+            "format": "uuid",
+            "title": "Device Installation Id",
+            "type": "string"
+          },
+          "expected_revision": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision"
+          },
+          "resource_type": {
+            "enum": [
+              "steps",
+              "heart_rate_summary"
+            ],
+            "title": "Resource Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource_type",
+          "device_installation_id"
+        ],
+        "title": "HealthKitSourcePreferenceRequest",
+        "type": "object"
+      },
+      "HealthKitSourcePreferenceResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "device_installation_id": {
+            "format": "uuid",
+            "title": "Device Installation Id",
+            "type": "string"
+          },
+          "resource_type": {
+            "enum": [
+              "steps",
+              "heart_rate_summary"
+            ],
+            "title": "Resource Type",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "resource_type",
+          "device_installation_id",
+          "revision"
+        ],
+        "title": "HealthKitSourcePreferenceResponse",
+        "type": "object"
+      },
       "InsightEvidenceReference": {
         "additionalProperties": false,
         "properties": {
@@ -3361,7 +3844,7 @@
           },
           "metrics": {
             "items": {
-              "pattern": "^(energy|exercise_duration|exercise_distance|sleep_duration|symptom_severity|symptom_episode_count|weight|temperature|systolic_pressure|diastolic_pressure|pulse|tracker:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:[a-z][a-z0-9_]{0,31}:v[1-9][0-9]*)$",
+              "pattern": "^(energy|exercise_duration|exercise_distance|sleep_duration|symptom_severity|symptom_episode_count|weight|temperature|systolic_pressure|diastolic_pressure|pulse|steps|resting_heart_rate|heart_rate_summary|tracker:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:[a-z][a-z0-9_]{0,31}:v[1-9][0-9]*)$",
               "type": "string"
             },
             "maxItems": 5,
@@ -3776,6 +4259,7 @@
           "F",
           "mmHg",
           "bpm",
+          "steps",
           "score",
           "episodes"
         ],
@@ -3791,7 +4275,9 @@
               "temperature",
               "systolic_pressure",
               "diastolic_pressure",
-              "pulse"
+              "pulse",
+              "resting_heart_rate",
+              "heart_rate_summary"
             ],
             "title": "Metric",
             "type": "string"
@@ -3851,7 +4337,7 @@
             "type": "string"
           },
           "metric": {
-            "pattern": "^(energy|exercise_duration|exercise_distance|sleep_duration|symptom_severity|symptom_episode_count|weight|temperature|systolic_pressure|diastolic_pressure|pulse|tracker:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:[a-z][a-z0-9_]{0,31}:v[1-9][0-9]*)$",
+            "pattern": "^(energy|exercise_duration|exercise_distance|sleep_duration|symptom_severity|symptom_episode_count|weight|temperature|systolic_pressure|diastolic_pressure|pulse|steps|resting_heart_rate|heart_rate_summary|tracker:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:[a-z][a-z0-9_]{0,31}:v[1-9][0-9]*)$",
             "title": "Metric",
             "type": "string"
           },
@@ -3887,6 +4373,9 @@
           "systolic_pressure",
           "diastolic_pressure",
           "pulse",
+          "steps",
+          "resting_heart_rate",
+          "heart_rate_summary",
           "symptom_severity",
           "symptom_episode_count"
         ],
@@ -4052,7 +4541,10 @@
           "mapping": {
             "custom": "#/components/schemas/CustomTrackerValueV1",
             "diastolic_pressure": "#/components/schemas/MeasurementValueV1",
+            "heart_rate_summary": "#/components/schemas/MeasurementValueV1",
             "pulse": "#/components/schemas/MeasurementValueV1",
+            "resting_heart_rate": "#/components/schemas/MeasurementValueV1",
+            "steps": "#/components/schemas/StepCountValueV1",
             "symptom_severity": "#/components/schemas/SymptomSeverityV1",
             "systolic_pressure": "#/components/schemas/MeasurementValueV1",
             "temperature": "#/components/schemas/MeasurementValueV1",
@@ -4063,6 +4555,9 @@
         "oneOf": [
           {
             "$ref": "#/components/schemas/MeasurementValueV1"
+          },
+          {
+            "$ref": "#/components/schemas/StepCountValueV1"
           },
           {
             "$ref": "#/components/schemas/SymptomSeverityV1"
@@ -7466,6 +7961,33 @@
         "title": "SleepEventV1",
         "type": "object"
       },
+      "StepCountValueV1": {
+        "additionalProperties": false,
+        "properties": {
+          "metric": {
+            "const": "steps",
+            "title": "Metric",
+            "type": "string"
+          },
+          "unit": {
+            "const": "steps",
+            "default": "steps",
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "minimum": 0.0,
+            "title": "Value",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "metric",
+          "value"
+        ],
+        "title": "StepCountValueV1",
+        "type": "object"
+      },
       "StoredAssociationResponse": {
         "additionalProperties": false,
         "properties": {
@@ -8340,7 +8862,7 @@
             "type": "string"
           },
           "metric": {
-            "pattern": "^(energy|exercise_duration|exercise_distance|sleep_duration|symptom_severity|symptom_episode_count|weight|temperature|systolic_pressure|diastolic_pressure|pulse|tracker:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:[a-z][a-z0-9_]{0,31}:v[1-9][0-9]*)$",
+            "pattern": "^(energy|exercise_duration|exercise_distance|sleep_duration|symptom_severity|symptom_episode_count|weight|temperature|systolic_pressure|diastolic_pressure|pulse|steps|resting_heart_rate|heart_rate_summary|tracker:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:[a-z][a-z0-9_]{0,31}:v[1-9][0-9]*)$",
             "title": "Metric",
             "type": "string"
           },
@@ -8502,7 +9024,7 @@
     }
   },
   "info": {
-    "description": "Owner-scoped Profile, daily Event/Observation, planning, and read-only Assistant APIs. Identity is resolved from server configuration or verified Firebase bearer tokens. Request bodies are limited to 65,536 bytes.",
+    "description": "Owner-scoped Profile, daily Event/Observation, planning, and read-only Assistant APIs. Identity is resolved from server configuration or verified Firebase bearer tokens. Request bodies are limited to 65,536 bytes except normalized HealthKit batches, which are limited to 1,048,576 bytes.",
     "title": "Personal Health API",
     "version": "1.0.0"
   },
@@ -12702,6 +13224,342 @@
         "summary": "Healthcheck",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/imports/healthkit/batches": {
+      "post": {
+        "operationId": "importHealthKitBatch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HealthKitImportBatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthKitImportBatchResult"
+                }
+              }
+            },
+            "description": "Accepted batch replay."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthKitImportBatchResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Batch or source conflict."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the route size limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The normalized import batch is invalid."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Import Healthkit Batch",
+        "tags": [
+          "healthkit-imports"
+        ]
+      }
+    },
+    "/imports/healthkit/batches/{batch_id}": {
+      "get": {
+        "operationId": "getHealthKitBatchReceipt",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthKitImportBatchResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Import receipt was not found."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the route size limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The normalized import batch is invalid."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Get Healthkit Batch Receipt Route",
+        "tags": [
+          "healthkit-imports"
+        ]
+      }
+    },
+    "/imports/healthkit/source-preferences": {
+      "put": {
+        "operationId": "setHealthKitSourcePreference",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HealthKitSourcePreferenceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthKitSourcePreferenceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Preference revision conflict."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the route size limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The normalized import batch is invalid."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Set Healthkit Source Preference Route",
+        "tags": [
+          "healthkit-imports"
+        ]
+      }
+    },
+    "/imports/healthkit/status": {
+      "get": {
+        "operationId": "getHealthKitImportStatus",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthKitImportStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the route size limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The normalized import batch is invalid."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Get Healthkit Import Status Route",
+        "tags": [
+          "healthkit-imports"
         ]
       }
     },

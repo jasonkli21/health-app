@@ -305,6 +305,137 @@ class Source(Base):
     )
 
 
+class HealthKitImportBatch(Base):
+    """Idempotent owner-scoped receipt for one bounded HealthKit upload."""
+
+    __tablename__ = "healthkit_import_batches"
+
+    owner_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    batch_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    device_installation_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    resource_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    policy_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    updated_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    unchanged_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    tombstoned_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    correction_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    conflict_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["owner_id"], ["users.id"], ondelete="CASCADE", name="fk_healthkit_batches_owner"
+        ),
+        CheckConstraint(
+            "resource_type IN ('workouts', 'sleep', 'steps', 'weight', "
+            "'resting_heart_rate', 'heart_rate_summary')",
+            name="ck_healthkit_batches_resource_type",
+        ),
+        CheckConstraint("policy_version = 'healthkit-v1'", name="ck_healthkit_batches_policy"),
+        CheckConstraint("length(content_hash) = 64", name="ck_healthkit_batches_hash"),
+        CheckConstraint(
+            "created_count >= 0 AND updated_count >= 0 AND unchanged_count >= 0 AND "
+            "tombstoned_count >= 0 AND correction_count >= 0 AND conflict_count >= 0",
+            name="ck_healthkit_batches_counts",
+        ),
+        Index("ix_healthkit_batches_owner_created", "owner_id", "created_at"),
+    )
+
+
+class HealthKitImportIdentity(Base):
+    """Maps a HealthKit source identity to its current canonical daily object."""
+
+    __tablename__ = "healthkit_import_identities"
+
+    owner_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    platform: Mapped[str] = mapped_column(
+        String(24), primary_key=True, server_default="apple_healthkit"
+    )
+    resource_type: Mapped[str] = mapped_column(String(32), primary_key=True)
+    source_sample_id: Mapped[str] = mapped_column(String(256), primary_key=True)
+    object_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    device_installation_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    is_aggregate: Mapped[bool] = mapped_column(nullable=False, server_default=text("false"))
+    aggregate_date: Mapped[date | None] = mapped_column(Date)
+    aggregate_timezone: Mapped[str | None] = mapped_column(String(64))
+    policy_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    analytics_selected: Mapped[bool] = mapped_column(nullable=False, server_default=text("true"))
+    tombstoned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["owner_id"], ["users.id"], ondelete="CASCADE", name="fk_healthkit_identity_owner"
+        ),
+        ForeignKeyConstraint(
+            ["owner_id", "object_id"],
+            ["health_objects.owner_id", "health_objects.id"],
+            ondelete="CASCADE",
+            name="fk_healthkit_identity_object",
+        ),
+        CheckConstraint("platform = 'apple_healthkit'", name="ck_healthkit_identity_platform"),
+        CheckConstraint(
+            "resource_type IN ('workouts', 'sleep', 'steps', 'weight', "
+            "'resting_heart_rate', 'heart_rate_summary')",
+            name="ck_healthkit_identity_resource_type",
+        ),
+        CheckConstraint("length(content_hash) = 64", name="ck_healthkit_identity_hash"),
+        CheckConstraint("policy_version = 'healthkit-v1'", name="ck_healthkit_identity_policy"),
+        CheckConstraint(
+            "(is_aggregate AND aggregate_date IS NOT NULL AND aggregate_timezone IS NOT NULL) OR "
+            "(NOT is_aggregate AND aggregate_date IS NULL AND aggregate_timezone IS NULL AND analytics_selected)",
+            name="ck_healthkit_identity_aggregate_shape",
+        ),
+        UniqueConstraint("owner_id", "object_id", name="uq_healthkit_identity_object"),
+        Index(
+            "ix_healthkit_identity_owner_aggregate",
+            "owner_id",
+            "resource_type",
+            "aggregate_date",
+            "analytics_selected",
+        ),
+    )
+
+
+class HealthKitSourcePreference(Base):
+    """Owner-authored source choice for device-day aggregate inputs."""
+
+    __tablename__ = "healthkit_source_preferences"
+
+    owner_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    resource_type: Mapped[str] = mapped_column(String(32), primary_key=True)
+    device_installation_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    source_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["owner_id"], ["users.id"], ondelete="CASCADE", name="fk_healthkit_preferences_owner"
+        ),
+        ForeignKeyConstraint(
+            ["owner_id", "source_id"],
+            ["sources.owner_id", "sources.id"],
+            ondelete="RESTRICT",
+            name="fk_healthkit_preferences_source",
+        ),
+        CheckConstraint(
+            "resource_type IN ('steps', 'heart_rate_summary')",
+            name="ck_healthkit_preferences_resource_type",
+        ),
+        CheckConstraint("revision > 0", name="ck_healthkit_preferences_revision"),
+    )
+
+
 class HealthObject(Base):
     __tablename__ = "health_objects"
 
@@ -638,14 +769,16 @@ class ObservationItem(Base):
         ),
         CheckConstraint(
             "metric_key IN ('weight', 'temperature', 'systolic_pressure', "
-            "'diastolic_pressure', 'pulse', 'symptom_severity', 'custom')",
+            "'diastolic_pressure', 'pulse', 'steps', 'resting_heart_rate', "
+            "'heart_rate_summary', 'symptom_severity', 'custom')",
             name="ck_observations_metric",
         ),
         CheckConstraint(
             "(metric_key = 'weight' AND unit IN ('kg', 'lb')) OR "
             "(metric_key = 'temperature' AND unit IN ('C', 'F')) OR "
             "(metric_key IN ('systolic_pressure', 'diastolic_pressure') AND unit = 'mmHg') OR "
-            "(metric_key = 'pulse' AND unit = 'bpm') OR "
+            "(metric_key IN ('pulse', 'resting_heart_rate', 'heart_rate_summary') AND unit = 'bpm') OR "
+            "(metric_key = 'steps' AND unit = 'steps') OR "
             "(metric_key = 'symptom_severity' AND unit = 'score') OR "
             "(metric_key = 'custom' AND unit = 'custom')",
             name="ck_observations_metric_unit",

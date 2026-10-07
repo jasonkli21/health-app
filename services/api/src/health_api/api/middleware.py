@@ -20,9 +20,15 @@ request_logger.propagate = False
 
 
 class RequestBoundaryMiddleware:
-    def __init__(self, app: ASGIApp, max_body_bytes: int = 65_536) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        max_body_bytes: int = 65_536,
+        path_limits: dict[str, int] | None = None,
+    ) -> None:
         self.app = app
         self.max_body_bytes = max_body_bytes
+        self.path_limits = path_limits or {}
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -30,6 +36,7 @@ class RequestBoundaryMiddleware:
             return
 
         request_id = str(uuid4())
+        body_limit = self.path_limits.get(scope.get("path", ""), self.max_body_bytes)
         started = monotonic()
         status = 500
         response_started = False
@@ -56,12 +63,12 @@ class RequestBoundaryMiddleware:
                 return
             chunk = message.get("body", b"")
             total += len(chunk)
-            if total > self.max_body_bytes:
+            if total > body_limit:
                 status = 413
                 body = json.dumps(
                     {
                         "code": "request_too_large",
-                        "message": "Request body exceeds the 65536 byte limit.",
+                        "message": f"Request body exceeds the {body_limit} byte limit.",
                         "field_errors": None,
                         "request_id": request_id,
                     },

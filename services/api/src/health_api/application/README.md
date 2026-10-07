@@ -60,3 +60,12 @@ health write or action proposal. Experiments are user-authored, revisioned,
 editable as drafts; once started, the outcome design stays fixed while notes
 remain editable. Starting requires a known baseline value. Lifecycle changes
 are manual, and results are descriptive baseline/intervention summaries.
+
+`healthkit_import_service.py` validates one bounded type-specific batch before
+entering an owner-locked unit of work. Batch receipts and canonical daily
+Event/Observation writes commit together; source identities make retries and
+changed samples deterministic. Device imports stay unconfirmed and AI use
+disabled. Tombstones archive only unchanged device-origin rows, so a manual
+correction survives later reads/deletions. Daily writes call the shared
+analytics invalidation path, and aggregate source-selection changes invalidate
+derived results in the same transaction.

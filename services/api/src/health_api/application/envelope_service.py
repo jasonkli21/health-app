@@ -74,6 +74,33 @@ def proposal_source(
     return source
 
 
+def healthkit_source(session: Session, owner_id: UUID, installation_id: UUID) -> Source:
+    """Resolve minimal device provenance for one owner-scoped installation."""
+    source_key = f"healthkit:{installation_id}"
+    session.execute(
+        insert(Source)
+        .values(
+            owner_id=owner_id,
+            source_key=source_key,
+            source_kind="device",
+            display_name="Apple Health",
+            external_namespace="apple-healthkit",
+            external_identifier=str(installation_id),
+        )
+        .on_conflict_do_nothing(index_elements=[Source.owner_id, Source.source_key])
+    )
+    source = session.scalar(
+        select(Source).where(Source.owner_id == owner_id, Source.source_key == source_key)
+    )
+    if (
+        source is None
+        or source.source_kind != "device"
+        or source.external_identifier != str(installation_id)
+    ):
+        raise RuntimeError("HealthKit source could not be resolved")
+    return source
+
+
 def next_daily_sequence(session: Session, owner_id: UUID) -> int:
     """Allocate one monotonic snapshot number; the owner row lock serializes daily writes."""
     value = session.scalar(

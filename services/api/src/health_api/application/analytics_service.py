@@ -14,7 +14,7 @@ from uuid import UUID, uuid5
 from zoneinfo import ZoneInfo
 
 from pydantic import ValidationError
-from sqlalchemy import and_, or_, select, text
+from sqlalchemy import and_, exists, or_, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -57,6 +57,7 @@ from health_api.persistence.models import (
     AnalyticsEvidence,
     EventItem,
     EventObservationLink,
+    HealthKitImportIdentity,
     HealthObject,
     HealthObjectRevision,
     ObservationItem,
@@ -83,6 +84,9 @@ _EVENT_METRICS: dict[str, tuple[DailyDomain, MetricKey]] = {
     "systolic_pressure": (DailyDomain.MEASUREMENTS, MetricKey.SYSTOLIC_PRESSURE),
     "diastolic_pressure": (DailyDomain.MEASUREMENTS, MetricKey.DIASTOLIC_PRESSURE),
     "pulse": (DailyDomain.MEASUREMENTS, MetricKey.PULSE),
+    "steps": (DailyDomain.EXERCISE, MetricKey.STEPS),
+    "resting_heart_rate": (DailyDomain.MEASUREMENTS, MetricKey.RESTING_HEART_RATE),
+    "heart_rate_summary": (DailyDomain.MEASUREMENTS, MetricKey.HEART_RATE_SUMMARY),
 }
 
 
@@ -420,6 +424,14 @@ def _load_inputs(
         .where(
             *owner_conditions,
             HealthObject.object_type == "event",
+            ~exists(
+                select(1).where(
+                    HealthKitImportIdentity.owner_id == HealthObject.owner_id,
+                    HealthKitImportIdentity.object_id == HealthObject.id,
+                    HealthKitImportIdentity.is_aggregate.is_(True),
+                    HealthKitImportIdentity.analytics_selected.is_(False),
+                )
+            ),
             or_(
                 and_(
                     EventItem.time_precision == "date_only",
@@ -457,6 +469,14 @@ def _load_inputs(
         .where(
             *owner_conditions,
             HealthObject.object_type == "observation",
+            ~exists(
+                select(1).where(
+                    HealthKitImportIdentity.owner_id == HealthObject.owner_id,
+                    HealthKitImportIdentity.object_id == HealthObject.id,
+                    HealthKitImportIdentity.is_aggregate.is_(True),
+                    HealthKitImportIdentity.analytics_selected.is_(False),
+                )
+            ),
             or_(
                 and_(
                     ObservationItem.time_precision == "date_only",

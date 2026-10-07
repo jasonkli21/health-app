@@ -4,6 +4,28 @@
 
 Check [current state](../../current-state.md) for delivery status and open gates. This plan defines intended scope; it is not evidence of delivery or authorization to begin work. Before implementation or a follow-up, inspect current code, preceding release/review evidence, accepted ADRs and contracts, and external dependencies. Reconcile material drift here before coding.
 
+### Reconciliation record — October 7, 2026
+
+The local implementation provides the bounded server contract, canonical
+ingestion, generated client, offline mappings/coordinator, and consent/status
+surface. The current host has Command Line Tools but no full Xcode toolchain or
+HealthKit-capable device. No native library or HealthKit entitlement is enabled
+because compatibility, permission semantics, aggregation behavior, and
+deletion delivery cannot be verified here. `getHealthKitNativeCapability`
+keeps iOS unavailable and Android/web unsupported; consent settings do not
+request Apple permission or start reads. P8.2 native queries and P8.5 remain
+open.
+
+The local mapping retains sleep stage and heart-rate-summary range/count/
+coverage in strict allowlisted `HealthObject.metadata_json`; it does not add a
+new sleep Event payload version. Steps use a new typed date-only Observation
+value, and resting-heart-rate/heart-rate-summary use additive Observation
+metrics and units. A future typed sleep-stage payload or richer summary shape
+must get a new schema version and migration. Aggregate identity is
+installation/date/timezone/policy scoped; an owner preference selects one
+installation for analytics. PostgreSQL concurrency and device behavior remain
+acceptance gates, not claims from mocks or offline generation.
+
 ## User outcome / scope
 
 **Deliver:** optional, user-controlled first-wave import of workouts, sleep, steps, weight, resting heart rate and heart-rate summaries. Fine-grained type selection, source/provenance, selective retention, dedupe, correction/deletion processing, checkpoints and Today/Insights integration.
@@ -29,7 +51,7 @@ User selects supported types, bounded initial lookback (default30days/max90 per 
 | Resting HR           | Low-frequency Observation or day summary based on actual HealthKit type semantics, unit beats/min and coverage                                | No inferred diagnosis                                                             |
 | Heart rate summaries | Daily summary Observation (min/max/mean, sample count, interval/coverage and method version), only if valid samples available                 | Individual high-frequency heart-rate samples never leave mobile                   |
 
-Phase 2 schemas may need additive versions/catalog entries for steps/resting-HR/HR-summary/sleep stages. Introduce typed import metadata/metric versions here with migration/client compatibility; do not pretend those metrics already exist. Health validates all normalized types/units/time/limits, source IDs/owner, content hash and aggregation method version. Native samples are **client-reported device data**, not cryptographically authenticated medical records; service cannot trust arbitrary mobile claims as independent verification. Provenance shows device-imported origin + `unconfirmed` confirmation status (distinct from AI pending proposal and user-confirmed fact). Consent to sync is not confirmation of each sample's medical accuracy.
+Phase 8 adds a typed step-count value and additive resting-HR/HR-summary metrics/units in the Observation contract, plus strict import metadata. Sleep stage remains allowlisted metadata in this implementation; it is not a new Event payload version. Health validates all normalized types/units/time/limits, source IDs/owner, content hash and aggregation method version. Native samples are **client-reported device data**, not cryptographically authenticated medical records; service cannot trust arbitrary mobile claims as independent verification. Provenance shows device-imported origin + `unconfirmed` confirmation status (distinct from AI pending proposal and user-confirmed fact). Consent to sync is not confirmation of each sample's medical accuracy.
 
 Device source metadata contains minimal app/source bundle identifier/version and device label only when needed; no serial/identifying detail or raw sample metadata dump. Quantity conversion is deterministic, original supported unit retained. Workout/sleep intervals map using Phase 2 overlap rules; overlapping sleep sources must not simply add duration. Step/heart summaries use a documented, SDK-verified source-aware aggregation method. Prefer platform authoritative aggregation where its deduplication/source semantics are verified; otherwise select one ranked source per overlapping interval/day and expose coverage/conflicts. Do not sum independent providers' daily totals. Persist method/policy versions and source coverage, not every raw sample behind the aggregate.
 

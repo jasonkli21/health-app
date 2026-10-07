@@ -9,6 +9,11 @@ typed `health_objects` with `analytics_artifacts` payload/lifecycle rows.
 `analytics_evidence` references exact owner object revisions with restrictive
 foreign keys, so historical evidence remains resolvable and input edits can
 stale current derived artifacts without rewriting their original snapshots.
+Phase 8 adds `healthkit_import_batches`, `healthkit_import_identities`, and
+`healthkit_source_preferences`. They retain receipt/identity/preference
+metadata only; native query anchors and raw HealthKit samples stay on the
+device. Import identity rows reference the canonical owner-scoped health
+object and are removed by the future owner-erasure workflow.
 JSON health payloads use PostgreSQL JSONB and are validated through typed
 domain schemas before writes. Composite foreign keys include `owner_id` for
 source, subtype, revision, proposal, receipt, and relationship references;

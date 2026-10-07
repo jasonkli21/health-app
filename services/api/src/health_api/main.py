@@ -13,6 +13,7 @@ from health_api.api.ai import router as ai_router
 from health_api.api.analytics import router as analytics_router
 from health_api.api.daily import router as daily_router
 from health_api.api.errors import install_error_handlers
+from health_api.api.healthkit_imports import router as healthkit_import_router
 from health_api.api.middleware import RequestBoundaryMiddleware
 from health_api.api.planning import router as planning_router
 from health_api.api.profile import router as profile_router
@@ -53,7 +54,8 @@ def create_app(
         description=(
             "Owner-scoped Profile, daily Event/Observation, planning, and read-only Assistant APIs. "
             "Identity is resolved from server configuration or verified Firebase bearer tokens. "
-            "Request bodies are limited to 65,536 bytes."
+            "Request bodies are limited to 65,536 bytes except normalized HealthKit batches, "
+            "which are limited to 1,048,576 bytes."
         ),
         docs_url=None if configured_settings.app_env == "cloud" else "/docs",
         redoc_url=None if configured_settings.app_env == "cloud" else "/redoc",
@@ -73,7 +75,11 @@ def create_app(
             timeout_seconds=configured_settings.auth_http_timeout_seconds,
             max_in_flight=configured_settings.auth_max_in_flight,
         )
-    app.add_middleware(RequestBoundaryMiddleware, max_body_bytes=65_536)
+    app.add_middleware(
+        RequestBoundaryMiddleware,
+        max_body_bytes=65_536,
+        path_limits={"/imports/healthkit/batches": 1_048_576},
+    )
     install_error_handlers(app)
     app.include_router(profile_router)
     app.include_router(daily_router)
@@ -81,6 +87,7 @@ def create_app(
     app.include_router(ai_router)
     app.include_router(proposals_router)
     app.include_router(analytics_router)
+    app.include_router(healthkit_import_router)
 
     @app.get("/healthz", tags=["system"], operation_id="healthcheck")
     def healthcheck() -> dict[str, str]:

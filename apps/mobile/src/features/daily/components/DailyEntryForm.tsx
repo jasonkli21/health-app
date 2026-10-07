@@ -217,6 +217,7 @@ export function DailyEntryForm({
       ? initialItem.observation.payload.value.metric
       : null;
   const severityOnly = observationMetric === "symptom_severity";
+  const stepCountOnly = observationMetric === "steps";
 
   return (
     <ScrollView
@@ -232,7 +233,7 @@ export function DailyEntryForm({
         value you can enter.
       </Text>
 
-      {!severityOnly ? (
+      {!severityOnly && !stepCountOnly ? (
         <View>
           <Text style={styles.fieldLabel}>Time detail</Text>
           <View accessibilityRole="radiogroup" style={styles.choices}>
@@ -699,7 +700,7 @@ export function DailyEntryForm({
       {initialItem?.object_type === "observation" && !severityOnly ? (
         <>
           <Field
-            label="Measurement value"
+            label={stepCountOnly ? "Daily step count" : "Measurement value"}
             value={draft.measurementValue}
             onChange={(measurementValue) => update({ measurementValue })}
             keyboardType="numbers-and-punctuation"
@@ -739,7 +740,10 @@ export function DailyEntryForm({
           {observationMetric === "pulse" ? (
             <Text style={styles.hint}>Unit: bpm</Text>
           ) : null}
-          {draft.precision === "instant" ? (
+          {stepCountOnly ? (
+            <Text style={styles.hint}>Unit: steps · local date aggregate</Text>
+          ) : null}
+          {!stepCountOnly && draft.precision === "instant" ? (
             <Field
               label="Interval end (optional)"
               hint="Preserves or edits the observation interval when one is recorded."

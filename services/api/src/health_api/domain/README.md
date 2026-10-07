@@ -45,3 +45,10 @@ days and reports constant/insufficient data without a statistic. Numerical
 tracker analysis is limited to number/quantity fields and an exact immutable
 schema version. These are descriptive software methods, not clinical
 thresholds or causal estimates.
+
+`healthkit_imports.py` defines the closed normalized batch, tombstone,
+receipt, status, and aggregate source-preference contracts. `StepCountValueV1`
+and the resting-heart-rate/heart-rate-summary Observation metrics are additive
+Phase 8 values. Sleep stage, source labels, and bounded aggregate method/count/
+range/coverage fields are allowlisted metadata; native HealthKit objects and
+raw high-frequency arrays are not accepted.

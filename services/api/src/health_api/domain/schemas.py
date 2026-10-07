@@ -252,6 +252,9 @@ class MetricKey(StrEnum):
     SYSTOLIC_PRESSURE = "systolic_pressure"
     DIASTOLIC_PRESSURE = "diastolic_pressure"
     PULSE = "pulse"
+    STEPS = "steps"
+    RESTING_HEART_RATE = "resting_heart_rate"
+    HEART_RATE_SUMMARY = "heart_rate_summary"
     SYMPTOM_SEVERITY = "symptom_severity"
     SYMPTOM_EPISODE_COUNT = "symptom_episode_count"
 
@@ -270,6 +273,7 @@ class MeasurementUnit(StrEnum):
     FAHRENHEIT = "F"
     MMHG = "mmHg"
     BPM = "bpm"
+    STEPS = "steps"
     SCORE = "score"
     EPISODES = "episodes"
 
@@ -387,6 +391,8 @@ class MeasurementValueV1(StrictModel):
         MetricKey.SYSTOLIC_PRESSURE,
         MetricKey.DIASTOLIC_PRESSURE,
         MetricKey.PULSE,
+        MetricKey.RESTING_HEART_RATE,
+        MetricKey.HEART_RATE_SUMMARY,
     ]
     value: FiniteDailyNumber
     unit: MeasurementUnit
@@ -399,6 +405,8 @@ class MeasurementValueV1(StrictModel):
             MetricKey.SYSTOLIC_PRESSURE: {MeasurementUnit.MMHG},
             MetricKey.DIASTOLIC_PRESSURE: {MeasurementUnit.MMHG},
             MetricKey.PULSE: {MeasurementUnit.BPM},
+            MetricKey.RESTING_HEART_RATE: {MeasurementUnit.BPM},
+            MetricKey.HEART_RATE_SUMMARY: {MeasurementUnit.BPM},
         }
         if self.unit not in supported[self.metric]:
             raise ValueError("unit is not supported for this measurement")
@@ -409,11 +417,19 @@ class MeasurementValueV1(StrictModel):
                 MetricKey.SYSTOLIC_PRESSURE,
                 MetricKey.DIASTOLIC_PRESSURE,
                 MetricKey.PULSE,
+                MetricKey.RESTING_HEART_RATE,
+                MetricKey.HEART_RATE_SUMMARY,
             }
             and self.value < 0
         ):
             raise ValueError("measurement must be nonnegative")
         return self
+
+
+class StepCountValueV1(StrictModel):
+    metric: Literal[MetricKey.STEPS]
+    value: Annotated[StrictInt, Field(ge=0)]
+    unit: Literal[MeasurementUnit.STEPS] = MeasurementUnit.STEPS
 
 
 class SymptomSeverityV1(StrictModel):
@@ -445,7 +461,7 @@ class CustomTrackerValueV1(StrictModel):
 
 
 type ObservationValueV1 = Annotated[
-    MeasurementValueV1 | SymptomSeverityV1 | CustomTrackerValueV1,
+    MeasurementValueV1 | StepCountValueV1 | SymptomSeverityV1 | CustomTrackerValueV1,
     Field(discriminator="metric"),
 ]
 
@@ -502,6 +518,8 @@ class ObservationSchemaV1(StrictModel):
         expected = (
             DailyDomain.SYMPTOMS
             if metric == MetricKey.SYMPTOM_SEVERITY
+            else DailyDomain.EXERCISE
+            if metric == MetricKey.STEPS
             else DailyDomain.MEASUREMENTS
         )
         if self.domain != expected:

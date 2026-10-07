@@ -250,5 +250,46 @@ when both daily resource types are selected and no domain filter is supplied.
 Health recomputes this preview from active, `ai_use_allowed` inputs at context
 construction time; a numerical tracker additionally requires its active
 definition to have AI use enabled. The Personal AI adapter remains disabled.
-For future Phase 8 ingestion, call `invalidate_analytics` in the same owner
-transaction when imported daily data is created, updated, or archived.
+
+## Phase 8 selective HealthKit import
+
+HealthKit routes use the verified app owner and accept normalized Event or
+Observation v1 records only. A batch contains one resource type, at most 200
+total entries/tombstones, one device installation ID, and the fixed
+`healthkit-v1` policy. The route body limit is 1,048,576 bytes. Extra fields,
+raw HealthKit objects/arrays, notes, wrong type/domain/unit combinations, and
+noncanonical aggregate identities are rejected before writes. The service
+computes a content hash; the client does not provide authorization anchors or
+owner IDs.
+
+| Method and path                             | Operation                      | Behavior                                                                                                                                                                                       |
+| ------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /imports/healthkit/batches`           | `importHealthKitBatch`         | Applies a type-specific batch and receipt in one owner transaction. Returns 201 for a new receipt, 200 for an identical replay, 409 for a batch/source conflict, and 422 for an invalid batch. |
+| `GET /imports/healthkit/batches/{batch_id}` | `getHealthKitBatchReceipt`     | Returns an owner-scoped receipt for retry reconciliation; it contains counts and identifiers, not sample bodies or anchors.                                                                    |
+| `GET /imports/healthkit/status`             | `getHealthKitImportStatus`     | Returns policy version, per-type counts/last accepted time, aggregate preference revisions, and the owner's known installation IDs. It does not claim Apple permission or data availability.   |
+| `PUT /imports/healthkit/source-preferences` | `setHealthKitSourcePreference` | Selects one existing installation for steps or heart-rate summaries with optimistic `expected_revision`; preference changes invalidate analytics transactionally.                              |
+
+A source-preference change also invalidates existing Today paging cursors. The
+mobile surface should reload Today after changing an aggregate source so one
+page set never mixes two source selections.
+
+Accepted low-frequency records use the source-sample UUID identity across
+installations. Step and heart-rate summaries use one date-only Observation per
+installation/local date/timezone/policy, with only one declared aggregate
+installation selected for Today/trends. Steps are an integer count; the
+heart-rate summary stores its mean as BPM and keeps min/max/count/coverage and
+aggregation method in allowlisted metadata. Sleep stage and source labels also
+use allowlisted metadata until a later typed schema decision. A source choice
+is not authenticated evidence that the underlying device reported a sample.
+
+Created Health rows are device-sourced, `unconfirmed`, and
+`ai_use_allowed=false`. Changed rows update their current revision when they
+remain unconfirmed device data. A deliberate user edit changes current source
+to manual and confirmation to `user_confirmed`; later sync updates are counted
+as corrections and do not overwrite it. Low-frequency tombstones archive only
+an unconfirmed device row, preserve its history, and retain the identity to
+block a repeat from restoring it. Imported create/update/archive operations
+reuse the daily transaction and invalidate Phase 7 analytics in that same
+owner transaction. No HealthKit anchor is stored by the server. Native query,
+permission, aggregation, and deletion behavior remain unverified until an iOS
+development build and real-device evidence are available.

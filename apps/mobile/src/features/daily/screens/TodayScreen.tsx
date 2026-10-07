@@ -16,6 +16,8 @@ import { sessionStore } from "../../../auth/sessionStore";
 import {
   DAILY_DOMAINS,
   DEVICE_TIMEZONE,
+  itemCoverageLabel,
+  itemOriginLabel,
   itemTimeLabel,
   itemTitle,
   itemValue,
@@ -634,7 +636,7 @@ export default function TodayScreen() {
                   <Pressable
                     key={`${item.object_type}:${item.id}`}
                     accessibilityRole="button"
-                    accessibilityLabel={`${itemKindLabel(item)}. ${itemTitle(item)}. ${itemValue(item)}. ${itemTimeLabel(item, data.timezone)}`}
+                    accessibilityLabel={`${itemKindLabel(item)}. ${itemTitle(item)}. ${itemValue(item)}. ${itemTimeLabel(item, data.timezone)}. ${itemOriginLabel(item) ?? ""}. ${itemCoverageLabel(item) ?? ""}`}
                     accessibilityHint="Open this entry to review, edit, archive, or view its history."
                     onPress={() =>
                       router.push({
@@ -650,6 +652,16 @@ export default function TodayScreen() {
                     <Text style={styles.cardMeta}>
                       {itemTimeLabel(item, data.timezone)}
                     </Text>
+                    {itemOriginLabel(item) ? (
+                      <Text style={styles.cardMeta}>
+                        {itemOriginLabel(item)}
+                      </Text>
+                    ) : null}
+                    {itemCoverageLabel(item) ? (
+                      <Text style={styles.cardMeta}>
+                        {itemCoverageLabel(item)}
+                      </Text>
+                    ) : null}
                   </Pressable>
                 ))
               )}

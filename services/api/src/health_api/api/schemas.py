@@ -6,7 +6,14 @@ from datetime import date, datetime, timedelta
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import AwareDatetime, ConfigDict, Field, StrictBool, StrictInt, model_validator
+from pydantic import (
+    AwareDatetime,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    model_validator,
+)
 
 from health_api.domain.analytics import (
     AnalysisMetricId,

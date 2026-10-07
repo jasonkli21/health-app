@@ -166,7 +166,10 @@ export interface components {
       | "temperature"
       | "systolic_pressure"
       | "diastolic_pressure"
-      | "pulse";
+      | "pulse"
+      | "steps"
+      | "resting_heart_rate"
+      | "heart_rate_summary";
     AnalyticsMetricCatalogResponse: {
       items: Array<components["schemas"]["MetricDefinition"]>;
     };
@@ -627,6 +630,94 @@ export interface components {
       object_id: string;
       revision: number;
     };
+    HealthKitImportBatchRequest: {
+      batch_id: string;
+      device_installation_id: string;
+      entries?: Array<components["schemas"]["HealthKitImportEntry"]>;
+      policy_version: "healthkit-v1";
+      resource_type:
+        | "workouts"
+        | "sleep"
+        | "steps"
+        | "weight"
+        | "resting_heart_rate"
+        | "heart_rate_summary";
+      tombstones?: Array<components["schemas"]["HealthKitImportTombstone"]>;
+    };
+    HealthKitImportBatchResult: {
+      batch_id: string;
+      conflict_count: number;
+      correction_count: number;
+      created_count: number;
+      replayed: boolean;
+      tombstoned_count: number;
+      unchanged_count: number;
+      updated_count: number;
+    };
+    HealthKitImportEntry: {
+      metadata?: components["schemas"]["HealthKitImportMetadata"];
+      record:
+        | components["schemas"]["EventSchemaV1"]
+        | components["schemas"]["ObservationSchemaV1"];
+      source_sample_id: string;
+    };
+    HealthKitImportMetadata: {
+      aggregation_method_version?: string | null;
+      coverage_end?: string | null;
+      coverage_start?: string | null;
+      device_label?: string | null;
+      maximum?: components["schemas"]["FiniteDailyNumber"] | null;
+      minimum?: components["schemas"]["FiniteDailyNumber"] | null;
+      sample_count?: number | null;
+      sleep_stage?:
+        | "awake"
+        | "asleep"
+        | "core"
+        | "deep"
+        | "rem"
+        | "unspecified"
+        | null;
+      source_bundle_identifier?: string | null;
+    };
+    HealthKitImportStatusResponse: {
+      installations: Array<
+        components["schemas"]["HealthKitSourceInstallation"]
+      >;
+      policy_version: "healthkit-v1";
+      server_ingest_enabled: true;
+      types: Array<components["schemas"]["HealthKitImportTypeStatus"]>;
+    };
+    HealthKitImportTombstone: {
+      source_sample_id: string;
+    };
+    HealthKitImportTypeStatus: {
+      imported_count: number;
+      last_success_at: string | null;
+      preference_revision: number | null;
+      preferred_installation_id: string | null;
+      resource_type:
+        | "workouts"
+        | "sleep"
+        | "steps"
+        | "weight"
+        | "resting_heart_rate"
+        | "heart_rate_summary";
+      tombstoned_count: number;
+    };
+    HealthKitSourceInstallation: {
+      device_installation_id: string;
+      source_name: string;
+    };
+    HealthKitSourcePreferenceRequest: {
+      device_installation_id: string;
+      expected_revision?: number | null;
+      resource_type: "steps" | "heart_rate_summary";
+    };
+    HealthKitSourcePreferenceResponse: {
+      device_installation_id: string;
+      resource_type: "steps" | "heart_rate_summary";
+      revision: number;
+    };
     InsightEvidenceReference: {
       object_id: string;
       object_type: "derived_signal" | "event" | "observation";
@@ -711,6 +802,7 @@ export interface components {
       | "F"
       | "mmHg"
       | "bpm"
+      | "steps"
       | "score"
       | "episodes";
     MeasurementValueV1: {
@@ -719,7 +811,9 @@ export interface components {
         | "temperature"
         | "systolic_pressure"
         | "diastolic_pressure"
-        | "pulse";
+        | "pulse"
+        | "resting_heart_rate"
+        | "heart_rate_summary";
       unit: components["schemas"]["MeasurementUnit"];
       value: components["schemas"]["FiniteDailyNumber"];
     };
@@ -741,6 +835,9 @@ export interface components {
       | "systolic_pressure"
       | "diastolic_pressure"
       | "pulse"
+      | "steps"
+      | "resting_heart_rate"
+      | "heart_rate_summary"
       | "symptom_severity"
       | "symptom_episode_count";
     MetricSummaryV1: {
@@ -775,6 +872,7 @@ export interface components {
     };
     ObservationValueV1:
       | components["schemas"]["MeasurementValueV1"]
+      | components["schemas"]["StepCountValueV1"]
       | components["schemas"]["SymptomSeverityV1"]
       | components["schemas"]["CustomTrackerValueV1"];
     OccurrenceActionRequest: {
@@ -1323,6 +1421,11 @@ export interface components {
       kind: "sleep";
       label?: string;
       quality?: number | null;
+    };
+    StepCountValueV1: {
+      metric: "steps";
+      unit?: "steps";
+      value: number;
     };
     StoredAssociationResponse: {
       id: string;
@@ -1969,6 +2072,28 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  getHealthKitBatchReceipt: {
+    path: {
+      batch_id: string;
+    };
+    responses: {
+      "200": components["schemas"]["HealthKitImportBatchResult"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  getHealthKitImportStatus: {
+    responses: {
+      "200": components["schemas"]["HealthKitImportStatusResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   getInsight: {
     path: {
       insight_id: string;
@@ -2121,6 +2246,18 @@ export interface operations {
       "200": {
         [key: string]: string;
       };
+    };
+  };
+  importHealthKitBatch: {
+    requestBody: components["schemas"]["HealthKitImportBatchRequest"];
+    responses: {
+      "200": components["schemas"]["HealthKitImportBatchResult"];
+      "201": components["schemas"]["HealthKitImportBatchResult"];
+      "401": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
     };
   };
   listActionProposalHistory: {
@@ -2632,6 +2769,17 @@ export interface operations {
     responses: {
       "200": components["schemas"]["AssistantMessageResponse"];
       "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  setHealthKitSourcePreference: {
+    requestBody: components["schemas"]["HealthKitSourcePreferenceRequest"];
+    responses: {
+      "200": components["schemas"]["HealthKitSourcePreferenceResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
       "413": components["schemas"]["ErrorResponse"];
       "422": components["schemas"]["ErrorResponse"];
       "503": components["schemas"]["ErrorResponse"];
@@ -3259,6 +3407,28 @@ export class HealthApiClient {
     );
   }
 
+  async getHealthKitBatchReceipt(
+    path: operations["getHealthKitBatchReceipt"]["path"],
+  ): Promise<components["schemas"]["HealthKitImportBatchResult"]> {
+    return this.request<components["schemas"]["HealthKitImportBatchResult"]>(
+      "GET",
+      `/imports/healthkit/batches/${encodeURIComponent(path.batch_id)}`,
+      undefined,
+      undefined,
+    );
+  }
+
+  async getHealthKitImportStatus(): Promise<
+    components["schemas"]["HealthKitImportStatusResponse"]
+  > {
+    return this.request<components["schemas"]["HealthKitImportStatusResponse"]>(
+      "GET",
+      `/imports/healthkit/status`,
+      undefined,
+      undefined,
+    );
+  }
+
   async getInsight(
     path: operations["getInsight"]["path"],
   ): Promise<components["schemas"]["InsightResponse"]> {
@@ -3386,6 +3556,17 @@ export class HealthApiClient {
     return this.request<{
       [key: string]: string;
     }>("GET", `/healthz`, undefined, undefined);
+  }
+
+  async importHealthKitBatch(
+    requestBody: operations["importHealthKitBatch"]["requestBody"],
+  ): Promise<components["schemas"]["HealthKitImportBatchResult"]> {
+    return this.request<components["schemas"]["HealthKitImportBatchResult"]>(
+      "POST",
+      `/imports/healthkit/batches`,
+      undefined,
+      requestBody,
+    );
   }
 
   async listActionProposalHistory(
@@ -3760,6 +3941,14 @@ export class HealthApiClient {
       undefined,
       requestBody,
     );
+  }
+
+  async setHealthKitSourcePreference(
+    requestBody: operations["setHealthKitSourcePreference"]["requestBody"],
+  ): Promise<components["schemas"]["HealthKitSourcePreferenceResponse"]> {
+    return this.request<
+      components["schemas"]["HealthKitSourcePreferenceResponse"]
+    >("PUT", `/imports/healthkit/source-preferences`, undefined, requestBody);
   }
 
   async transitionContext(
