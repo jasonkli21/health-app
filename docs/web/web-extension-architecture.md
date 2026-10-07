@@ -2,7 +2,9 @@
 
 ## Status
 
-Deferred until the initial mobile/backend implementation is complete. This document exists now so the mobile-first implementation preserves a clean web extension path without adding web scope to Phases 0–9.
+Deferred web-client design. This document preserves a clean extension path
+without making web context mandatory for ordinary mobile or backend work.
+Check [current state](../current-state.md) for delivered capabilities.
 
 ## Goal
 

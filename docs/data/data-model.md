@@ -2,6 +2,9 @@
 
 The model supports structured common health concepts, custom user-defined information, temporal correctness, provenance, confirmation status, sparse tracking, and longitudinal analysis.
 
+This is the logical product model, not an inventory of delivered tables or
+features. See [current state](../current-state.md) for the implemented subset.
+
 Core vocabulary: Fact/profile item, Constraint, Preference, Regimen, Goal, Plan, Active context, Event, Observation, Tracker definition, Experiment, Derived signal, Insight, Recommendation, Record, Relationship, Action proposal.
 
 A common `health_objects` envelope should include identity, user, object type/domain/status, title, validity window, recorded/created/updated times, source, confirmation status, schema version, notes, and metadata JSONB.
@@ -75,8 +78,9 @@ The Phase 6 command union is closed over Profile create/update, Event create
 with linked supported Observations, goal create/update, plan create/update,
 and tracker-definition create. It reuses the existing payload registries,
 revision validation, and owner-reference checks. There are no archive/delete,
-permission-grant, or arbitrary patch commands. The provider adapter remains
-disabled until its actual identity/delegation/tool contract is reviewed.
+permission-grant, or arbitrary patch commands. Provider messaging and
+AI-originated proposals must remain disabled until the actual
+identity/delegation/tool contract is reviewed.
 
 ## Phase 1 Profile v1 contract
 
@@ -84,7 +88,7 @@ Phase 1 registers only `profile_item` schema version 1. Its payload has `kind`, 
 
 Profile validity instants must include an offset and are normalized to UTC. Windows are half-open `[valid_from, valid_to)`; either bound may be absent, and two supplied bounds must be ordered. Recorded/created/updated times describe when Health knew the item. They do not replace effective validity. Manual structured saves are `user_confirmed`; provenance remains a separate source field. `ai_use_allowed` and `cross_domain_use_allowed` both default to false. Phase 1 stores only bounded display metadata, not unvalidated health payloads.
 
-The schema registry is additive: a later payload version gets a new `(object_type, schema_version)` entry and a migration/conversion policy that keeps old revision snapshots readable. Existing registered versions are immutable. Phase 1 does not register event, observation, regimen, or other later-phase schemas.
+The schema registry is additive: a later payload version gets a new `(object_type, schema_version)` entry and a migration/conversion policy that keeps old revision snapshots readable. Existing registered versions are immutable. The initial Phase 1 release registered only Profile; later phase releases add their own supported schemas without reusing old versions.
 
 ## Phase 1 relational representation
 

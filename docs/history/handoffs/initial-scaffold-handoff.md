@@ -1,4 +1,8 @@
-# Codex handoff
+> Historical scaffold handoff. Its Phase 0-only restriction and read order are
+> superseded. Current repository instructions are in AGENTS.md; start with
+> docs/README.md and docs/current-state.md.
+
+# Initial scaffold handoff
 
 ## Objective
 

@@ -99,7 +99,7 @@ OpenAPI JSON and the generated TypeScript client are committed together. The
 generation command used was:
 
 ```bash
-CI=true PATH="/Users/jasonkli/projects/health-app/.venv/bin:/Users/jasonkli/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:$PATH" \
+CI=true PATH=".venv/bin:$PATH" \
   pnpm dlx pnpm@9.15.0 --filter @personal-health/api-client generate
 ```
 

@@ -2,9 +2,7 @@
 
 ## Implementation-time reconciliation gate
 
-**Status: planned. Dependencies: accepted Phases 1–6 and their actual release evidence.** Read [Phase 7 roadmap](../implementation-plan.md#phase-7--insights-and-recommendations), data/AI/security docs, actual measurement/rollup/catalog/timezone/coverage rules, planning/trackers, context/search and proposal executor. Inspect available data and choose only supported metrics. Record drift and update material plan/ADR before code; no analytics based on future HealthKit/records.
-
-Real homes: API domain/application/persistence/API/integrations layers/tests, root migrations/contracts, api-client, mobile app/src/tests. All new artifacts below are **planned/provisional**. Prior products and their exact paths/APIs are assumptions to reconcile at implementation time, not facts about Phase 0.
+Check [current state](../../current-state.md) for delivery status and open gates. This plan defines intended scope; it is not evidence of delivery or authorization to begin work. Before implementation or a follow-up, inspect current code, preceding release/review evidence, accepted ADRs and contracts, and external dependencies. Reconcile material drift here before coding.
 
 ## Goal / scope
 
@@ -124,4 +122,4 @@ Accept when deterministic trends/associations are correct, insufficient data pro
 
 Before Phase 8: Can every displayed number be traced to method/input revisions? Are missingness and causal limits visible? Are stale values invalidated on edit/import? Are recommendation actions safe/idempotent? Is AI unnecessary for authoritative computation?
 
-Luna Max must create planned `docs/implementation/evidence/phase-7-release.md`: metric/method versions/thresholds/fixtures, migration head/routes, evidence/stale/expiry/recompute rules, recommendation proposal contract, experiment lifecycle, generated procedure, deterministic/performance/mobile tests, optional live AI/safety review and unresolved checks. Include ingestion invalidation hooks Phase 8 must invoke.
+The implementing session must create planned `docs/implementation/evidence/phase-7-release.md`: metric/method versions/thresholds/fixtures, migration head/routes, evidence/stale/expiry/recompute rules, recommendation proposal contract, experiment lifecycle, generated procedure, deterministic/performance/mobile tests, optional live AI/safety review and unresolved checks. Include ingestion invalidation hooks Phase 8 must invoke.

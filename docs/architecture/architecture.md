@@ -2,13 +2,13 @@
 
 ## Ownership boundary
 
-The Health application owns canonical health state, domain validation, health-specific retrieval, analytics, and actions. Personal AI owns model/provider orchestration, general conversation/memory, research/search, and cross-domain reasoning.
+The Health application owns canonical health state, domain validation, health-specific retrieval, analytics, and actions. Personal AI is the intended owner of model/provider orchestration, general conversation/memory, research/search, and cross-domain reasoning.
 
 ```text
 Mobile Health UI
       |
       v
-Health API ------------------> Personal AI System
+Health API -- reviewed, scoped contract --> Personal AI System
    |                                |
    v                                v
 Postgres <--------------------- Health API
@@ -20,11 +20,11 @@ The Personal AI System never connects directly to the Health database.
 
 ## Local architecture
 
-Expo app, FastAPI localhost, PostgreSQL Docker, local objects, optional Personal AI endpoint. Ordinary development works without cloud.
+Expo app, FastAPI localhost, PostgreSQL Docker, and local objects. Ordinary development works without cloud. Provider messaging stays disabled until its external contract is reviewed.
 
 ## Cloud architecture
 
-Expo client, shared auth, Cloud Run Health API, isolated Neon Postgres, GCS, authenticated Personal AI service.
+Target topology: Expo client, shared auth, Cloud Run Health API, isolated Neon Postgres, private GCS, and an authenticated Personal AI service. This is a design target, not a deployed environment; see current state.
 
 ## Layering
 

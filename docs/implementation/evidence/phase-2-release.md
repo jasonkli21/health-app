@@ -163,7 +163,7 @@ writes.
 | Client                                        | OpenAPI export and client regeneration passed; the only contract change is the explicit `FiniteDailyNumber` schema alias for daily values. Strict generated-client TypeScript check passed.                           |
 | Python static/build                           | Configured CI Ruff check, Ruff format check (36 files), mypy (21 sources), compileall, scaffold verification and Alembic offline SQL generation passed.                                                               |
 | Formatting                                    | Whole-repository Prettier check passed after OpenAPI/client regeneration and documentation edits.                                                                                                                     |
-| iOS bundle                                    | Expo SDK 57 export succeeded with Node 24.19: 1,136 modules and one 2.5 MB Hermes bundle at `/private/tmp/health-phase2-review-ios-bundle`. This is Metro bundle evidence, not device-interaction evidence.           |
+| iOS bundle                                    | Expo SDK 57 export succeeded with Node 24.19: 1,136 modules and one 2.5 MB Hermes bundle in a disposable temporary directory. This is Metro bundle evidence, not device-interaction evidence.                         |
 | Migration head                                | `alembic heads`: `b9f5e1a72c4d (head)`. Offline graph/SQL generation passed; database migration lifecycle and model drift checks remain open.                                                                         |
 
 ## Main-session final re-review
@@ -176,50 +176,34 @@ skipped**; mobile reports **54 passed**. Configured CI Python static/scaffold
 checks, mobile TypeScript/ESLint and client TypeScript pass. OpenAPI/client
 regeneration leaves no tracked diff. These results supersede the earlier
 39-pass count above. Phase 2 acceptance remains blocked on the database checks
-below; Phase 3 has not started. See `phase-2-review.md` and
-`../coordinator-state.md` for the exact resume scope.
+below. At this Phase 2 checkpoint, Phase 3 had not started; see
+[current state](../../current-state.md) for later progress and current scope.
 
 ## Unverified gates and prerequisites
 
-The documented disposable PostgreSQL 16 cluster at
-`/private/tmp/health-phase2-pg-20261003/data` was verified against PID 78748
-and its exact PostgreSQL command, then stopped gracefully. Restart and fresh
-cluster attempts failed at operating-system shared-memory allocation. No
-unrelated process or IPC resource was changed. The exact cluster has no
-`postmaster.pid`, `pg_ctl status` reports no server running, and its log ends
-with a clean database shutdown. Its failed resume log records
-`shmget(key=11678823, size=56)` returning `ENOSPC`; read-only `ipcs -m`
-contained no segment with that key. The remaining segments could not be
-attributed to this cluster, and a later read-only process inventory showed
-other task-owned PostgreSQL clusters, which were left alone. Consequently the P2.3
-PostgreSQL-backed route tests, fresh migration lifecycle/drift check, `EXPLAIN`
-plans, revision-history worst-case profiling and measured Today latency remain
-unverified. The implementation bounds candidate objects at 10,000 and pages
-at 100, but those static limits are not a substitute for a database execution
-plan or timing result.
+At the Phase 2 checkpoint, the disposable PostgreSQL test cluster had been
+stopped cleanly. Subsequent restart and fresh-cluster attempts failed at
+operating-system shared-memory allocation with ENOSPC. No unrelated database
+or IPC resource was changed. PostgreSQL-backed route tests, migration
+lifecycle/drift, EXPLAIN plans, revision-history profiling and measured Today
+latency remained unverified. The implementation's static candidate/page
+bounds did not substitute for database execution or timing evidence.
 
-During review-fix verification, a new scratch path at
-`/private/tmp/health-phase2-review-pg-20261004` was attempted twice with local
-PostgreSQL 16.15. Both `initdb` bootstrap attempts failed with `shmget(...,
-size=56)` / `ENOSPC`; `initdb` removed the failed data directory. The override
-attempt still selected System V shared memory before bootstrap. The sandbox
-denied `ps`, and `ipcs -m` displayed no segments while its system query also
-reported a permission limitation. No initialized cluster was started, and no
-existing or other task-owned PostgreSQL process or IPC resource was touched.
-The database-backed tests, migration lifecycle/drift, and query plans were not
-run as a result.
+Further disposable-cluster initialization attempts failed with the same
+shared-memory limit and did not start a server. Database-backed tests,
+migration lifecycle/drift and query-plan measurements remained open at that
+checkpoint.
 
 PostgreSQL 17/Docker, exact pnpm 9.15 frozen install and the complete GitHub
 Actions workflow were unavailable locally. Actual device/simulator keyboard,
-visual layout and VoiceOver checks remain manual gates; the iOS bundle verifies
-Metro compilation only. Expo's online compatibility endpoint, Phase 0 advisory
-and dependency source-use review also remain open. No cloud, AI, future-phase
-planning, native health permission or web capability is claimed.
+visual layout and VoiceOver checks remained manual gates; the iOS bundle
+verified Metro compilation only. Expo's online compatibility endpoint, Phase 0
+advisory and dependency source-use review also remained open. This checkpoint
+made no cloud, AI, future-phase planning, native health permission or web
+acceptance claim.
 
-Before a Phase 3 deployment, rerun the complete PostgreSQL 17 CI workflow,
-exercise the migration on a fresh database and a backed-up staging copy, run
-the P2.3 owner-isolation/snapshot suite, record representative `EXPLAIN
-ANALYZE` and bounded Today latency for sparse and high-revision owners, and
-complete the device/accessibility and existing Phase 0/1 release gates. Replace
-development-only principal/auth settings and configure the approved secure
-deployment environment before exposing any health endpoint outside local use.
+Before a Phase 3 deployment, the checkpoint recommended rerunning the complete
+PostgreSQL 17 CI workflow, exercising migration lifecycle and owner-isolation
+checks on a disposable database, measuring bounded Today queries, completing
+device/accessibility and prior release gates, and using approved cloud auth and
+private storage before exposing a health endpoint outside local use.

@@ -1,3 +1,7 @@
+> Historical evidence for the original scaffold review. Its readiness note
+> describes the repository at that date; current delivery status is in
+> docs/current-state.md.
+
 # Phase 0 scaffold review
 
 Review date: 2026-10-03. Scope: repository foundation fixes and documentation-only Phase 1–9 planning. No domain tables, product screens, AI behavior, native health integrations, cloud deployment, or web client were implemented.
@@ -25,24 +29,24 @@ The roadmap ordering remains unchanged. Universal Add's natural-language proposa
 
 Execution used bundled Python 3.12.14 and Node 24.19.0, plus temporary pnpm 9.15.0. System `python3` was 3.9.6 and `node`/Docker were absent from PATH; documentation names the required runtimes. Dependencies were installed into ignored local directories; no global runtime or cloud infrastructure was installed.
 
-| Check                                                                                              | Result / limits                                                                                                                            |
-| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `python scripts/verify_scaffold.py`                                                                | Pass after corrections                                                                                                                     |
-| `PYTHONPYCACHEPREFIX=/private/tmp/health-pycache python -m compileall -q services/api/src scripts` | Pass; initial system-Python invocation attempted a sandbox-blocked global cache, corrected with writable cache/runtime                     |
-| `pytest -c services/api/pyproject.toml services/api/tests`                                         | 1 passed; upstream Starlette warning about future httpx2 migration, no test failure                                                        |
-| `ruff check` and `ruff format --check`, explicit API config                                        | Pass                                                                                                                                       |
-| `mypy --config-file services/api/pyproject.toml services/api/src scripts`                          | Strict check passes                                                                                                                        |
-| TestClient liveness + OpenAPI boundary inspection                                                  | 200 `{status: ok}`; only `/healthz` in OpenAPI                                                                                             |
-| Actual uvicorn process/HTTP smoke                                                                  | Pass on loopback temporary port; server stopped after check. Sandbox initially blocked binding; authorized escalation completed the check. |
-| Frozen pnpm install                                                                                | Pass; final lock resolves native peers without incompatible-peer warnings                                                                  |
-| `pnpm mobile:lint`, `pnpm mobile:typecheck`                                                        | Pass                                                                                                                                       |
-| `pnpm mobile:test`                                                                                 | Pass with **no test files**, explicitly not mobile behavior coverage                                                                       |
-| `expo install --check` offline then online                                                         | Pass after online check identified and corrected TypeScript to ~6.0.3; installed package engine ranges also support Node 22.13             |
-| `expo export --platform ios`                                                                       | Pass, 1,101 modules; temporary Hermes bundle created outside repo                                                                          |
-| `pnpm format:check`                                                                                | Pass after formatting                                                                                                                      |
-| YAML/manifests, Markdown link/plan structure and cross-phase review                                | Pass; details finalized after all plan files were written                                                                                  |
-| Docker Compose startup/config, Xcode/Expo Go device launch, full Expo Doctor                       | **Unverified external gates**: Docker/simulator absent; static Compose review and bundling do not prove these                              |
-| Cloud/auth/AI/HealthKit/provider checks                                                            | Out of Phase 0 scope; explicit implementation-time gates in plans                                                                          |
+| Check                                                                                           | Result / limits                                                                                                                            |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `python scripts/verify_scaffold.py`                                                             | Pass after corrections                                                                                                                     |
+| `PYTHONPYCACHEPREFIX="$TMPDIR/health-pycache" python -m compileall -q services/api/src scripts` | Pass; initial system-Python invocation attempted a sandbox-blocked global cache, corrected with writable cache/runtime                     |
+| `pytest -c services/api/pyproject.toml services/api/tests`                                      | 1 passed; upstream Starlette warning about future httpx2 migration, no test failure                                                        |
+| `ruff check` and `ruff format --check`, explicit API config                                     | Pass                                                                                                                                       |
+| `mypy --config-file services/api/pyproject.toml services/api/src scripts`                       | Strict check passes                                                                                                                        |
+| TestClient liveness + OpenAPI boundary inspection                                               | 200 `{status: ok}`; only `/healthz` in OpenAPI                                                                                             |
+| Actual uvicorn process/HTTP smoke                                                               | Pass on loopback temporary port; server stopped after check. Sandbox initially blocked binding; authorized escalation completed the check. |
+| Frozen pnpm install                                                                             | Pass; final lock resolves native peers without incompatible-peer warnings                                                                  |
+| `pnpm mobile:lint`, `pnpm mobile:typecheck`                                                     | Pass                                                                                                                                       |
+| `pnpm mobile:test`                                                                              | Pass with **no test files**, explicitly not mobile behavior coverage                                                                       |
+| `expo install --check` offline then online                                                      | Pass after online check identified and corrected TypeScript to ~6.0.3; installed package engine ranges also support Node 22.13             |
+| `expo export --platform ios`                                                                    | Pass, 1,101 modules; temporary Hermes bundle created outside repo                                                                          |
+| `pnpm format:check`                                                                             | Pass after formatting                                                                                                                      |
+| YAML/manifests, Markdown link/plan structure and cross-phase review                             | Pass; details finalized after all plan files were written                                                                                  |
+| Docker Compose startup/config, Xcode/Expo Go device launch, full Expo Doctor                    | **Unverified external gates**: Docker/simulator absent; static Compose review and bundling do not prove these                              |
+| Cloud/auth/AI/HealthKit/provider checks                                                         | Out of Phase 0 scope; explicit implementation-time gates in plans                                                                          |
 
 Known dependency notices: eslint 9 is marked deprecated upstream but remains compatible with the SDK 57 ESLint config; uuid 7 is a transitive upstream deprecation; pnpm 9 on Node 24 emits a `url.parse` deprecation. Do not change SDK/tool major versions solely to suppress notices. Upgrade deliberately with compatibility evidence. The API lock's Starlette/httpx warning should be reconciled when Phase 1 grows tests, without treating it as a failed smoke check.
 

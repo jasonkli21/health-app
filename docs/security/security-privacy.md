@@ -18,7 +18,7 @@ Cloud config requires a private GCS bucket, a pooled runtime Neon endpoint with 
 
 These controls are a private product security baseline, not a claim of formal HIPAA compliance. Cloud identity, connection, GCS IAM, billing, and restore behavior remain unverified until a user-supplied staging environment is deployed.
 
-## Phase 5 AI data controls
+## AI data controls
 
 Every health object defaults to `ai_use_allowed=false`. Profile, planning, and
 daily Event/Observation forms expose the item-level choice; daily permission
@@ -29,8 +29,9 @@ bounded to 100 entries and 65,536 serialized bytes; daily history and
 unconsented objects are not included. Search has a 90-day daily-entry window
 and bounded pages.
 
-No health data is sent to an AI provider in the current build. The actual
-Personal AI service and its service identity, delegation, tool registration and
-retention terms were not supplied; the adapter is disabled, and configuration
-rejects `PERSONAL_AI_ENABLED=true`. The real provider boundary, retention
-review and service safety checks remain release gates.
+Do not send health data to an AI provider unless its service identity,
+delegation, tool registration, retention, and safety contracts are supplied
+and reviewed. Until then, the provider adapter must remain disabled and
+configuration must reject activation. See [current state](../current-state.md)
+for the current provider status and [Phase 5 evidence](../implementation/evidence/phase-5-release.md)
+for the checks and remaining gates.

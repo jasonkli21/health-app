@@ -92,5 +92,4 @@ Phase 2 implementation. This does not close any external or native-device gate.
 Known external gates remain PG17/Docker, exact pnpm9/full CI, actual device and
 VoiceOver/keyboard walkthrough, online compatibility, and Phase 0 advisories.
 No cloud/AI/native/web capabilities belong in this fix scope. The final review
-disposition is recorded in the Phase 2 checkpoint. Future implementation agents
-use Luna Extra High.
+disposition is recorded in the Phase 2 checkpoint. Future implementation should follow current repository guidance and the active user request.

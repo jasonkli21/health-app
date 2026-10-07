@@ -1,3 +1,7 @@
+> Historical one-time prompt for the scaffold review and plan authoring. It is
+> not current guidance or implementation authorization. See AGENTS.md and
+> docs/current-state.md.
+
 # Initial Codex prompt
 
 Use **Sol High** for this session.

@@ -2,66 +2,11 @@
 
 ## Implementation-time reconciliation gate
 
-**Status: local proposal core delivered; live AI submission remains gated. Dependencies: locally delivered Phases 1–5 and their actual release evidence.** Read [Phase 6 roadmap](../implementation-plan.md#phase-6--ai-action-proposals), ADR 0006, actual Phase 5 evidence, owner/source/revision/permission schemas, Profile/daily/planning command contracts and mobile form flows. Identify actual external proposal capability support; record drift and update material plan/ADR changes before code.
-
-The original scaffold names below were provisional. The local reconciliation and delivery checkpoint above record which existing API, application, persistence, generated-client, and mobile modules were inspected and changed; provider integration and release verification remain open.
-
-### Reconciliation before implementation — October 5, 2026
-
-- Phases 1–5 have local release evidence. The actual owner-authenticated APIs
-  and application commands are in `services/api/src/health_api`; generated
-  client artifacts are in `contracts/openapi` and `packages/api-client`; the
-  mobile Assistant is under `apps/mobile/src/features/assistant`.
-- Phase 5 explicitly has no supplied Personal AI endpoint, service identity,
-  end-user delegation, callback/tool protocol, or retention contract. The
-  only adapter is disabled and `PERSONAL_AI_ENABLED=true` is rejected. There
-  is therefore no supportable live `health.propose.*` registration or AI
-  caller identity to implement. Proposal creation by a provider remains
-  disabled until that contract is supplied; no provider URL or credential is
-  guessed.
-- Existing source metadata can represent `ai` and user-confirmed state, but
-  `health_object_revisions` constrains actors to the owner and does not record
-  a proposal reference. Existing command services each own a transaction and
-  hard-code manual provenance. These are real reuse gaps for a one-transaction
-  proposal executor and will be changed before composing commands.
-- Proposal drafts are not canonical health facts. Persist them in dedicated,
-  owner-scoped proposal, immutable proposal-revision, event, and receipt
-  tables. This avoids putting pending state in `health_objects` or changing
-  its clinical resource allowlist. Applying a command will call existing
-  domain services in a shared outer unit of work, preserving their schema,
-  owner-reference, and history validation.
-- The plan's live-provider package is gated, not simulated. This delivery
-  implements the fail-closed proposal core and owner-confirmation path where
-  the repository can verify them. It must report provider submission,
-  provider role/delegation, and live confirmation walkthrough as unresolved
-  external gates.
-
-ADR 0006 and this plan were reconciled before code to record these actual
-service and persistence boundaries.
-
-### Local delivery checkpoint — October 5, 2026
-
-- The closed command schemas, proposal/revision/event/receipt persistence,
-  owner-authenticated APIs, shared-transaction executor, target history
-  provenance, generated client, and mobile review/edit/confirm/reject inbox
-  are implemented.
-- The API can create owner-authored pending drafts, but provider submission is
-  not implemented. The AI adapter remains disabled. No delegated tool role,
-  callback, or live provider confirmation walkthrough can be claimed.
-- The mobile command editor presents the bounded typed command list as JSON
-  for user editing; every edited revision is validated by the closed server
-  command union and requires confirmation again. A more polished family-specific
-  form editor remains a UX follow-up.
-- AI-populated direct form Save has no source flow to exercise while the
-  provider is unavailable. Existing manual forms keep their existing direct
-  save commands; proposal apply is the single implemented confirmed executor.
-- Release evidence records exact static checks and the unrun database/race,
-  mobile-device, and live provider gates. The phase is not accepted for live AI
-  use until these gates are completed against actual configured systems.
+Check [current state](../../current-state.md) for delivery status and open gates. This plan defines intended scope; it is not evidence of delivery or authorization to begin work. Before implementation or a follow-up, inspect current code, preceding release/review evidence, accepted ADRs and contracts, and external dependencies. Reconcile material drift here before coding.
 
 ## Outcome / strict deliver and defer
 
-**Local delivery:** profile create/update, Event creation (including explicitly linked supported Observations), goal create/update, plan create/update and tracker-definition creation as typed owner-authored proposals. The owner can review, edit, confirm or reject them; one transactional executor applies approved changes with provenance/history and idempotency. Provider-authored proposals remain gated on the missing Personal AI service/delegation contract.
+**Deliver:** profile create/update, Event creation (including explicitly linked supported Observations), goal create/update, plan create/update and tracker-definition creation as typed owner-authored proposals. The owner can review, edit, confirm or reject them; one transactional executor applies approved changes with provenance/history and idempotency. Provider-authored proposals remain gated on the missing Personal AI service/delegation contract.
 
 **Defer:** provider submission until its actual identity/delegation contract is supplied; autonomous changes, bulk destructive/archive/delete proposals, regimen/context-specific proposal commands unless explicitly added by an approved contract extension, automated insight/recommendation generation to Phase 7, record extraction proposals to Phase 9, device import/web. Existing manual CRUD remains available. Any future AI-originated proposal cannot apply or approve itself.
 
@@ -173,4 +118,4 @@ Accept when all five requested proposal families work, every AI-originated mutat
 
 Before Phase 7: Is there exactly one transactional executor? Does any service token bypass confirmation? Are stale views invalidated and reviewed again? Are origins preserved after edits? Can later recommendations/extraction reuse the same mechanism without direct writes?
 
-Implementing Luna Max must create planned `docs/implementation/evidence/phase-6-release.md`: actual commands/states/API fields, migrations/head, transaction/receipt uniqueness rules, provenance/history examples, explicit-save UX contract, role/tool matrix, generated procedure, concurrency/failure and live provider results, flags and unresolved checks. Include extension instructions for Phase 7/9 without preimplementing their commands.
+Implementing The implementing session must create planned `docs/implementation/evidence/phase-6-release.md`: actual commands/states/API fields, migrations/head, transaction/receipt uniqueness rules, provenance/history examples, explicit-save UX contract, role/tool matrix, generated procedure, concurrency/failure and live provider results, flags and unresolved checks. Include extension instructions for Phase 7/9 without preimplementing their commands.

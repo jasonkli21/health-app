@@ -12,29 +12,25 @@ Health facts discovered in conversation should be proposed into Health rather th
 
 Design for general wellness, education, personally consequential medical reasoning, and urgent-safety classifications with progressively stricter grounding/action policies.
 
-## Phase 5 implementation boundary
+## Authorization and data flow
 
-Health currently implements versioned `HealthContextPack` v1 preview and
-AI-permission-filtered full-text search. The pack contains only active,
-temporally eligible owner objects that the user individually marked
-`ai_use_allowed` and selected by resource type. Daily summaries cover only the
-included, opted-in entries, and evidence references identify exact object
-revisions. Ranking is deterministic: safety constraints and active context
-come first, then confirmation state and task relevance; source kind is
-displayed as provenance without an invented confidence score. Text and notes
-remain untrusted data. Cross-domain permission is a separate flag and does not
-authorize this Assistant.
+Health may build a versioned, minimized context preview from canonical
+owner-scoped resources. Every included object must be active and temporally
+eligible, and the owner must have explicitly enabled its AI-use permission.
+Task scope and per-request exclusions can narrow that set but cannot grant
+permission. Context size, included resources, and evidence are bounded and
+revision-linked. User text and notes remain untrusted data; relationship
+metadata must not make an unauthorized endpoint searchable or visible.
 
-The mobile Assistant shows the requested scope and local preview. The provider
-adapter remains disabled: this repository has no Personal AI service or
-supplied endpoint, service identity, delegation, tool callback, or retention
-contract. `PERSONAL_AI_ENABLED=true` is rejected and no destination URL is
-configurable. Message submission therefore fails closed with a sanitized 503;
-context preview and permission-filtered search continue to work locally. Do
-not claim live service compatibility or safety evaluation from this state.
+Cross-domain permission is separate and does not authorize this Assistant.
+Health rebuilds context immediately before any future provider send, checks
+permissions again on every read, binds delegation to a short-lived
+owner/request scope, and validates every cited revision. If any required
+provider identity, delegation, callback, retention, timeout, or safety contract
+is absent or unreviewed, provider messaging and AI-originated proposal
+submission must remain disabled. Health-side preview/search and owner-authored
+structured proposals are separate local capabilities.
 
-When the service contract is supplied, Health must keep ownership and
-per-object permission checks at every read, bind delegation to a short-lived
-owner/request scope, rebuild context at send time, and validate every cited
-revision. The Phase 5 launch gate remains the real service auth, retention,
-timeout, tool registration, safety-copy and live read-only evaluation.
+See [current state](../current-state.md) for what is implemented and
+[Phase 5 evidence](../implementation/evidence/phase-5-release.md) for the
+verified preview/search boundary and open provider gates.

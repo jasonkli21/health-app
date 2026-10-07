@@ -1,4 +1,8 @@
-# Implementation coordinator state
+> Archived coordinator notes. This file contains dated implementation-session
+> state and is preserved only as history. It is not current status or policy;
+> use docs/current-state.md and the linked release/review evidence.
+
+# Historical implementation coordinator state
 
 ## Current checkpoint — October 5, 2026
 
@@ -14,7 +18,7 @@ Static verification passed: changed-file Ruff, mypy (32 API source files),
 mobile TypeScript, ESLint, Prettier, OpenAPI export/client generation, Alembic
 head/offline SQL generation, and `git diff --check`. A broader Ruff pass found
 six import-order issues in unchanged API files; changed files are clean. No
-tests were added or run. See [`phase-5-release.md`](evidence/phase-5-release.md)
+tests were added or run. See [`phase-5-release.md`](../implementation/evidence/phase-5-release.md)
 for commands, scope, limitations and open gates.
 
 Do not claim live AI, clinical-safety, database-migration, cloud, or device
@@ -99,7 +103,7 @@ PG17 is still unavailable.
 ## Phase 3 implementation checkpoint — October 4, 2026
 
 - Local implementation is committed through `c288982`: `d041477` strict settings/provider identity mapping; `95d7c3d` Firebase backend auth, typed bearer contract, and real mobile Firebase SDK session lifecycle; `0708109` path-safe local/GCS object adapters and non-root hash-locked API container; `c288982` explicit GCP Terraform/Cloud Build artifacts and migration-first rollback runbook. P3.4 is offline artifacts only. P3.5 live acceptance is not complete, and this checkpoint does not advance Phase 4.
-- Full release evidence is in [`phase-3-release.md`](evidence/phase-3-release.md). The final API test run reports **77 passed, 41 skipped**: 40 carried Phase 2 PostgreSQL cases (`daily_api` 12, `daily_persistence` 6, `profile_api` 9, `profile_persistence` 13) plus one new skipped `test_provider_identity_persistence.py` first-login race. The PostgreSQL gate still includes full route/persistence tests, migration lifecycle and drift checks, and query profiles. The documented prior `initdb` ENOSPC remains the blocker; no new initdb or unrelated cluster/IPC attempt was made.
+- Full release evidence is in [`phase-3-release.md`](../implementation/evidence/phase-3-release.md). The final API test run reports **77 passed, 41 skipped**: 40 carried Phase 2 PostgreSQL cases (`daily_api` 12, `daily_persistence` 6, `profile_api` 9, `profile_persistence` 13) plus one new skipped `test_provider_identity_persistence.py` first-login race. The PostgreSQL gate still includes full route/persistence tests, migration lifecycle and drift checks, and query profiles. The documented prior `initdb` ENOSPC remains the blocker; no new initdb or unrelated cluster/IPC attempt was made.
 - Python Ruff check passed, Ruff format check found 43 files formatted, mypy found no issues in 24 source files, scaffold verification and pip checks passed, and the hashed production lock dry run passed. Mobile has **60 passing tests**, strict TypeScript, ESLint and whole-repository Prettier pass; exact pnpm 9.15.0 frozen install succeeded from the local cache with zero downloads; Expo iOS export bundled 1,157 modules into a 2.9 MB Hermes bundle. OpenAPI/client regeneration produced no diff. Offline Alembic SQL reached `c3721f5a9a01`, but is not database migration evidence.
 - IaC/build boundaries: Terraform/OpenTofu, gcloud, Docker and Podman are unavailable; HCL formatting, validation and provider-lock generation are unverified. Cloud Build YAML parsing, builder-script syntax/argument guard and offline SQL generation passed. No live Firebase users/project, Neon endpoints/secrets, GCP project/region, private bucket/retention policy, approved spend budget, instance/connection budget or state bucket was supplied. No cloud operation or spend occurred. See the evidence file for official vendor sources checked 2026-10-04 and exact commands.
 - Resume sequence: first obtain an authorized disposable PostgreSQL instance, set `TEST_DATABASE_URL`, run all currently skipped tests and the Phase 2 migration lifecycle/drift/query checks, and close that deferred gate. Independently obtain owner-approved non-secret release identifiers and approved secret names/versions/budget, install Terraform/OpenTofu and gcloud under normal tooling policy, generate/commit provider lock, validate and review a plan, then request any required external apply approval only after a concrete plan. Deploy migration Job before API service and run the real two-user, owner isolation, GCS privacy, connection, shutdown, rollback and cost/log-redaction acceptance. Do not begin Phase 4 until root re-review and release acceptance are complete.

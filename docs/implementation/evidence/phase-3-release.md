@@ -4,8 +4,9 @@
 complete through `a50bb52`. Root independently verified 90 API tests passing,
 43 PostgreSQL skips, 79 mobile tests passing and the static/contract checks
 recorded in `phase-3-review.md`. Database and real staging acceptance remain
-open. The user explicitly requested stopping after this phase; Phase 4 has
-not started and must not start without a new instruction.
+open. At this October 4 checkpoint, Phase 4 had not started and was not
+authorized by that task. Phase 4 was authorized later; see current state and
+its release evidence for subsequent implementation status.
 
 **Checkpoint:** October 4, 2026. **Scope:** local implementation and offline
 release artifacts only. No cloud project was selected, no service was
@@ -20,7 +21,7 @@ initialization, provider locking and schema validation now pass; no plan or
 apply has run. The dated original verification below is superseded by the
 review-fix checkpoint at the end of this file.
 P3.5 live identity, storage, database, rollout, rollback and cost acceptance
-remains open. The implementation does not authorize Phase 4.
+remains open. Phase 4 is covered by its own plan and release evidence; this record covers Phase 3 only.
 
 The Phase 2 PostgreSQL gate remains deferred under the user's explicit
 instruction to proceed. The latest local API run reports **90 passed and 43
@@ -126,8 +127,7 @@ Node 24 runtime and local pnpm store; it restored 862 packages with zero
 downloads:
 
 ```bash
-CI=true PATH="/Users/jasonkli/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/Users/jasonkli/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:$PATH" \
-  pnpm dlx pnpm@9.15.0 install --frozen-lockfile --ignore-scripts
+CI=true pnpm dlx pnpm@9.15.0 install --frozen-lockfile --ignore-scripts
 ```
 
 Mobile validation used the same Node PATH and pinned pnpm command:
@@ -146,7 +146,7 @@ generated API-client TypeScript passed. Expo produced an iOS export from 1,157
 modules with a 2.9 MB Hermes bundle:
 
 ```bash
-EXPO_NO_TELEMETRY=1 pnpm dlx pnpm@9.15.0 --filter @personal-health/mobile exec expo export --platform ios --output-dir /private/tmp/health-phase3-ios-export
+EXPO_NO_TELEMETRY=1 pnpm dlx pnpm@9.15.0 --filter @personal-health/mobile exec expo export --platform ios --output-dir "${TMPDIR:-/tmp}/health-phase3-ios-export"
 ```
 
 OpenAPI was regenerated with the `.venv/bin` directory and bundled Node 24 on
@@ -156,7 +156,7 @@ Neon-shaped URL emitted 283 lines and reached head `c3721f5a9a01`:
 
 ```bash
 APP_ENV=cloud MIGRATION_DATABASE_URL='postgresql+psycopg://phase3:synthetic@ep-phase3.us-east-2.aws.neon.tech/health?sslmode=verify-full' \
-  .venv/bin/alembic upgrade head --sql >/private/tmp/health-phase3-migration.sql
+  .venv/bin/alembic upgrade head --sql >"${TMPDIR:-/tmp}/health-phase3-migration.sql"
 ```
 
 This confirms only that Alembic can render offline PostgreSQL SQL. It does not
@@ -200,8 +200,8 @@ test users or live API/bucket/DB endpoints for P3.5 validation.
 CloudRun deployment, Firebase user and revocation flows, Neon TLS/pooling and
 migration execution, GCS IAM/object round trip, startup/outage behavior,
 connection counts, billing, log redaction, rollback and mobile device/keyboard/
-accessibility behavior all remain live or manual release gates. Do not describe
-P3.4 as deployed, P3.5 as complete, or Phase 4 as authorized.
+accessibility behavior all remain live or manual release gates. This dated
+checkpoint did not describe P3.4 as deployed or P3.5 as complete.
 
 ## Official vendor references checked October 4, 2026
 
@@ -234,7 +234,7 @@ P3.4 as deployed, P3.5 as complete, or Phase 4 as authorized.
   is the resource reference for the reviewable Terraform source. Its provider
   configuration and schema have not been initialized or validated locally.
 
-## Review-fix verification checkpoint — October 4, 2026, after 15:05 PDT
+## Review-fix verification checkpoint — October 4, 2026
 
 Commits: `4d2dd7a` mobile persistence/session/configuration and generated-client
 body guard; `f6dcf59` redacted logging, serialized migrations and real SDK token
@@ -262,7 +262,7 @@ Local verification after these fixes:
   outputs reproduce the contract/client; only the intended non-syntax JSON
   error propagation changes the generated client. OpenAPI is unchanged.
 - `EXPO_NO_TELEMETRY=1 node node_modules/expo/bin/cli export --platform ios
---output-dir /private/tmp/health-phase3-review-ios-final` from `apps/mobile` passes:
+--output-dir "${TMPDIR:-/tmp}/health-phase3-review-ios-final"` from `apps/mobile` passes:
   **1,158 modules**, **2.9 MB** Hermes bundle. Device persistence, keyboard,
   VoiceOver and actual account-switch interaction remain manual gates.
 
@@ -273,8 +273,7 @@ and certificate outage are enforced without mocking token verification. This
 is deterministic SDK evidence, not real Firebase service acceptance. The new
 signed two-subject route test remains skipped until PostgreSQL is available.
 
-Terraform 1.13.3 was downloaded from HashiCorp into
-`/private/tmp/health-terraform-bin`, verified against its official SHA256
+Terraform 1.13.3 was downloaded from HashiCorp to a temporary directory, verified against its official SHA256
 manifest (`8362e7284b38a1194884963deed83481696d468b42dab88052775f4280383584`),
 and executed locally. Default sandbox curl failed DNS resolution for
 `releases.hashicorp.com`; elevated authorized download succeeded. Default
@@ -284,10 +283,10 @@ could not complete the local provider handshake; elevated validation succeeded.
 No remote backend, cloud credentials, plan, apply or resource operation was used.
 
 ```bash
-/private/tmp/health-terraform-bin/terraform -chdir=infra/gcp fmt -check
-/private/tmp/health-terraform-bin/terraform -chdir=infra/gcp init -backend=false -input=false
-/private/tmp/health-terraform-bin/terraform -chdir=infra/gcp providers lock -platform=darwin_arm64 -platform=linux_amd64
-/private/tmp/health-terraform-bin/terraform -chdir=infra/gcp validate -no-color
+terraform -chdir=infra/gcp fmt -check
+terraform -chdir=infra/gcp init -backend=false -input=false
+terraform -chdir=infra/gcp providers lock -platform=darwin_arm64 -platform=linux_amd64
+terraform -chdir=infra/gcp validate -no-color
 ```
 
 All four succeed under the tooling permissions described above. The reviewed

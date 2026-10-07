@@ -1,4 +1,4 @@
-# Phase 4 independent review — handoff for Luna XHigh
+# Phase 4 independent review — initial findings (October 5, 2026)
 
 Reviewed October 5, 2026. Scope: `65d82dd` through `e044428` inclusive (diff
 against `d835d95`), the reconciled phase 4 plan, ADR 0008, product/UX/security
@@ -109,7 +109,7 @@ correctness or requirement work; P3 means a smaller usability defect.
 
 8. **P2 — Occurrence eligibility ignores resource validity and referenced lifecycle.**
    `application/planning_service.py:list_planning_occurrences,
-   set_planning_schedule,record_occurrence_action,_validate_references`.
+set_planning_schedule,record_occurrence_action,_validate_references`.
    Plan/regimen start/end dates are stored but never constrain expansion or
    occurrence commands. An expired or not-yet-valid resource still appears
    and accepts actions if its schedule permits it. A scheduled plan item
@@ -297,28 +297,10 @@ correctness or requirement work; P3 means a smaller usability defect.
   probes with mocked persistence demonstrated #5's unknown state after a time
   change and #6's clearing of the moved due time. These are not substitutes
   for PostgreSQL integration tests.
-- A disposable `initdb` attempt under `/private/tmp` failed with host System V
+- A disposable `initdb` attempt under a disposable temporary directory failed with host System V
   shared-memory exhaustion (`shmget: No space left on device`), matching the
   inherited Phase 2 blocker. No existing database/cloud/user data was touched.
 
-For the fresh **Luna XHigh** session: fix #1/#2 first, then the privacy/recovery
-and occurrence-state defects. Add focused regression tests for every finding
-as part of its fix. Complete the phase plan's missing lifecycle/reference,
-immutable tracker-version, two-owner, recurrence/DST/leap/zone, stale-write,
-race/idempotency and unchanged-daily-rollup coverage. Run migration
-upgrade/downgrade/re-upgrade on a disposable PostgreSQL database, including
-refusal to downgrade recorded Phase 4 data and Alembic model drift checks
-(the model currently additionally declares
-`uq_planning_schedule_identity_context`, absent from the migration). Verify
-OpenAPI/client parity and mobile keyboard/accessibility/end-to-end flows.
-Keep inherited Phase 2 PostgreSQL and Phase 3 live-cloud gates explicit; static
-checks and local source completion do not close them. Update release evidence
-with actual results. Avoid clinical inference, AI features, and speculative
-architecture work while repairing this phase.
-
 ## Follow-up status
 
-This is the original review snapshot, not a list of current unresolved defects.
-Commit `80a8c96` addressed its findings. An independent follow-up found and fixed
-additional gaps; see [audit evidence](../implementation/evidence/phase-4-audit.md)
-for verification and the remaining PostgreSQL/cloud/device acceptance gates.
+This initial review snapshot records findings before the correction commit. Its findings were addressed and later audited; see [Phase 4 audit evidence](phase-4-audit.md) for the follow-up verification and remaining acceptance gates.

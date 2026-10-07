@@ -1,68 +1,8 @@
 # Phase 4 — Personal planning, contexts and custom trackers
 
-## Implementation-time reconciliation — October 5, 2026
-
-Phase 4 was implemented against the repository after Phase 3 local review. The
-user explicitly authorized this phase. Phase 2 PostgreSQL acceptance and Phase
-3 live-cloud acceptance remain inherited, unverified release gates; this work
-does not claim either gate passed.
-
-The planned paths were provisional. The actual API is under
-`services/api/src/health_api`, migrations use the current Alembic head
-`c3721f5a9a01`, generated DTOs come from FastAPI OpenAPI, and mobile features
-live under `apps/mobile/src/features` behind Expo Router. Phase 1–3 already
-provide the owner-scoped envelope, manual source, revision snapshots, verified
-cloud owner dependency, Event/Observation storage, and Today snapshot paging.
-
-The implementation follows these reconciled decisions (see
-[ADR 0008](../../architecture/adr/0008-planning-tracker-storage.md)):
-
-- Extend the existing envelope type/domain checks and add owner-consistent
-  subtype, plan-item, schedule-version, occurrence-override, and tracker-schema
-  tables. Do not create a second planner store or generic object-write route.
-- Keep envelope status `active`/`archived`; goals, regimens, plans, contexts,
-  and tracker definitions keep their richer lifecycle in typed subtype rows.
-  Revision snapshots include the subtype state. Manual writes remain
-  `user_confirmed` and permissions default to false.
-- Preserve existing Event/Observation rollup meanings. Custom tracker entries
-  use the existing Observation envelope/subtype and immutable tracker schema
-  version; they do not participate in Phase 2 numeric summaries unless they
-  declare a supported metric/unit mapping.
-- Today adds planning items and active contexts additively. Schedules expand
-  only for bounded reads; occurrence keys use the original local slot and
-  survive schedule revisions. Overrides are owner-resolved and revision
-  checked.
-- Phase 2 database test skips and Phase 3 real cloud/manual checks remain
-  explicit release evidence, not blockers to local implementation.
-
 ## Implementation-time reconciliation gate
 
-**Status: reconciliation complete; local implementation complete; acceptance remains open.** The repository, preceding evidence, owner/object/history conventions, Event/Observation and Today contracts, cloud auth, mobile routes, generated DTOs, and current migration head were inspected before implementation. Drift and design decisions are recorded above and in [ADR 0008](../../architecture/adr/0008-planning-tracker-storage.md). The additive Phase 4 migration is `d4e5f607a8b9` on `c3721f5a9a01`.
-
-### Implementation status — October 5, 2026
-
-- **P4.1:** typed bounded domain payloads, lifecycle rules, stable item and
-  tracker-field identifiers, reference validation, and deterministic local
-  schedule/DST rules are implemented.
-- **P4.2:** owner-scoped goal, regimen, plan, context, and tracker CRUD,
-  optimistic revisions, history, stable plan-item links/reorder, and typed
-  OpenAPI routes are implemented.
-- **P4.3:** effective-dated schedule versions, bounded timezone-aware occurrence
-  expansion, reschedule-aware stable keys, action history/revision checks, and
-  additive Today planning/context fields are implemented.
-- **P4.4:** immutable tracker schema versions, owner/version-validated custom
-  Observation values, archive behavior, tracker builder/entry UI, and universal
-  Add access are implemented.
-- **P4.5:** Plan, schedule editor, Today actions, rescheduling, tracker entry,
-  and context linking flows are implemented. Generated contracts are current.
-
-Automated regression tests and mobile/API-client static checks were run; see
-the [independent audit evidence](../evidence/phase-4-audit.md) for results and
-remaining acceptance gates. Contract generation and changed-file lint were verified. PostgreSQL migration lifecycle/drift, the Phase 2 database
-gate, Phase 3 live-cloud acceptance, and device/accessibility review remain
-unverified; see the [Phase 4 evidence](../evidence/phase-4-release.md).
-
-The following work areas and contracts remain the design and acceptance reference for the implementation. Source code lives in `services/api/src/health_api/{domain,application,api,persistence}`, `migrations`, `contracts/openapi`, `packages/api-client`, and `apps/mobile/{app,src}`; automated and device acceptance gates are tracked separately above and in the release evidence.
+Check [current state](../../current-state.md) for delivery status and open gates. This plan defines intended scope; it is not evidence of delivery or authorization to begin work. Before implementation or a follow-up, inspect current code, preceding release/review evidence, accepted ADRs and contracts, and external dependencies. Reconcile material drift here before coding.
 
 ## Goal / boundary
 

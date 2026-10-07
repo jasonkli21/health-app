@@ -31,9 +31,10 @@ history but currently own their transactions and hard-code manual provenance.
   confirmation of the previous revision.
 - Do not implement or enable a `health.propose.*` provider tool without the
   actual service identity, delegated-user capability, callback, and retention
-  contract. Until then the existing Assistant and proposal generation remain
-  disabled. A fake adapter may test DTO mapping but cannot establish provider
-  authorization.
+  contract. Until then live provider messaging and AI-originated proposal
+  submission remain disabled. Health-side preview/search and owner-authored
+  proposal workflows are local capabilities. A fake adapter may test DTO
+  mapping but cannot establish provider authorization.
 - A deliberate Save in a structured form can confirm the displayed proposal
   revision directly through the same executor. General Assistant proposals
   still require a pending state and a separate explicit user confirmation.

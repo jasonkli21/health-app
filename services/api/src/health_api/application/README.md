@@ -24,3 +24,24 @@ the latest revision for each day candidate through the owner/object/sequence
 index and builds summaries from that same snapshot. The PostgreSQL read uses a
 transaction-local two-second statement timeout; compound snapshot markers keep
 continuation cursors on complete command boundaries.
+
+`ai_context_service.py` builds local previews and search results from
+owner-scoped canonical rows. Each request rechecks item permission, active
+state, temporal validity, selected resource types/domains/sections, and any
+request-specific exclusions. Request scope can narrow sharing but cannot
+grant it. Ranking is deterministic and the serialized pack has entry and byte
+bounds; mandatory constraints that cannot fit cause a validation error.
+Relationship references are retained only when both permitted endpoints are
+included. Today summaries use only the included permitted Events and linked
+Observations, so truncation or scope cannot reveal a withheld endpoint.
+
+The custom-tracker Observation value is excluded from AI context and search
+until its immutable tracker schema can be included safely for interpretation.
+Scheduled occurrence intent is also not part of the current context pack.
+Search uses a permission-safe text projection, including during matching and
+ranking, rather than sanitizing only displayed excerpts. Preview and search
+are Health-side capabilities; sending a live message remains disabled until
+the external Personal AI identity, delegation, callback, and retention
+contract is reviewed. Focused API coverage lives in
+`services/api/tests/test_ai_context_api.py`; PostgreSQL-specific cases still
+require the documented disposable test database.

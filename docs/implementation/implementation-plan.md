@@ -1,10 +1,10 @@
 # Phased implementation plan
 
-Phase 1 has been implemented and independently reviewed for local development;
-external release gates are recorded in its release evidence. Phases 2–9 remain.
-Each phase should begin with a repository-wide reconciliation against this plan.
-If the code reveals a better design, update the plan/ADR first rather than
-forcing implementation to match stale prose.
+This roadmap defines intended product scope and phase order, not delivery
+status. See [current state](../current-state.md) and the linked release
+evidence for what exists and which gates remain open. Reconcile a phase plan
+against the repository before implementation; update the plan or ADR first if
+the code reveals a material design change.
 
 Detailed documentation-only execution plans: [phase index](phases/README.md). Reconcile each plan immediately before implementation.
 

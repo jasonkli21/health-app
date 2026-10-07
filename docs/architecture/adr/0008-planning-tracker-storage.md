@@ -54,4 +54,3 @@ unknown, not missed.
 - PostgreSQL migration lifecycle, query plans, cloud auth parity, and mobile
   device/DST presentation remain release gates and must be reported separately
   from local source implementation.
-

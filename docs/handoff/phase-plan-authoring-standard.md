@@ -1,34 +1,21 @@
-# Detailed phase-plan authoring standard
+# Phase-plan maintenance standard
 
 ## Purpose
 
-After the Phase 0 scaffold review and any approved/small Phase 0 corrections, create implementation-ready plans for Phases 1–9 of `docs/implementation/implementation-plan.md`.
-
-These plans are design/execution artifacts, not implementation. They are intended to be handed to a **Luna Max** implementation agent later. Assume that agent can inspect the repository at implementation time but does not have the original design conversation or hidden context.
-
-The existing roadmap remains authoritative for phase ordering and high-level scope. The detailed plans may clarify, decompose, and tighten it, but must not silently expand the product or move major capabilities between phases. If the Phase 0 review reveals a material roadmap/architecture problem, update or propose the source decision first, then plan from the corrected baseline.
-
-The separate web extension remains deferred. Do not create W0–W9 detailed web plans as part of this task.
+Use this standard when creating or materially revising an implementation plan.
+The existing phase plans live under docs/implementation/phases/. Keep plans
+repository-grounded and useful for future implementation, while making clear
+that plans describe intended scope rather than delivery status. Current status
+and open acceptance gates belong in docs/current-state.md and dated release or
+review evidence. A plan alone does not authorize implementation.
 
 ## Output
 
-Create one file per implementation phase under `docs/implementation/phases/`:
-
-```text
-phase-1-implementation-plan.md
-phase-2-implementation-plan.md
-phase-3-implementation-plan.md
-phase-4-implementation-plan.md
-phase-5-implementation-plan.md
-phase-6-implementation-plan.md
-phase-7-implementation-plan.md
-phase-8-implementation-plan.md
-phase-9-implementation-plan.md
-```
-
-Also create `docs/implementation/phases/README.md` as a short index that states phase order, dependencies, and the rule that each plan must be reconciled against the actual repository immediately before implementation.
-
-Do not create post-implementation guides or release evidence now. Each plan should instead specify what implementation/release evidence the implementing agent must record when that phase is delivered.
+Update only the plans needed for the authorized planning task. Preserve the
+roadmap's accepted phase ordering and scope unless an explicit decision record
+is changed. Add or revise the phase index when navigation or dependencies
+change. Do not create release evidence as part of planning; the implementation
+session records actual results in docs/implementation/evidence/.
 
 ## Planning principles
 
@@ -38,7 +25,7 @@ Inspect the corrected Phase 0 repository before writing the plans. Name the actu
 
 ### Self-contained for implementation
 
-A Luna Max agent should be able to open a phase plan, inspect the current repo, reconcile any drift, and implement the phase without having to redesign the phase from scratch. Preserve the why behind important constraints, not only a checklist of files to edit.
+An implementing agent should be able to open a phase plan, inspect the current repo, reconcile any drift, and implement the phase without having to redesign the phase from scratch. Preserve the why behind important constraints, not only a checklist of files to edit.
 
 ### Reconciliation gate for every phase
 
@@ -180,7 +167,7 @@ End with a short set of questions that should all be answerable positively befor
 
 ### 14. Implementation handoff / release evidence
 
-Specify what the Luna Max implementation session should leave for the next phase: important routes/contracts, migration state, generated-client procedure, config/feature flags, verification commands/results, known external checks still unverified, and any release-evidence document to create.
+Specify what the implementation session should leave for the next phase: important routes/contracts, migration state, generated-client procedure, config/feature flags, verification commands/results, known external checks still unverified, and any release-evidence document to create.
 
 ## Phase-specific emphasis
 
@@ -211,4 +198,4 @@ After writing all nine plans, review them together and correct cross-phase incon
 - tests/source separation and generated-contract boundaries remain consistent;
 - the plans do not silently introduce speculative infrastructure.
 
-The final output of this planning task is documentation only. Do not implement Phase 1–9 code.
+Planning edits do not authorize phase implementation. Follow the current user request and docs/current-state.md for the active scope.

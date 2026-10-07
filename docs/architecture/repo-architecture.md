@@ -6,7 +6,7 @@ Use feature-oriented organization under `apps/mobile/src/features/`. Native inte
 
 ## Future web
 
-`apps/web` is deliberately not created during the initial roadmap. When added after Phase 9, it should be a Next.js client over the existing Health API. See the separate web plan.
+`apps/web` is not implemented. The intended web client is a separate Next.js app over the existing Health API; see the separate web plan. Current delivery status is in [current state](../current-state.md).
 
 ## Shared frontend packages
 

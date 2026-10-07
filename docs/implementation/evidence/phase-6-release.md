@@ -128,7 +128,7 @@ structured forms retain their existing save behavior.
 
   ```bash
   PYTHONPATH=services/api/src .venv/bin/python services/api/scripts/export_openapi.py
-  /Users/jasonkli/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node packages/api-client/scripts/generate-client.mjs
+  node packages/api-client/scripts/generate-client.mjs
   ```
 
 ## Local verification after independent review

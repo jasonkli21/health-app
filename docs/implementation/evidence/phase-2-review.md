@@ -120,7 +120,9 @@ fresh and existing-data migrations and drift checks, and record representative
 EXPLAIN/ANALYZE and latency for sparse and high-revision owners. Investigate and
 delegate any substantive failures before closing the phase. Do not start Phase
 3 while these checks remain blocked. No unrelated cluster or IPC cleanup is
-authorized by this checkpoint.
+authorized by this checkpoint. This was the Phase 2 review stop condition;
+Phase 3 was authorized later and is recorded in its own release evidence and
+the current-state page.
 
 ## Verification and handoff
 

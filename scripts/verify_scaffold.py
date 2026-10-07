@@ -10,6 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED = (
     "README.md",
+    "AGENTS.md",
     "CODEX.md",
     ".env.example",
     ".gitignore",
@@ -28,10 +29,14 @@ REQUIRED = (
     "docs/api/api-contract.md",
     "docs/local-development.md",
     "docs/implementation/implementation-plan.md",
+    "docs/README.md",
+    "docs/current-state.md",
+    "docs/implementation/phases/README.md",
     "docs/implementation/web-extension-plan.md",
     "docs/web/web-extension-architecture.md",
-    "docs/handoff/codex-handoff.md",
     "docs/handoff/phase-plan-authoring-standard.md",
+    "docs/history/handoffs/initial-scaffold-handoff.md",
+    "docs/implementation/evidence/phase-0-review.md",
     "apps/mobile/package.json",
     "apps/mobile/app.json",
     "apps/mobile/tsconfig.json",

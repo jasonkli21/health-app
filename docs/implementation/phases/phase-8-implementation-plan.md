@@ -2,9 +2,7 @@
 
 ## Implementation-time reconciliation gate
 
-**Status: planned. Dependencies: accepted Phases 1–7 with real evidence.** Read [Phase 8 roadmap](../implementation-plan.md#phase-8--healthkit), ADR 0005/mobile-native boundary, actual Event/Observation/source catalog, Today/analytics selection methods, cloud auth and generated client. Inspect Expo/RN/native-library compatibility and current Apple HealthKit APIs/entitlements/privacy/background requirements from official sources at execution time. Record drift and update material plan/ADR before code.
-
-Existing homes: `apps/mobile/{app,src,tests}` and mobile manifest, API layers/tests, migrations/contracts and frontend package reservations. Native adapters/import schemas/cursors/build config below are **planned/provisional**. No HealthKit package or adapter exists in Phase 0; never import native code into api-client/domain/design-tokens/shared for hypothetical future web reuse.
+Check [current state](../../current-state.md) for delivery status and open gates. This plan defines intended scope; it is not evidence of delivery or authorization to begin work. Before implementation or a follow-up, inspect current code, preceding release/review evidence, accepted ADRs and contracts, and external dependencies. Reconcile material drift here before coding.
 
 ## User outcome / scope
 
@@ -122,4 +120,4 @@ First-wave types import selectively with owner consent, correct source/time/cove
 
 Before Phase 9: Can every imported row/summary be traced to source/policy/receipt? Does account change require renewed consent? Are deletes and manual corrections safe? Is no-data interpretation honest? Are real-device gates complete for every enabled type?
 
-Luna Max must create planned `docs/implementation/evidence/phase-8-release.md`: native/library/build versions, entitlements/permission behavior, selected type/schema/retention mappings, source precedence and policy version, migration/head/import API/receipts, checkpoint/retry/tombstone contract, generated commands, offline vs actual device results, background/store/privacy external gates and disabled capabilities. Include exact cleanup requirements for Phase 9 erasure.
+The implementing session must create planned `docs/implementation/evidence/phase-8-release.md`: native/library/build versions, entitlements/permission behavior, selected type/schema/retention mappings, source precedence and policy version, migration/head/import API/receipts, checkpoint/retry/tombstone contract, generated commands, offline vs actual device results, background/store/privacy external gates and disabled capabilities. Include exact cleanup requirements for Phase 9 erasure.

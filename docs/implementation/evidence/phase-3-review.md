@@ -5,7 +5,7 @@ release evidence, configuration, identity mapping, Firebase verifier, HTTP
 dependencies, mobile sessions/transport/routing, storage adapters, container,
 Terraform, build/runbook and tests. Local implementation is reviewable; live
 release remains gated. Phase 2's database checks are deferred by user instruction,
-not passed. Fix agents spawned after the 15:05 PDT restart use Sol Medium.
+not passed. The remaining acceptance boundaries are recorded in the release evidence.
 
 ## Required fixes
 
@@ -88,7 +88,7 @@ Root will lightly re-review and verify. Live release inputs and the carried
 database acceptance remain explicit human/environment gates before closing
 Phase 3 or starting Phase 4.
 
-## Fix disposition — October 4, 2026, after 15:05 PDT
+## Fix disposition — October 4, 2026
 
 The review baseline is `8b6c093`. All seven code premises were confirmed.
 Earlier uncommitted edits were preserved and completed. Root's independent
@@ -121,7 +121,8 @@ pass. Expo iOS export passes. `19fe52e` adds formatted HCL and the signed Google
 8.2.0 lock for macOS ARM64/Linux AMD64; Terraform 1.13.3 backend-disabled init,
 provider lock and schema validation pass. Exact commands/tool limitations are
 in [release evidence](phase-3-release.md). No PostgreSQL, cloud apply/deployment
-or spend occurred; Phase 3 live acceptance and Phase 4 remain gated.
+or spend occurred; at this dated checkpoint Phase 3 live acceptance and Phase
+4 remained gated. Phase 4 was authorized later; see its release evidence.
 
 Follow-up `e802439` invalidates the owner epoch before SDK sign-in can install
 a different user, suppresses signed-out callbacks that could resurrect a
@@ -139,6 +140,7 @@ passing API tests with 43 database skips**, **79 mobile tests**, configured
 Ruff/format/mypy/scaffold, mobile TypeScript/zero-warning ESLint, client
 TypeScript, contract regeneration and Terraform format checks successfully.
 
-The user then requested stopping after the current phase. Local code review is
-closed; database and live release acceptance remain open as listed in release
-evidence. No Phase 4 implementation is authorized to begin from this checkpoint.
+At this October 4 checkpoint, the user requested stopping after the current
+phase. Local code review was closed; database and live release acceptance
+remained open as listed in release evidence. Phase 4 was authorized later and
+is recorded in its own release evidence.

@@ -4,6 +4,10 @@ A mobile-first personal health application for maintaining a structured, extensi
 
 The Health app owns canonical health state. A separate `personal-ai-system` is the intended boundary for reusable model orchestration, research, and cross-domain AI reasoning.
 
+For the current implementation boundary and open verification gates, see
+[docs/current-state.md](docs/current-state.md). Start repository documentation
+at [docs/README.md](docs/README.md).
+
 ## What it does
 
 The application is designed around a flexible personal-health model rather than a fixed questionnaire or a single-purpose tracker.
@@ -21,7 +25,12 @@ Current product surfaces support:
 - generated API contracts for the mobile client;
 - Firebase-compatible cloud identity boundaries;
 - local and cloud object-storage abstractions;
-- an explicit integration boundary for future AI-assisted insights and recommendations.
+- consent-scoped Health context preview and search, with provider messaging
+  disabled until an external contract is supplied;
+- owner-authored, typed action proposals with explicit review and confirmation.
+
+Live Personal AI messaging and AI-originated proposal submission are not
+available in the current build. Phase 7 insights remain planned.
 
 The broader product model is designed to represent nutrition, exercise, sleep, symptoms, measurements, medications/supplements, habits, goals, active contexts, and individualized trackers without treating missing data as false or zero.
 
@@ -53,7 +62,7 @@ The broader product model is designed to represent nutrition, exercise, sleep, s
                   | object metadata      |
                   +----+------------+----+
                        |            |
-                       |            +---- typed HTTP ----> personal-ai-system
+                       |            +-- disabled adapter --> personal-ai-system
                        |
                        v
                   PostgreSQL / Neon
@@ -86,8 +95,10 @@ The broader product model is designed to represent nutrition, exercise, sleep, s
 
 **`personal-ai-system`**
 
-- is an external AI/research boundary;
-- should consume explicitly scoped health context rather than becoming the health database.
+- is an external AI/research boundary and is not connected in the current build;
+- must consume only explicitly consented, purpose-scoped context through a
+  reviewed typed contract;
+- never receives database credentials or owns canonical health state.
 
 ## Repository layout
 
@@ -417,6 +428,8 @@ Object-storage limits and timeouts are configured server-side; never place crede
 Useful starting points:
 
 ```text
+docs/README.md
+docs/current-state.md
 docs/project-brief.md
 docs/architecture/architecture.md
 docs/data/data-model.md
