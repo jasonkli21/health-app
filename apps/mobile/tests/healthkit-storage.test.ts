@@ -10,6 +10,7 @@ const secureStoreMock = vi.hoisted(() => ({
   values: new Map<string, string>(),
   keys: new Set<string>(),
   fail: false,
+  failOnKey: null as string | null,
 }));
 
 vi.mock("expo-secure-store", () => {
@@ -20,17 +21,20 @@ vi.mock("expo-secure-store", () => {
   return {
     getItemAsync: async (key: string) => {
       validateKey(key);
-      if (secureStoreMock.fail) throw new Error("SecureStore unavailable");
+      if (secureStoreMock.fail || secureStoreMock.failOnKey === key)
+        throw new Error("SecureStore unavailable");
       return secureStoreMock.values.get(key) ?? null;
     },
     setItemAsync: async (key: string, value: string) => {
       validateKey(key);
-      if (secureStoreMock.fail) throw new Error("SecureStore unavailable");
+      if (secureStoreMock.fail || secureStoreMock.failOnKey === key)
+        throw new Error("SecureStore unavailable");
       secureStoreMock.values.set(key, value);
     },
     deleteItemAsync: async (key: string) => {
       validateKey(key);
-      if (secureStoreMock.fail) throw new Error("SecureStore unavailable");
+      if (secureStoreMock.fail || secureStoreMock.failOnKey === key)
+        throw new Error("SecureStore unavailable");
       secureStoreMock.values.delete(key);
     },
   };
@@ -40,6 +44,7 @@ beforeEach(() => {
   secureStoreMock.values.clear();
   secureStoreMock.keys.clear();
   secureStoreMock.fail = false;
+  secureStoreMock.failOnKey = null;
 });
 
 describe("HealthKit secure storage", () => {
@@ -103,5 +108,90 @@ describe("HealthKit secure storage", () => {
         savedAt: "2026-10-07T20:00:00Z",
       }),
     ).rejects.toThrow("SecureStore unavailable");
+  });
+
+  it("clears realistic encoded identities without affecting another owner", async () => {
+    const store = new SecureCheckpointStore();
+    const ownerA = "a".repeat(28);
+    const ownerB = "account-b";
+    const installA = "12345678-1234-4234-8234-123456789abc";
+    const installB = "install-b";
+    const checkpoint = (ownerId: string, deviceInstallationId: string) => ({
+      ownerId,
+      deviceInstallationId,
+      resourceType: "steps" as const,
+      policyVersion: "healthkit-v1" as const,
+      anchor: "opaque-anchor",
+      savedAt: "2026-10-07T20:00:00Z",
+    });
+    const keyA = checkpointKey(ownerA, installA, "steps");
+    const keyB = checkpointKey(ownerB, installB, "steps");
+
+    expect(keyA.length).toBeGreaterThan(256);
+    await store.save(keyA, checkpoint(ownerA, installA));
+    await store.save(keyB, checkpoint(ownerB, installB));
+    await store.save(keyB, {
+      ...checkpoint(ownerB, installB),
+      anchor: "updated",
+    });
+    await store.clearOwner(ownerA);
+
+    expect(secureStoreMock.values.has(keyA)).toBe(false);
+    expect(secureStoreMock.values.has(keyB)).toBe(true);
+    expect(await store.load(keyB)).toMatchObject({
+      ownerId: ownerB,
+      anchor: "updated",
+    });
+    await store.clearOwner(ownerA);
+    expect(secureStoreMock.values.has(keyB)).toBe(true);
+  });
+
+  it("preserves an invalid index and refuses to claim cleanup succeeded", async () => {
+    const store = new SecureCheckpointStore();
+    const ownerId = "owner-a";
+    const key = checkpointKey(ownerId, "install-a", "steps");
+    secureStoreMock.values.set(
+      "healthkit.checkpoint.index.v1",
+      JSON.stringify([key, 42]),
+    );
+    secureStoreMock.values.set(key, JSON.stringify({ ownerId }));
+
+    await expect(store.clearOwner(ownerId)).rejects.toThrow(
+      "Checkpoint index is invalid",
+    );
+    expect(secureStoreMock.values.has(key)).toBe(true);
+    expect(secureStoreMock.values.get("healthkit.checkpoint.index.v1")).toBe(
+      JSON.stringify([key, 42]),
+    );
+  });
+
+  it("retains the old inventory when deletion is interrupted and completes on retry", async () => {
+    const store = new SecureCheckpointStore();
+    const ownerId = "owner-a";
+    const key = checkpointKey(ownerId, "install-a", "steps");
+    const checkpoint = {
+      ownerId,
+      deviceInstallationId: "install-a",
+      resourceType: "steps" as const,
+      policyVersion: "healthkit-v1" as const,
+      anchor: "opaque-anchor",
+      savedAt: "2026-10-07T20:00:00Z",
+    };
+    await store.save(key, checkpoint);
+
+    secureStoreMock.failOnKey = key;
+    await expect(store.clearOwner(ownerId)).rejects.toThrow(
+      "SecureStore unavailable",
+    );
+    expect(
+      JSON.parse(secureStoreMock.values.get("healthkit.checkpoint.index.v1")!),
+    ).toEqual([key]);
+
+    secureStoreMock.failOnKey = null;
+    await store.clearOwner(ownerId);
+    expect(secureStoreMock.values.has(key)).toBe(false);
+    expect(secureStoreMock.values.get("healthkit.checkpoint.index.v1")).toBe(
+      "[]",
+    );
   });
 });

@@ -63,6 +63,7 @@ _SAFE_FIELD_NAMES = {
     "ended_at",
     "interval_end",
     "metric",
+    "distance",
     "timezone",
     "local_date",
     "event_id",

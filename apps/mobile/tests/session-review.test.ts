@@ -5,6 +5,7 @@ import {
   SessionChangedError,
 } from "../src/auth/authenticatedFetch";
 import { SessionStore } from "../src/auth/sessionStore";
+import { ApiError } from "@personal-health/api-client";
 
 const base = "https://api.example.test";
 const response = (status: number) => ({
@@ -22,6 +23,83 @@ function deferred<T>() {
 }
 
 describe("session review regressions", () => {
+  it("preserves a recent-authentication error without refreshing or expiring the session", async () => {
+    const store = new SessionStore("firebase");
+    store.setSignedIn("owner-a", null);
+    const token = vi.fn(async () => "token");
+    const fetcher = vi.fn(async () => ({
+      ok: false,
+      status: 401,
+      json: async () => ({
+        code: "recent_authentication_required",
+        message: "Sign in again.",
+        request_id: "request-1",
+      }),
+    }));
+    const request = createAuthenticatedFetch(
+      store,
+      token,
+      fetcher,
+      undefined,
+      base,
+    );
+
+    const error = await request(`${base}/deletion-requests`).catch(
+      (caught: unknown) => caught,
+    );
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).body?.code).toBe(
+      "recent_authentication_required",
+    );
+    expect(token).toHaveBeenCalledTimes(1);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(store.getSnapshot().status).toBe("signed_in");
+  });
+
+  it("preserves recent-auth errors after token refresh without losing the session", async () => {
+    const store = new SessionStore("firebase");
+    store.setSignedIn("owner-a", null);
+    let sends = 0;
+    const fetcher = vi.fn(async () => {
+      sends += 1;
+      return {
+        ok: false,
+        status: 401,
+        json: async () =>
+          sends === 1
+            ? {
+                code: "invalid_token",
+                message: "Refresh token.",
+                request_id: "request-1",
+              }
+            : {
+                code: "recent_authentication_required",
+                message: "Sign in again.",
+                request_id: "request-1",
+              },
+      };
+    });
+    const token = vi.fn(async () => "token");
+    const request = createAuthenticatedFetch(
+      store,
+      token,
+      fetcher,
+      undefined,
+      base,
+    );
+
+    const error = await request(`${base}/deletion-requests`).catch(
+      (caught: unknown) => caught,
+    );
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).body?.request_id).toBe("request-1");
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(token).toHaveBeenCalledTimes(2);
+    expect(store.getSnapshot().status).toBe("signed_in");
+  });
+
   it.each([
     "auth/user-disabled",
     "auth/user-token-expired",
@@ -66,6 +144,37 @@ describe("session review regressions", () => {
     expect(store.getSnapshot().status).toBe("signed_in");
     failed = false;
     expect((await request(`${base}/profile`)).status).toBe(200);
+  });
+
+  it("retains the invalid-token body after a failed refresh and expires that session", async () => {
+    const store = new SessionStore("firebase");
+    store.setSignedIn("owner-a", null);
+    const request = createAuthenticatedFetch(
+      store,
+      async (refresh) => {
+        if (refresh) return "refreshed-token";
+        return "stale-token";
+      },
+      async () => ({
+        ok: false,
+        status: 401,
+        json: async () => ({
+          code: "invalid_token",
+          message: "Token is invalid.",
+          request_id: "request-2",
+        }),
+      }),
+      undefined,
+      base,
+    );
+
+    const error = await request(`${base}/profile`).catch(
+      (caught: unknown) => caught,
+    );
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).body?.code).toBe("invalid_token");
+    expect(store.getSnapshot().status).toBe("expired");
   });
 
   it("does not expire a new owner when an old token fails asynchronously", async () => {

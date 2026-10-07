@@ -1,5 +1,5 @@
 import { ApiError } from "@personal-health/api-client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import * as SecureStore from "expo-secure-store";
 import {
   Pressable,
@@ -11,9 +11,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { signOutCurrentUser } from "../../../auth/firebaseSession";
+import { signOutCurrentUserForSession } from "../../../auth/firebaseSession";
 import { sessionStore } from "../../../auth/sessionStore";
 import { accountDataApi, createDeletionRequestId } from "../api";
+import { clearOwnerDeletionState } from "../localCleanup";
 import { HealthKitConsentStore } from "../../../integrations/healthkit/consent";
 import { SecureCheckpointStore } from "../../../integrations/healthkit/checkpoint";
 import { secureKeySegment } from "../../../integrations/healthkit/secureKey";
@@ -39,8 +40,16 @@ function userFacingError(error: unknown, deletionRequest = false): string {
     : "Could not reach your Health service to prepare the export.";
 }
 
+function localCleanupError(): string {
+  return "Server deletion is complete, but this device could not clear saved consent or checkpoints. Retry local cleanup.";
+}
+
 export function AccountDataScreen() {
-  const session = sessionStore.getSnapshot();
+  const session = useSyncExternalStore(
+    sessionStore.subscribe,
+    sessionStore.getSnapshot,
+    sessionStore.getSnapshot,
+  );
   const localScope = session.userId ?? "development-local";
   const requestKey = pendingRequestKey(localScope);
   const [confirmation, setConfirmation] = useState("");
@@ -50,59 +59,138 @@ export function AccountDataScreen() {
   >(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [recoveryState, setRecoveryState] = useState<
+    "loading" | "ready" | "error"
+  >("loading");
+  const [localCleanupPending, setLocalCleanupPending] = useState(false);
+
+  const isOriginalSession = useCallback((): boolean => {
+    const current = sessionStore.getSnapshot();
+    return (
+      current.epoch === session.epoch &&
+      current.userId === session.userId &&
+      (session.mode === "dev"
+        ? current.mode === "dev" && current.status === "ready"
+        : current.status === "signed_in")
+    );
+  }, [session.epoch, session.mode, session.status, session.userId]);
 
   const finishDeletion = useCallback(async (): Promise<void> => {
-    if (session.userId) {
-      await consentStore.clearOwner(session.userId);
-      await checkpointStore.clearOwner(session.userId);
-    }
-    await SecureStore.deleteItemAsync(requestKey);
+    await clearOwnerDeletionState(
+      session.userId,
+      consentStore,
+      checkpointStore,
+      () => SecureStore.deleteItemAsync(requestKey),
+    );
+    if (!isOriginalSession()) return;
+    setLocalCleanupPending(false);
     setDeletionStatus("completed");
     setMessage("Health data deletion is complete. Signing out now.");
-    await signOutCurrentUser();
-  }, [requestKey, session.userId]);
+    await signOutCurrentUserForSession(session.epoch, session.userId);
+  }, [isOriginalSession, requestKey, session.epoch, session.userId]);
+
+  const loadRecovery = useCallback(async (): Promise<void> => {
+    setBusy(false);
+    setRequestId(null);
+    setDeletionStatus(null);
+    setLocalCleanupPending(false);
+    setConfirmation("");
+    setRecoveryState("loading");
+    setMessage(null);
+    try {
+      const savedId = await SecureStore.getItemAsync(requestKey);
+      if (!isOriginalSession()) return;
+
+      let status: Awaited<
+        ReturnType<typeof accountDataApi.getOwnerDataDeletionStatus>
+      > | null = null;
+      if (savedId) {
+        try {
+          status = await accountDataApi.getOwnerDataDeletionStatus({
+            request_id: savedId,
+          });
+        } catch (error) {
+          if (!(error instanceof ApiError) || error.status !== 404) throw error;
+        }
+      }
+      if (!status) {
+        try {
+          status = await accountDataApi.getCurrentOwnerDataDeletionRequest();
+        } catch (error) {
+          if (!(error instanceof ApiError) || error.status !== 404) throw error;
+        }
+      }
+
+      if (!isOriginalSession()) return;
+      if (!status) {
+        setRequestId(null);
+        setDeletionStatus(null);
+        setLocalCleanupPending(false);
+        setRecoveryState("ready");
+        return;
+      }
+      if (!savedId || savedId !== status.request_id)
+        await SecureStore.setItemAsync(requestKey, status.request_id);
+      if (!isOriginalSession()) return;
+      setRequestId(status.request_id);
+      setDeletionStatus(status.status);
+      setRecoveryState("ready");
+      if (status.status === "completed") {
+        setLocalCleanupPending(true);
+        try {
+          await finishDeletion();
+        } catch (error) {
+          if (isOriginalSession()) {
+            setMessage(localCleanupError());
+          }
+        }
+      } else {
+        setMessage("A saved deletion request is ready to continue.");
+      }
+    } catch (error) {
+      if (isOriginalSession()) {
+        setRecoveryState("error");
+        setMessage(userFacingError(error, true));
+      }
+    }
+  }, [finishDeletion, isOriginalSession, requestKey]);
 
   useEffect(() => {
-    let active = true;
-    void (async () => {
-      const savedId = await SecureStore.getItemAsync(requestKey);
-      if (!active || !savedId) return;
-      setRequestId(savedId);
-      try {
-        const status = await accountDataApi.getOwnerDataDeletionStatus({
-          request_id: savedId,
-        });
-        if (!active) return;
-        setDeletionStatus(status.status);
-        if (status.status === "completed") await finishDeletion();
-        else setMessage("A saved deletion request is ready to continue.");
-      } catch (error) {
-        if (active) setMessage(userFacingError(error, true));
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [finishDeletion, requestKey]);
+    void loadRecovery();
+  }, [loadRecovery]);
 
   async function exportData(): Promise<void> {
     setBusy(true);
     setMessage(null);
     try {
       const snapshot = await accountDataApi.exportCurrentOwnerData();
+      if (!isOriginalSession()) return;
       await Share.share({
         title: "Personal Health data export",
         message: JSON.stringify(snapshot),
       });
-      setMessage("Your data export is ready in the share sheet.");
+      if (isOriginalSession())
+        setMessage("Your data export is ready in the share sheet.");
     } catch (error) {
-      setMessage(userFacingError(error));
+      if (isOriginalSession()) setMessage(userFacingError(error));
     } finally {
-      setBusy(false);
+      if (isOriginalSession()) setBusy(false);
     }
   }
 
   async function continueDeletion(): Promise<void> {
+    if (localCleanupPending && deletionStatus === "completed") {
+      setBusy(true);
+      setMessage(null);
+      try {
+        await finishDeletion();
+      } catch {
+        if (isOriginalSession()) setMessage(localCleanupError());
+      } finally {
+        if (isOriginalSession()) setBusy(false);
+      }
+      return;
+    }
     if (!requestId && confirmation !== CONFIRMATION) {
       setMessage(`Type ${CONFIRMATION} to confirm this irreversible action.`);
       return;
@@ -113,15 +201,22 @@ export function AccountDataScreen() {
       const activeRequestId = requestId ?? createDeletionRequestId();
       if (!requestId) {
         await SecureStore.setItemAsync(requestKey, activeRequestId);
+        if (!isOriginalSession()) return;
         setRequestId(activeRequestId);
       }
       const result = await accountDataApi.requestOwnerDataDeletion({
         request_id: activeRequestId,
         confirmation: CONFIRMATION,
       });
+      if (!isOriginalSession()) return;
       setDeletionStatus(result.status);
       if (result.status === "completed") {
-        await finishDeletion();
+        setLocalCleanupPending(true);
+        try {
+          await finishDeletion();
+        } catch {
+          if (isOriginalSession()) setMessage(localCleanupError());
+        }
       } else {
         setMessage(
           result.status === "running"
@@ -130,9 +225,9 @@ export function AccountDataScreen() {
         );
       }
     } catch (error) {
-      setMessage(userFacingError(error, true));
+      if (isOriginalSession()) setMessage(userFacingError(error, true));
     } finally {
-      setBusy(false);
+      if (isOriginalSession()) setBusy(false);
     }
   }
 
@@ -154,7 +249,9 @@ export function AccountDataScreen() {
         </Text>
         <Pressable
           accessibilityRole="button"
-          disabled={busy || deletionStatus === "completed"}
+          disabled={
+            busy || recoveryState !== "ready" || deletionStatus === "completed"
+          }
           onPress={() => void exportData()}
           style={styles.secondaryButton}
         >
@@ -182,9 +279,22 @@ export function AccountDataScreen() {
             onChangeText={setConfirmation}
             placeholder={CONFIRMATION}
             value={confirmation}
+            editable={!busy && recoveryState === "ready"}
             style={styles.input}
           />
         )}
+        {recoveryState === "error" ? (
+          <Pressable
+            accessibilityRole="button"
+            disabled={busy}
+            onPress={() => void loadRecovery()}
+            style={styles.secondaryButton}
+          >
+            <Text style={styles.secondaryButtonText}>
+              Retry request recovery
+            </Text>
+          </Pressable>
+        ) : null}
         {message ? (
           <Text accessibilityRole="alert" style={styles.message}>
             {message}
@@ -192,16 +302,22 @@ export function AccountDataScreen() {
         ) : null}
         <Pressable
           accessibilityRole="button"
-          disabled={busy || deletionStatus === "completed"}
+          disabled={
+            busy ||
+            recoveryState !== "ready" ||
+            (deletionStatus === "completed" && !localCleanupPending)
+          }
           onPress={() => void continueDeletion()}
           style={styles.deleteButton}
         >
           <Text style={styles.deleteButtonText}>
             {busy
               ? "Processing…"
-              : requestId
-                ? "Continue deletion"
-                : "Delete my data"}
+              : localCleanupPending
+                ? "Retry local cleanup"
+                : requestId
+                  ? "Continue deletion"
+                  : "Delete my data"}
           </Text>
         </Pressable>
       </ScrollView>

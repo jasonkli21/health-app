@@ -6,6 +6,10 @@ from threading import Barrier
 from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, sessionmaker
+
 from health_api.application import daily_service
 from health_api.application.daily_service import (
     CreateDailyEntry,
@@ -32,9 +36,6 @@ from health_api.persistence.models import (
     Source,
     User,
 )
-from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, sessionmaker
 
 
 def new_principal(session: Session, principal_id: UUID | None = None) -> UUID:
@@ -132,7 +133,11 @@ def test_compound_symptom_save_is_idempotent_and_records_manual_history(
         db_session.scalars(
             select(HealthObjectRevision)
             .where(HealthObjectRevision.owner_id == owner)
-            .order_by(HealthObjectRevision.daily_sequence)
+            .order_by(
+                HealthObjectRevision.daily_sequence,
+                HealthObjectRevision.daily_object_type,
+                HealthObjectRevision.object_id,
+            )
         )
     )
     assert [item.daily_sequence for item in revisions] == [1, 1]

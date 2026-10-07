@@ -1,4 +1,5 @@
 import { ApiError } from "@personal-health/api-client";
+import type { components } from "@personal-health/api-client";
 import type { FetchLike, FetchResponse } from "@personal-health/api-client";
 
 import type { SessionStore } from "./sessionStore";
@@ -34,6 +35,10 @@ const definitiveAuthCodes = new Set([
   "auth/invalid-refresh-token",
   "auth/user-not-found",
 ]);
+const domainAuthCodes = new Set([
+  "recent_authentication_required",
+  "principal_unavailable",
+]);
 
 function isDefinitiveTokenFailure(error: unknown): boolean {
   return (
@@ -43,6 +48,29 @@ function isDefinitiveTokenFailure(error: unknown): boolean {
     typeof error.code === "string" &&
     definitiveAuthCodes.has(error.code)
   );
+}
+
+async function apiErrorBody(
+  response: FetchResponse,
+): Promise<components["schemas"]["ErrorResponse"] | undefined> {
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+  }
+  if (
+    typeof body !== "object" ||
+    body === null ||
+    !("code" in body) ||
+    typeof body.code !== "string" ||
+    !("message" in body) ||
+    typeof body.message !== "string" ||
+    !("request_id" in body) ||
+    typeof body.request_id !== "string"
+  )
+    return undefined;
+  return body as components["schemas"]["ErrorResponse"];
 }
 
 export class SessionChangedError extends Error {
@@ -133,11 +161,19 @@ export function createAuthenticatedFetch(
     let response = await send(false);
     if (response.status !== 401) return response;
     assertCurrent();
+    const initialError = await apiErrorBody(response);
+    assertCurrent();
+    if (initialError && domainAuthCodes.has(initialError.code))
+      throw new ApiError(401, initialError);
     response = await send(true);
     assertCurrent();
     if (response.status === 401) {
+      const refreshedError = await apiErrorBody(response);
+      assertCurrent();
+      if (refreshedError && domainAuthCodes.has(refreshedError.code))
+        throw new ApiError(401, refreshedError);
       onExpired({ epoch, userId: session.userId! });
-      throw new ApiError(401);
+      throw new ApiError(401, refreshedError);
     }
     return response;
   };

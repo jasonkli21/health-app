@@ -319,7 +319,7 @@ async def test_conversion_bound_is_a_sanitized_input_error_before_persistence(
     after = await api_client.get("/today", params={"date": "2026-05-01"})
     assert rejected.status_code == 422
     assert rejected.json()["code"] == "validation_error"
-    assert any(field["field"].endswith("value") for field in rejected.json()["field_errors"])
+    assert any(field["field"].endswith("distance") for field in rejected.json()["field_errors"])
     assert "1e+300" not in rejected.text
     assert after.json()["as_of_sequence"] == before.json()["as_of_sequence"]
 

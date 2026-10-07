@@ -8,24 +8,38 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import Response
+from pydantic import AwareDatetime
+from sqlalchemy.orm import Session
+
 from health_api.api.dependencies import get_current_owner, get_session, get_settings
 from health_api.api.errors import APIError
-from health_api.api.schemas import StrictModel
+from health_api.api.schemas import ErrorResponse, StrictModel
 from health_api.application.account_data_service import (
     AccountDataConflict,
     AccountDataNotFound,
     AccountExportLimitExceeded,
     begin_owner_deletion,
     export_owner_snapshot,
+    find_owner_deletion,
     load_owner_deletion,
     process_owner_deletion,
 )
 from health_api.config.settings import Settings
 from health_api.persistence.models import OwnerDeletionJob
-from pydantic import AwareDatetime
-from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["account-data"])
+
+COMMON_ERRORS: dict[int, dict[str, object]] = {
+    401: {"model": ErrorResponse, "description": "Authentication is required or recent."},
+    404: {"model": ErrorResponse, "description": "Owner data or deletion request was not found."},
+    409: {
+        "model": ErrorResponse,
+        "description": "The owner lifecycle conflicts with this request.",
+    },
+    413: {"model": ErrorResponse, "description": "The bounded export limit was exceeded."},
+    422: {"model": ErrorResponse, "description": "The request is invalid."},
+    503: {"model": ErrorResponse, "description": "Health storage is unavailable."},
+}
 
 
 class OwnerDeletionRequest(StrictModel):
@@ -73,7 +87,10 @@ def _require_recent_authentication(request: Request, settings: Settings) -> None
     "/exports/current",
     operation_id="exportCurrentOwnerData",
     response_class=Response,
-    responses={200: {"content": {"application/json": {"schema": {"type": "object"}}}}},
+    responses={
+        **COMMON_ERRORS,
+        200: {"content": {"application/json": {"schema": {"type": "object"}}}},
+    },
 )
 def export_current_owner_data(
     owner_id: Annotated[UUID, Depends(get_current_owner)],
@@ -104,6 +121,7 @@ def export_current_owner_data(
     operation_id="requestOwnerDataDeletion",
     response_model=OwnerDeletionResponse,
     status_code=202,
+    responses=COMMON_ERRORS,
 )
 def request_owner_data_deletion(
     body: OwnerDeletionRequest,
@@ -125,9 +143,31 @@ def request_owner_data_deletion(
 
 
 @router.get(
+    "/deletion-requests/current",
+    operation_id="getCurrentOwnerDataDeletionRequest",
+    response_model=OwnerDeletionResponse,
+    responses=COMMON_ERRORS,
+)
+def get_current_owner_data_deletion_request(
+    request: Request,
+    owner_id: Annotated[UUID, Depends(get_current_owner)],
+    session: Annotated[Session, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> OwnerDeletionResponse:
+    """Recover a pending or completed request after local request-ID loss."""
+    _require_recent_authentication(request, settings)
+    try:
+        job = find_owner_deletion(session, owner_id)
+    except AccountDataNotFound:
+        raise APIError(404, "not_found", "Deletion request was not found.") from None
+    return _deletion_response(job)
+
+
+@router.get(
     "/deletion-requests/{request_id}",
     operation_id="getOwnerDataDeletionStatus",
     response_model=OwnerDeletionResponse,
+    responses=COMMON_ERRORS,
 )
 def get_owner_data_deletion_status(
     request_id: UUID,

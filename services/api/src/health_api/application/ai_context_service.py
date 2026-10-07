@@ -77,14 +77,27 @@ def _common_vector():
 
 def _payload_vector(payload: Any):
     return func.to_tsvector(
-        literal_column("'simple'"), cast(_payload_search_projection(payload), Text)
+        literal_column("'simple'"), cast(_payload_search_expression(payload), Text)
     )
 
 
-def _payload_search_projection(payload: Any):
+def _payload_search_expression(payload: Any):
     # Relationship labels and identifiers are not search evidence. They are
     # omitted from matching/ranking, as well as from displayed excerpts.
     return payload.op("-")("related").op("-")("items").op("-")("linked_observation_ids")
+
+
+def _payload_search_projection(payload: Any):
+    """Backwards-compatible name for the SQL-side relationship-safe projection."""
+    return _payload_search_expression(payload)
+
+
+def _payload_search_value(payload: Any) -> Any:
+    """Apply the SQL search projection to an already-decoded JSON payload."""
+    if not isinstance(payload, dict):
+        return payload
+    excluded = {"related", "items", "linked_observation_ids"}
+    return {key: value for key, value in payload.items() if key not in excluded}
 
 
 def _candidate_branch(
@@ -773,7 +786,7 @@ def search_ai_resources(
             title=row.title,
             source_kind=row.source_kind,
             confirmation_status=row.confirmation_status,
-            excerpt=_excerpt(row.title, row.notes, _payload_search_projection(row.payload), query),
+            excerpt=_excerpt(row.title, row.notes, _payload_search_value(row.payload), query),
             time_precision=row.time_precision,
             occurred_at=row.occurred_at,
             local_date=row.local_date,

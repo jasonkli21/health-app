@@ -7,9 +7,11 @@ from uuid import UUID
 
 import pytest
 from google.api_core.exceptions import GoogleAPICallError
+
 from health_api.integrations.object_storage import (
     GCSObjectStorage,
     LocalObjectStorage,
+    ObjectCleanupPending,
     ObjectNotFound,
     ObjectStorageUnavailable,
     ObjectTooLarge,
@@ -150,11 +152,22 @@ class FakeBucket:
     def __init__(self) -> None:
         self.objects: dict[str, dict[str, Any]] = {}
         self.blobs: list[FakeBlob] = []
+        self.list_calls: list[dict[str, Any]] = []
 
     def blob(self, name: str) -> FakeBlob:
         blob = FakeBlob(name, self.objects)
         self.blobs.append(blob)
         return blob
+
+    def list_blobs(self, **kwargs: Any) -> list[FakeBlob]:
+        self.list_calls.append(kwargs)
+        matching = sorted(name for name in self.objects if name.startswith(kwargs["prefix"]))
+        result: list[FakeBlob] = []
+        for name in matching[: kwargs["max_results"]]:
+            blob = self.blob(name)
+            blob.generation = self.objects[name]["generation"]
+            result.append(blob)
+        return result
 
 
 class FakeClient:
@@ -215,3 +228,31 @@ def test_gcs_outage_is_sanitized_and_payload_bound_is_checked() -> None:
     with pytest.raises(ObjectStorageUnavailable) as raised:
         storage.put(OWNER_ID, "text/plain", b"x")
     assert "do-not-leak-this-payload" not in str(raised.value)
+
+
+def test_gcs_owner_cleanup_has_a_request_time_bound_and_resumes_in_batches() -> None:
+    client = FakeClient()
+    bucket = client.bucket_instance
+    prefix = f"owners/{OWNER_ID.hex}/objects/"
+    for index in range(30):
+        name = f"{prefix}{index:032x}.blob"
+        bucket.objects[name] = {"data": b"synthetic", "generation": index + 1}
+    storage = GCSObjectStorage(
+        "synthetic-private-bucket", max_size_bytes=32, client=client, timeout_seconds=10
+    )
+
+    with pytest.raises(ObjectCleanupPending):
+        storage.delete_owner(OWNER_ID)
+    assert bucket.list_calls[0]["max_results"] == 24
+    assert len(bucket.objects) == 7
+    deleted = [blob for blob in bucket.blobs if blob.calls]
+    assert len(deleted) == 23
+    assert all(blob.calls[0]["timeout"] == 10 for blob in deleted)
+
+    while True:
+        try:
+            storage.delete_owner(OWNER_ID)
+            break
+        except ObjectCleanupPending:
+            continue
+    assert bucket.objects == {}

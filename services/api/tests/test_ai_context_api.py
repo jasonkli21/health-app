@@ -141,9 +141,14 @@ async def test_today_summary_keeps_symptom_severity_linked_within_included_scope
         json={"task": "Review symptom severity", "resource_types": ["observation"]},
     )
     assert observations_only.status_code == 200
-    assert not any(
-        row["metric"] == "symptom_severity" for row in observations_only.json()["today_summaries"]
+    observations_only_severity = next(
+        row
+        for row in observations_only.json()["today_summaries"]
+        if row["metric"] == "symptom_severity"
     )
+    assert observations_only_severity["known_value"] is None
+    assert observations_only_severity["logged_count"] == 0
+    assert observations_only_severity["coverage"] == {"known_count": 0, "total_count": 0}
 
     linked_scope = await ai_api_client.post(
         "/ai/context",

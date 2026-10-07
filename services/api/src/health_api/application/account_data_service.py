@@ -8,14 +8,15 @@ from io import StringIO
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy import Select, literal_column, select, text
+from sqlalchemy.orm import Session
+
 from health_api.integrations.object_storage import (
     ObjectCleanupPending,
     ObjectStorage,
     ObjectStorageUnavailable,
 )
 from health_api.persistence.models import Base, OwnerDeletionJob, OwnerErasureLedger, User
-from sqlalchemy import Select, literal_column, select, text
-from sqlalchemy.orm import Session
 
 _INTERNAL_OWNER_TABLES = {"owner_deletion_jobs", "owner_erasure_ledger"}
 _OWNER_DATA_TABLE_NAMES = frozenset(
@@ -185,6 +186,13 @@ def export_owner_snapshot(session: Session, owner_id: UUID) -> str:
 def begin_owner_deletion(session: Session, owner_id: UUID, request_id: UUID) -> OwnerDeletionJob:
     """Commit the owner write freeze and durable erasure intent before cleanup starts."""
     with session.begin():
+        # Serialize a request ID independently of the owner row. The latter
+        # prevents two distinct requests from freezing the same owner at once;
+        # this advisory lock also makes overlapping identical retries replay.
+        request_lock = int.from_bytes(request_id.bytes[:8], "big", signed=True)
+        session.execute(
+            text("SELECT pg_advisory_xact_lock(:request_lock)"), {"request_lock": request_lock}
+        )
         job = session.get(OwnerDeletionJob, request_id)
         if job is not None:
             if job.owner_id != owner_id:
@@ -200,6 +208,17 @@ def begin_owner_deletion(session: Session, owner_id: UUID, request_id: UUID) -> 
         ).scalar_one_or_none()
         if user is None:
             raise AccountDataNotFound
+        # Check again after owner serialization for deployments where request
+        # IDs are allocated before the lock is acquired.
+        job = session.get(OwnerDeletionJob, request_id)
+        if job is not None:
+            if job.owner_id != owner_id:
+                raise AccountDataNotFound
+            if job.status != "completed":
+                job.status = "running"
+                job.error_code = None
+                job.updated_at = datetime.now(UTC)
+            return job
         if user.lifecycle != "active":
             raise AccountDataConflict
 
@@ -213,6 +232,19 @@ def begin_owner_deletion(session: Session, owner_id: UUID, request_id: UUID) -> 
 def load_owner_deletion(session: Session, owner_id: UUID, request_id: UUID) -> OwnerDeletionJob:
     job = session.get(OwnerDeletionJob, request_id)
     if job is None or job.owner_id != owner_id:
+        raise AccountDataNotFound
+    return job
+
+
+def find_owner_deletion(session: Session, owner_id: UUID) -> OwnerDeletionJob:
+    """Discover the authenticated owner's durable deletion job for recovery."""
+    job = session.scalar(
+        select(OwnerDeletionJob)
+        .where(OwnerDeletionJob.owner_id == owner_id)
+        .order_by(OwnerDeletionJob.requested_at.desc(), OwnerDeletionJob.id.desc())
+        .limit(1)
+    )
+    if job is None:
         raise AccountDataNotFound
     return job
 

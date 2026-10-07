@@ -302,7 +302,7 @@ async def test_device_day_aggregates_use_the_declared_preferred_installation(
         },
     )
     assert stale_page.status_code == 422
-    assert stale_page.json()["error"]["code"] == "invalid_cursor"
+    assert stale_page.json()["code"] == "invalid_cursor"
     after_switch = await api_client.get(
         "/today", params={"date": "2026-10-01", "timezone": "America/Los_Angeles"}
     )
@@ -400,7 +400,7 @@ async def test_today_read_lock_keeps_preference_change_out_of_the_page_snapshot(
         },
     )
     assert next_page.status_code == 422
-    assert next_page.json()["error"]["code"] == "invalid_cursor"
+    assert next_page.json()["code"] == "invalid_cursor"
 
 
 @pytest.mark.asyncio
@@ -463,7 +463,7 @@ async def test_aggregate_revisions_reject_stale_batches_and_allow_post_delete_re
     )
     assert tombstone.status_code == stale_after_delete.status_code == recomputed.status_code == 201
     assert stale_after_delete.json()["unchanged_count"] == 1
-    assert recomputed.json()["created_count"] == 1
+    assert recomputed.json()["updated_count"] == 1
     today = await api_client.get(
         "/today", params={"date": "2026-10-01", "timezone": "America/Los_Angeles"}
     )

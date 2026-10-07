@@ -700,6 +700,9 @@ def create_action_proposal(
             session.add(proposal)
             session.flush()
             _append_revision(session, proposal, owner_id, snapshot)
+            # The event has a composite FK to this exact revision; SQLAlchemy
+            # does not infer ordering between these independent mappings.
+            session.flush()
             _append_event(
                 session,
                 proposal,
@@ -864,6 +867,7 @@ def edit_action_proposal(
             }
             session.flush()
             _append_revision(session, proposal, owner_id, snapshot)
+            session.flush()
             _append_event(
                 session, proposal, owner_id, "edited", {"superseded_revision": expected_revision}
             )

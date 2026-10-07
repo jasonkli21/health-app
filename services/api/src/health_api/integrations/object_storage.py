@@ -272,6 +272,10 @@ class LocalObjectStorage:
 class GCSObjectStorage:
     """GCS adapter using application default credentials and bounded operations."""
 
+    # Leave one configured call timeout for listing, then keep the worst-case
+    # sequential cleanup step below the 300-second Cloud Run request ceiling.
+    _OWNER_CLEANUP_REQUEST_BUDGET_SECONDS = 240
+
     def __init__(
         self,
         bucket_name: str,
@@ -368,19 +372,26 @@ class GCSObjectStorage:
             raise ObjectStorageUnavailable from None
 
     def delete_owner(self, owner_id: UUID) -> None:
-        """Delete a bounded prefix batch with generation preconditions; repeat until empty."""
+        """Delete a time-bounded prefix batch with generation preconditions."""
         prefix = f"owners/{owner_id.hex}/objects/"
+        batch_size = max(
+            1,
+            min(
+                1000,
+                self._OWNER_CLEANUP_REQUEST_BUDGET_SECONDS // self.timeout_seconds - 1,
+            ),
+        )
         try:
             blobs = list(
                 self._bucket.list_blobs(
                     prefix=prefix,
-                    max_results=1001,
+                    max_results=batch_size + 1,
                     versions=True,
                     timeout=self.timeout_seconds,
                     retry=None,
                 )
             )
-            batch = blobs[:1000]
+            batch = blobs[:batch_size]
             for blob in batch:
                 name = getattr(blob, "name", "")
                 if not name.startswith(prefix) or not re.fullmatch(

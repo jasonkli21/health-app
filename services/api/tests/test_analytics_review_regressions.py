@@ -124,6 +124,8 @@ def test_analytics_symptom_severity_uses_latest_linked_same_day_value() -> None:
         day,
         day,
         "UTC",
+        {},
+        {},
     )
 
     assert points[0].value == 0
@@ -155,6 +157,8 @@ def test_analytics_symptom_severity_omits_cross_day_relationships() -> None:
         day,
         day,
         "UTC",
+        {},
+        {},
     )
 
     assert points[0].value is None

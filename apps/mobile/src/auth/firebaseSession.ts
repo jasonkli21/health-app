@@ -180,6 +180,63 @@ export async function signOutCurrentUser(): Promise<void> {
   });
 }
 
+export async function signOutCurrentUserForSession(
+  epoch: number,
+  userId: string | null,
+): Promise<boolean> {
+  const matches = () => {
+    const snapshot = sessionStore.getSnapshot();
+    return (
+      snapshot.epoch === epoch &&
+      snapshot.userId === userId &&
+      (userId === null
+        ? snapshot.mode === "dev" && snapshot.status === "ready"
+        : snapshot.status === "signed_in")
+    );
+  };
+  if (!matches()) return false;
+
+  const requestedAuth = auth;
+  if (userId !== null && requestedAuth?.currentUser?.uid !== userId)
+    return false;
+  const intent = ++operation;
+  let signedOut = false;
+  await mutate(async () => {
+    if (
+      intent !== operation ||
+      !matches() ||
+      (userId !== null && requestedAuth?.currentUser?.uid !== userId)
+    )
+      return;
+    sessionStore.setInitializing();
+    try {
+      if (requestedAuth) await firebaseAuth.signOut(requestedAuth);
+      if (intent === operation) {
+        if (userId !== null && requestedAuth?.currentUser?.uid !== userId)
+          return;
+        sessionStore.setSignedOut();
+        signedOut = true;
+      }
+    } catch {
+      const currentUser = requestedAuth?.currentUser;
+      if (
+        intent === operation &&
+        userId !== null &&
+        currentUser?.uid === userId
+      ) {
+        sessionStore.setSignedIn(
+          currentUser.uid,
+          currentUser.email,
+          "Sign-out failed. Try again.",
+        );
+      } else if (intent === operation && currentUser === null) {
+        sessionStore.setUnavailable("Sign-out failed. Try again.");
+      }
+    }
+  });
+  return signedOut;
+}
+
 export async function clearRejectedFirebaseSession(
   epoch: number,
   userId: string,

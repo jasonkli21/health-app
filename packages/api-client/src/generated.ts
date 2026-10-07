@@ -720,9 +720,6 @@ export interface components {
       resource_type: "steps" | "heart_rate_summary";
       revision: number;
     };
-    HTTPValidationError: {
-      detail?: Array<components["schemas"]["ValidationError"]>;
-    };
     InsightEvidenceReference: {
       object_id: string;
       object_type: "derived_signal" | "event" | "observation";
@@ -1606,13 +1603,6 @@ export interface components {
       unit: string;
     };
     UTCInstant: string;
-    ValidationError: {
-      ctx?: Record<string, never>;
-      input?: unknown;
-      loc: Array<string | number>;
-      msg: string;
-      type: string;
-    };
     WorkoutEventV1: {
       distance?: components["schemas"]["DistanceQuantity"] | null;
       duration?: components["schemas"]["DurationQuantity"] | null;
@@ -1978,7 +1968,15 @@ export interface operations {
     };
   };
   exportCurrentOwnerData: {
-    responses: { "200": Record<string, never> };
+    responses: {
+      "200": Record<string, never>;
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
   };
   getActionProposal: {
     path: {
@@ -2040,6 +2038,17 @@ export interface operations {
     responses: {
       "200": components["schemas"]["ContextResponse"];
       "401": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  getCurrentOwnerDataDeletionRequest: {
+    responses: {
+      "200": components["schemas"]["OwnerDeletionResponse"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
       "413": components["schemas"]["ErrorResponse"];
       "422": components["schemas"]["ErrorResponse"];
       "503": components["schemas"]["ErrorResponse"];
@@ -2156,7 +2165,12 @@ export interface operations {
     };
     responses: {
       "200": components["schemas"]["OwnerDeletionResponse"];
-      "422": components["schemas"]["HTTPValidationError"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
     };
   };
   getPlan: {
@@ -2791,7 +2805,12 @@ export interface operations {
     requestBody: components["schemas"]["OwnerDeletionRequest"];
     responses: {
       "202": components["schemas"]["OwnerDeletionResponse"];
-      "422": components["schemas"]["HTTPValidationError"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
     };
   };
   searchAIEligibleHealthData: {
@@ -3411,6 +3430,17 @@ export class HealthApiClient {
     return this.request<components["schemas"]["ContextResponse"]>(
       "GET",
       `/contexts/${encodeURIComponent(path.context_id)}`,
+      undefined,
+      undefined,
+    );
+  }
+
+  async getCurrentOwnerDataDeletionRequest(): Promise<
+    components["schemas"]["OwnerDeletionResponse"]
+  > {
+    return this.request<components["schemas"]["OwnerDeletionResponse"]>(
+      "GET",
+      `/deletion-requests/current`,
       undefined,
       undefined,
     );

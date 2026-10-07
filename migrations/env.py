@@ -6,7 +6,10 @@ from typing import cast
 
 from alembic import context
 from health_api.config.settings import get_settings
-from health_api.config.settings import migration_database_url as resolve_migration_database_url
+from health_api.config.settings import (
+    migration_database_url as resolve_migration_database_url,
+)
+from health_api.persistence.migration_compare import include_schema_object
 from health_api.persistence.migration_lock import migration_release_lock
 from health_api.persistence.models import Base
 from sqlalchemy import Connection, engine_from_config, pool
@@ -45,7 +48,10 @@ def run_migrations_online() -> None:
         connection = cast(Connection, injected_connection)
         with migration_release_lock(connection):
             context.configure(
-                connection=connection, target_metadata=target_metadata, compare_type=True
+                connection=connection,
+                target_metadata=target_metadata,
+                compare_type=True,
+                include_object=include_schema_object,
             )
             with context.begin_transaction():
                 context.run_migrations()
@@ -60,7 +66,12 @@ def run_migrations_online() -> None:
         echo=False,
     )
     with connectable.connect() as connection, migration_release_lock(connection):
-        context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            include_object=include_schema_object,
+        )
         with context.begin_transaction():
             context.run_migrations()
 
