@@ -113,3 +113,44 @@ were not run. Offline SQL generation does not demonstrate a live migration or
 database behavior. Mobile device accessibility/timezone/session review and
 actual provider/safety review remain open. No clinical validity or efficacy is
 claimed.
+
+## Independent review follow-up — October 7, 2026
+
+The follow-up implements the source corrections for findings 1–17 and adds
+focused regression fixtures that advance the executable verification required
+by finding 18. Analytics revision snapshots now stringify UUIDs and
+timestamps. AI trend previews apply request exclusions, active/valid-at-`as_of`
+checks, tracker-definition consent, and interval clipping; symptom severity
+uses eligible same-day linked endpoints and exact contributing evidence.
+Daily edits invalidate owner-wide. Locked aggregate reads refresh ORM identity
+map state. Signal revision participates in insight/recommendation identity;
+user decisions survive stale history, and explicit refresh renews expired
+undecided artifacts with a retained revision. Lists paginate by effective
+expiry state.
+
+Tracker labels are bounded while metric IDs and schema versions remain exact.
+Experiments preserve planned end dates and record an aware `actual_end_at` on
+completion/stop; results are clipped at that instant. Experiment and planning
+writes share owner-first locking. The mobile Insights screen clears cached
+analysis on focus, reloads authoritative artifact states, separates its
+analysis metric from the experiment outcome, supports notes-only edits after
+start, and exposes cursor-based history. Daily evidence opens the exact source
+revision; derived-signal evidence opens the exact saved analytics revision.
+
+Focused API regression fixtures cover JSON-safe snapshots, linked symptom
+severity (including zero/latest and cross-day relationships), long Unicode
+tracker labels, terminal experiment boundaries, missing-day/rolling-mean and
+calendar-half trend goldens, zero-baseline comparison, tied/constant/inverse
+Spearman cases, and the 14-pair/21-calendar-day association threshold. The
+full acceptance matrix still includes further numerical, unit/DST, schema
+version, ownership, persistence, and race cases. Database-backed
+migration/drift/query-plan checks, full AI permission and `as_of` integration
+coverage, analytics-specific mobile interaction tests, and device walkthroughs
+remain open. Phase 7 is not accepted from these local fixes or checks alone.
+
+Follow-up verification completed: API suite `144 passed, 50 skipped`; mobile
+suite `21 files, 98 tests passed`; mobile TypeScript and changed-file ESLint;
+Mypy for all 38 API source files; Ruff check/format for changed Python files;
+OpenAPI `--check`; generated-client regeneration; and `git diff --check`. The
+skipped API cases require the disposable PostgreSQL environment and do not
+establish live persistence, migration, or concurrency behavior.

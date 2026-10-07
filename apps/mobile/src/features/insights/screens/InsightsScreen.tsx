@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -35,6 +35,11 @@ type Experiment = components["schemas"]["ExperimentResponse"];
 type ExperimentResult = components["schemas"]["ExperimentResult"];
 type ExperimentDraft = components["schemas"]["ExperimentPayloadV1"];
 type PendingExperimentCreate = { id: string; experiment: ExperimentDraft };
+type EvidenceLink = {
+  object_id: string;
+  revision: number;
+  object_type: string;
+};
 
 function isDefinitiveCreateFailure(error: unknown): boolean {
   return (
@@ -60,6 +65,7 @@ function ValueField({
   placeholder,
   multiline = false,
   keyboardType = "default",
+  disabled = false,
 }: {
   label: string;
   value: string;
@@ -67,6 +73,7 @@ function ValueField({
   placeholder?: string;
   multiline?: boolean;
   keyboardType?: "default" | "numeric";
+  disabled?: boolean;
 }) {
   return (
     <View style={styles.field}>
@@ -77,6 +84,7 @@ function ValueField({
         onChangeText={onChange}
         placeholder={placeholder}
         multiline={multiline}
+        editable={!disabled}
         keyboardType={keyboardType}
         autoCapitalize={multiline ? "sentences" : "none"}
         style={[styles.input, multiline && styles.multiline]}
@@ -89,15 +97,18 @@ function SelectButton({
   label,
   selected,
   onPress,
+  disabled = false,
 }: {
   label: string;
   selected: boolean;
   onPress: () => void;
+  disabled?: boolean;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected }}
+      disabled={disabled}
       onPress={onPress}
       style={[styles.choice, selected && styles.choiceSelected]}
     >
@@ -137,6 +148,14 @@ export default function InsightsScreen() {
   const [insights, setInsights] = useState<Insight[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [experiments, setExperiments] = useState<Experiment[]>([]);
+  const [insightCursor, setInsightCursor] = useState<string | null>(null);
+  const [recommendationCursor, setRecommendationCursor] = useState<
+    string | null
+  >(null);
+  const [experimentCursor, setExperimentCursor] = useState<string | null>(null);
+  const [expandedEvidence, setExpandedEvidence] = useState<
+    Record<string, boolean>
+  >({});
   const [metric, setMetric] = useState("");
   const [selectedPairs, setSelectedPairs] = useState<string[]>([]);
   const [from, setFrom] = useState(dateOffset(-29));
@@ -154,13 +173,19 @@ export default function InsightsScreen() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const screenGeneration = useRef(0);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      screenGeneration.current += 1;
       const epoch = sessionStore.getSnapshot().epoch;
       setLoading(true);
+      setBusy(false);
       setError(null);
+      setTrend(null);
+      setAssociations([]);
+      setResults({});
       void Promise.all([
         insightsApi.listAnalyticsMetrics(),
         insightsApi.listAnalyticsAssociationPairs(),
@@ -182,6 +207,9 @@ export default function InsightsScreen() {
             setInsights(insightPage.items);
             setRecommendations(recommendationPage.items);
             setExperiments(experimentPage.items);
+            setInsightCursor(insightPage.next_cursor);
+            setRecommendationCursor(recommendationPage.next_cursor);
+            setExperimentCursor(experimentPage.next_cursor);
             setMetric((current) => current || catalog.items[0]?.metric || "");
             setForm((current) =>
               current.outcome_metric
@@ -206,40 +234,69 @@ export default function InsightsScreen() {
 
   async function runTrend() {
     if (!metric) return;
+    const generation = screenGeneration.current;
+    const epoch = sessionStore.getSnapshot().epoch;
     setBusy(true);
     setError(null);
     try {
       const result = await insightsApi.getTrend({ metric, from, to, timezone });
-      setTrend(result);
+      if (
+        generation === screenGeneration.current &&
+        epoch === sessionStore.getSnapshot().epoch
+      )
+        setTrend(result);
     } catch (requestError) {
-      setError(insightsErrorMessage(requestError));
+      if (
+        generation === screenGeneration.current &&
+        epoch === sessionStore.getSnapshot().epoch
+      )
+        setError(insightsErrorMessage(requestError));
     } finally {
-      setBusy(false);
+      if (
+        generation === screenGeneration.current &&
+        epoch === sessionStore.getSnapshot().epoch
+      )
+        setBusy(false);
     }
   }
 
   async function runAssociations() {
     if (!selectedPairs.length) return;
+    const generation = screenGeneration.current;
+    const epoch = sessionStore.getSnapshot().epoch;
     setBusy(true);
     setError(null);
     try {
-      setAssociations(
-        await insightsApi.getAssociations({
-          pair: selectedPairs,
-          from,
-          to,
-          timezone,
-        }),
-      );
+      const response = await insightsApi.getAssociations({
+        pair: selectedPairs,
+        from,
+        to,
+        timezone,
+      });
+      if (
+        generation === screenGeneration.current &&
+        epoch === sessionStore.getSnapshot().epoch
+      )
+        setAssociations(response);
     } catch (requestError) {
-      setError(insightsErrorMessage(requestError));
+      if (
+        generation === screenGeneration.current &&
+        epoch === sessionStore.getSnapshot().epoch
+      )
+        setError(insightsErrorMessage(requestError));
     } finally {
-      setBusy(false);
+      if (
+        generation === screenGeneration.current &&
+        epoch === sessionStore.getSnapshot().epoch
+      )
+        setBusy(false);
     }
   }
 
   async function generateInsights() {
     if (!metric && !selectedPairs.length) return;
+    const generation = screenGeneration.current;
+    const epoch = sessionStore.getSnapshot().epoch;
     setBusy(true);
     setError(null);
     try {
@@ -250,22 +307,145 @@ export default function InsightsScreen() {
         to_date: to,
         timezone,
       });
-      setTrend(generated.signals[0] ?? trend);
+      const [insightPage, recommendationPage] = await Promise.all([
+        insightsApi.listInsights({ limit: 50 }),
+        insightsApi.listRecommendations({ limit: 50 }),
+      ]);
+      if (
+        generation !== screenGeneration.current ||
+        epoch !== sessionStore.getSnapshot().epoch
+      )
+        return;
+      setTrend(generated.signals[0] ?? null);
       setAssociations(generated.associations);
-      setInsights((current) => {
-        const next = new Map(current.map((item) => [item.id, item]));
-        for (const item of generated.insights) next.set(item.id, item);
-        return [...next.values()];
-      });
-      setRecommendations((current) => {
-        const next = new Map(current.map((item) => [item.id, item]));
-        for (const item of generated.recommendations) next.set(item.id, item);
-        return [...next.values()];
-      });
+      setInsights(insightPage.items);
+      setRecommendations(recommendationPage.items);
+      setInsightCursor(insightPage.next_cursor);
+      setRecommendationCursor(recommendationPage.next_cursor);
+      setResults({});
     } catch (requestError) {
-      setError(insightsErrorMessage(requestError));
+      if (
+        generation === screenGeneration.current &&
+        epoch === sessionStore.getSnapshot().epoch
+      )
+        setError(insightsErrorMessage(requestError));
     } finally {
-      setBusy(false);
+      if (
+        generation === screenGeneration.current &&
+        epoch === sessionStore.getSnapshot().epoch
+      )
+        setBusy(false);
+    }
+  }
+
+  async function loadMoreInsights() {
+    if (!insightCursor) return;
+    const generation = screenGeneration.current;
+    const epoch = sessionStore.getSnapshot().epoch;
+    setBusy(true);
+    setError(null);
+    try {
+      const page = await insightsApi.listInsights({
+        limit: 50,
+        cursor: insightCursor,
+      });
+      if (
+        generation !== screenGeneration.current ||
+        epoch !== sessionStore.getSnapshot().epoch
+      )
+        return;
+      setInsights((current) => [
+        ...new Map(
+          [...current, ...page.items].map((item) => [item.id, item]),
+        ).values(),
+      ]);
+      setInsightCursor(page.next_cursor);
+    } catch (requestError) {
+      if (
+        generation === screenGeneration.current &&
+        epoch === sessionStore.getSnapshot().epoch
+      )
+        setError(insightsErrorMessage(requestError));
+    } finally {
+      if (
+        generation === screenGeneration.current &&
+        epoch === sessionStore.getSnapshot().epoch
+      )
+        setBusy(false);
+    }
+  }
+
+  async function loadMoreRecommendations() {
+    if (!recommendationCursor) return;
+    const generation = screenGeneration.current;
+    const epoch = sessionStore.getSnapshot().epoch;
+    setBusy(true);
+    setError(null);
+    try {
+      const page = await insightsApi.listRecommendations({
+        limit: 50,
+        cursor: recommendationCursor,
+      });
+      if (
+        generation !== screenGeneration.current ||
+        epoch !== sessionStore.getSnapshot().epoch
+      )
+        return;
+      setRecommendations((current) => [
+        ...new Map(
+          [...current, ...page.items].map((item) => [item.id, item]),
+        ).values(),
+      ]);
+      setRecommendationCursor(page.next_cursor);
+    } catch (requestError) {
+      if (
+        generation === screenGeneration.current &&
+        epoch === sessionStore.getSnapshot().epoch
+      )
+        setError(insightsErrorMessage(requestError));
+    } finally {
+      if (
+        generation === screenGeneration.current &&
+        epoch === sessionStore.getSnapshot().epoch
+      )
+        setBusy(false);
+    }
+  }
+
+  async function loadMoreExperiments() {
+    if (!experimentCursor) return;
+    const generation = screenGeneration.current;
+    const epoch = sessionStore.getSnapshot().epoch;
+    setBusy(true);
+    setError(null);
+    try {
+      const page = await insightsApi.listExperiments({
+        limit: 50,
+        cursor: experimentCursor,
+      });
+      if (
+        generation !== screenGeneration.current ||
+        epoch !== sessionStore.getSnapshot().epoch
+      )
+        return;
+      setExperiments((current) => [
+        ...new Map(
+          [...current, ...page.items].map((item) => [item.id, item]),
+        ).values(),
+      ]);
+      setExperimentCursor(page.next_cursor);
+    } catch (requestError) {
+      if (
+        generation === screenGeneration.current &&
+        epoch === sessionStore.getSnapshot().epoch
+      )
+        setError(insightsErrorMessage(requestError));
+    } finally {
+      if (
+        generation === screenGeneration.current &&
+        epoch === sessionStore.getSnapshot().epoch
+      )
+        setBusy(false);
     }
   }
 
@@ -364,6 +544,11 @@ export default function InsightsScreen() {
       setExperiments((current) =>
         current.map((row) => (row.id === updated.id ? updated : row)),
       );
+      setResults((current) => {
+        const next = { ...current };
+        delete next[updated.id];
+        return next;
+      });
       if (editing?.id === updated.id) setEditing(updated);
     } catch (requestError) {
       setError(insightsErrorMessage(requestError));
@@ -373,6 +558,8 @@ export default function InsightsScreen() {
   }
 
   async function loadExperimentResult(item: Experiment) {
+    const generation = screenGeneration.current;
+    const epoch = sessionStore.getSnapshot().epoch;
     setBusy(true);
     setError(null);
     try {
@@ -380,16 +567,62 @@ export default function InsightsScreen() {
         { experiment_id: item.id },
         { timezone },
       );
-      setResults((current) => ({ ...current, [item.id]: response.result }));
+      if (
+        generation === screenGeneration.current &&
+        epoch === sessionStore.getSnapshot().epoch
+      )
+        setResults((current) => ({ ...current, [item.id]: response.result }));
     } catch (requestError) {
-      setError(insightsErrorMessage(requestError));
+      if (
+        generation === screenGeneration.current &&
+        epoch === sessionStore.getSnapshot().epoch
+      )
+        setError(insightsErrorMessage(requestError));
     } finally {
-      setBusy(false);
+      if (
+        generation === screenGeneration.current &&
+        epoch === sessionStore.getSnapshot().epoch
+      )
+        setBusy(false);
     }
   }
 
   const selectedMetric = metrics.find((item) => item.metric === metric);
+  const selectedOutcomeMetric = metrics.find(
+    (item) => item.metric === form.outcome_metric,
+  );
+  const designLocked = editing !== null && editing.state !== "draft";
   const visiblePoints = trend?.result.points.slice(-14) ?? [];
+
+  function openEvidence(reference: EvidenceLink) {
+    if (reference.object_type === "derived_signal") {
+      router.push({
+        pathname: "/analytics/evidence/[objectId]",
+        params: {
+          objectId: reference.object_id,
+          revision: String(reference.revision),
+        },
+      });
+      return;
+    }
+    if (
+      reference.object_type === "event" ||
+      reference.object_type === "observation"
+    ) {
+      router.push({
+        pathname: "/daily/item/[itemId]/history",
+        params: {
+          itemId: reference.object_id,
+          type: reference.object_type,
+          revision: String(reference.revision),
+        },
+      });
+    }
+  }
+
+  function toggleEvidence(key: string) {
+    setExpandedEvidence((current) => ({ ...current, [key]: !current[key] }));
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -432,10 +665,8 @@ export default function InsightsScreen() {
                     selected={metric === item.metric}
                     onPress={() => {
                       setMetric(item.metric);
-                      setForm((current) => ({
-                        ...current,
-                        outcome_metric: item.metric,
-                      }));
+                      setTrend(null);
+                      setAssociations([]);
                     }}
                   />
                 ))}
@@ -447,20 +678,33 @@ export default function InsightsScreen() {
                 <ValueField
                   label="From date"
                   value={from}
-                  onChange={setFrom}
+                  onChange={(value) => {
+                    setFrom(value);
+                    setTrend(null);
+                    setAssociations([]);
+                  }}
                   placeholder="YYYY-MM-DD"
                 />
                 <ValueField
                   label="To date"
                   value={to}
-                  onChange={setTo}
+                  onChange={(value) => {
+                    setTo(value);
+                    setTrend(null);
+                    setAssociations([]);
+                  }}
                   placeholder="YYYY-MM-DD"
                 />
               </View>
               <ValueField
                 label="IANA timezone"
                 value={timezone}
-                onChange={setTimezone}
+                onChange={(value) => {
+                  setTimezone(value);
+                  setTrend(null);
+                  setAssociations([]);
+                  setResults({});
+                }}
                 placeholder="America/Los_Angeles"
               />
               <ActionButton
@@ -527,33 +771,31 @@ export default function InsightsScreen() {
                   {trend.result.evidence_refs.length} exact source revisions
                   support this result.
                 </Text>
-                {trend.result.evidence_refs.slice(0, 8).map((reference) => (
-                  <Pressable
-                    key={`${reference.object_id}:${reference.revision}`}
-                    accessibilityRole="button"
-                    disabled={
-                      reference.object_type !== "event" &&
-                      reference.object_type !== "observation"
-                    }
-                    onPress={() =>
-                      router.push({
-                        pathname: "/daily/item/[itemId]",
-                        params: { itemId: reference.object_id },
-                      })
-                    }
-                    style={styles.evidenceLink}
-                  >
-                    <Text style={styles.evidenceText}>
-                      {reference.object_type} · revision {reference.revision} ·{" "}
-                      {reference.object_id}
-                    </Text>
-                  </Pressable>
-                ))}
+                {trend.result.evidence_refs
+                  .slice(0, expandedEvidence.trend ? undefined : 8)
+                  .map((reference) => (
+                    <Pressable
+                      key={`${reference.object_id}:${reference.revision}`}
+                      accessibilityRole="button"
+                      onPress={() => openEvidence(reference)}
+                      style={styles.evidenceLink}
+                    >
+                      <Text style={styles.evidenceText}>
+                        {reference.object_type} · revision {reference.revision}{" "}
+                        · {reference.object_id}
+                      </Text>
+                    </Pressable>
+                  ))}
                 {trend.result.evidence_refs.length > 8 ? (
-                  <Text style={styles.help}>
-                    Showing 8 of {trend.result.evidence_refs.length} source
-                    references.
-                  </Text>
+                  <ActionButton
+                    label={
+                      expandedEvidence.trend
+                        ? "Show fewer source references"
+                        : `Show all ${trend.result.evidence_refs.length} source references`
+                    }
+                    secondary
+                    onPress={() => toggleEvidence("trend")}
+                  />
                 ) : null}
               </View>
             ) : null}
@@ -639,33 +881,31 @@ export default function InsightsScreen() {
                     {item.insight.method_version}
                   </Text>
                   <Text style={styles.help}>{item.insight.uncertainty}</Text>
-                  {item.insight.evidence_refs.slice(0, 8).map((reference) => (
-                    <Pressable
-                      key={`${reference.object_id}:${reference.revision}`}
-                      accessibilityRole="button"
-                      disabled={
-                        reference.object_type !== "event" &&
-                        reference.object_type !== "observation"
-                      }
-                      onPress={() =>
-                        router.push({
-                          pathname: "/daily/item/[itemId]",
-                          params: { itemId: reference.object_id },
-                        })
-                      }
-                      style={styles.evidenceLink}
-                    >
-                      <Text style={styles.evidenceText}>
-                        {reference.object_type} · revision {reference.revision}{" "}
-                        · {reference.object_id}
-                      </Text>
-                    </Pressable>
-                  ))}
+                  {item.insight.evidence_refs
+                    .slice(0, expandedEvidence[item.id] ? undefined : 8)
+                    .map((reference) => (
+                      <Pressable
+                        key={`${reference.object_id}:${reference.revision}`}
+                        accessibilityRole="button"
+                        onPress={() => openEvidence(reference)}
+                        style={styles.evidenceLink}
+                      >
+                        <Text style={styles.evidenceText}>
+                          {reference.object_type} · revision{" "}
+                          {reference.revision} · {reference.object_id}
+                        </Text>
+                      </Pressable>
+                    ))}
                   {item.insight.evidence_refs.length > 8 ? (
-                    <Text style={styles.help}>
-                      Showing 8 of {item.insight.evidence_refs.length} evidence
-                      references.
-                    </Text>
+                    <ActionButton
+                      label={
+                        expandedEvidence[item.id]
+                          ? "Show fewer evidence references"
+                          : `Show all ${item.insight.evidence_refs.length} evidence references`
+                      }
+                      secondary
+                      onPress={() => toggleEvidence(item.id)}
+                    />
                   ) : null}
                   {item.state === "current" ? (
                     <ActionButton
@@ -677,6 +917,14 @@ export default function InsightsScreen() {
                   ) : null}
                 </View>
               ))}
+              {insightCursor ? (
+                <ActionButton
+                  label="Load more insight history"
+                  secondary
+                  busy={busy}
+                  onPress={() => void loadMoreInsights()}
+                />
+              ) : null}
             </View>
 
             <View style={styles.section}>
@@ -730,11 +978,23 @@ export default function InsightsScreen() {
                   )}
                 </View>
               ))}
+              {recommendationCursor ? (
+                <ActionButton
+                  label="Load more recommendation history"
+                  secondary
+                  busy={busy}
+                  onPress={() => void loadMoreRecommendations()}
+                />
+              ) : null}
             </View>
 
             <View style={styles.section}>
               <Text accessibilityRole="header" style={styles.sectionTitle}>
-                {editing ? "Edit experiment" : "Manual experiment"}
+                {designLocked
+                  ? "Edit experiment notes"
+                  : editing
+                    ? "Edit experiment draft"
+                    : "Manual experiment"}
               </Text>
               <Text style={styles.help}>
                 You set the hypothesis, intervention and outcome. The comparison
@@ -747,6 +1007,7 @@ export default function InsightsScreen() {
                   setForm((current) => ({ ...current, hypothesis: value }))
                 }
                 multiline
+                disabled={designLocked}
               />
               <ValueField
                 label="What you plan to try"
@@ -755,11 +1016,28 @@ export default function InsightsScreen() {
                   setForm((current) => ({ ...current, intervention: value }))
                 }
                 multiline
+                disabled={designLocked}
               />
               <Text style={styles.fieldLabel}>
-                Outcome metric: {selectedMetric?.label ?? "choose above"} (
-                {selectedMetric?.unit ?? ""})
+                Outcome metric: {selectedOutcomeMetric?.label ?? "choose below"}{" "}
+                ({selectedOutcomeMetric?.unit ?? ""})
               </Text>
+              <View style={styles.choices}>
+                {metrics.map((item) => (
+                  <SelectButton
+                    key={`outcome:${item.metric}`}
+                    label={`${item.label} · ${item.unit}`}
+                    selected={form.outcome_metric === item.metric}
+                    disabled={designLocked}
+                    onPress={() =>
+                      setForm((current) => ({
+                        ...current,
+                        outcome_metric: item.metric,
+                      }))
+                    }
+                  />
+                ))}
+              </View>
               <View style={styles.row}>
                 <ValueField
                   label="Baseline starts"
@@ -771,6 +1049,7 @@ export default function InsightsScreen() {
                     }))
                   }
                   placeholder="YYYY-MM-DD"
+                  disabled={designLocked}
                 />
                 <ValueField
                   label="Intervention starts"
@@ -779,6 +1058,7 @@ export default function InsightsScreen() {
                     setForm((current) => ({ ...current, start_date: value }))
                   }
                   placeholder="YYYY-MM-DD"
+                  disabled={designLocked}
                 />
                 <ValueField
                   label="Intervention ends"
@@ -787,6 +1067,7 @@ export default function InsightsScreen() {
                     setForm((current) => ({ ...current, end_date: value }))
                   }
                   placeholder="YYYY-MM-DD"
+                  disabled={designLocked}
                 />
               </View>
               <ValueField
@@ -814,14 +1095,18 @@ export default function InsightsScreen() {
                 <ActionButton
                   label={
                     editing
-                      ? "Save draft"
+                      ? designLocked
+                        ? "Save notes"
+                        : "Save draft"
                       : pendingCreate
                         ? "Retry original save"
                         : "Save experiment draft"
                   }
                   busy={busy}
                   disabled={
-                    !form.hypothesis.trim() || !form.intervention.trim()
+                    designLocked
+                      ? false
+                      : !form.hypothesis.trim() || !form.intervention.trim()
                   }
                   onPress={() => void saveExperiment()}
                 />
@@ -843,6 +1128,9 @@ export default function InsightsScreen() {
                     {item.state} · {item.experiment.baseline_start} to{" "}
                     {item.experiment.end_date} ·{" "}
                     {item.experiment.outcome_metric}
+                    {item.experiment.actual_end_at
+                      ? ` · ended ${new Date(item.experiment.actual_end_at).toLocaleString()}`
+                      : ""}
                   </Text>
                   <Text style={styles.cardBody}>
                     {item.experiment.hypothesis}
@@ -850,6 +1138,15 @@ export default function InsightsScreen() {
                   {item.state === "draft" && !pendingCreate ? (
                     <ActionButton
                       label="Edit draft"
+                      secondary
+                      onPress={() => editExperiment(item)}
+                    />
+                  ) : null}
+                  {(["active", "completed", "stopped"] as const).includes(
+                    item.state as "active" | "completed" | "stopped",
+                  ) ? (
+                    <ActionButton
+                      label="Edit notes"
                       secondary
                       onPress={() => editExperiment(item)}
                     />
@@ -895,7 +1192,9 @@ export default function InsightsScreen() {
                         }
                       />
                     ) : null}
-                    {item.state !== "archived" ? (
+                    {(["active", "completed", "stopped"] as const).includes(
+                      item.state as "active" | "completed" | "stopped",
+                    ) ? (
                       <ActionButton
                         label="View descriptive results"
                         secondary
@@ -908,6 +1207,10 @@ export default function InsightsScreen() {
                     <View style={styles.result}>
                       <Text style={styles.help}>
                         Calendar timezone: {results[item.id].timezone}
+                      </Text>
+                      <Text style={styles.help}>
+                        Planned through {item.experiment.end_date}; observed
+                        through {results[item.id].intervention.to_date}.
                       </Text>
                       <Text style={styles.cardBody}>
                         Baseline ({results[item.id].baseline.known_days} known,{" "}
@@ -938,6 +1241,14 @@ export default function InsightsScreen() {
                   ) : null}
                 </View>
               ))}
+              {experimentCursor ? (
+                <ActionButton
+                  label="Load more experiment history"
+                  secondary
+                  busy={busy}
+                  onPress={() => void loadMoreExperiments()}
+                />
+              ) : null}
             </View>
           </>
         ) : null}

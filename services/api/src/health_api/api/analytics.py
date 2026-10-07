@@ -9,15 +9,16 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Any, Literal, cast
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Path, Query, Response
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from health_api.api.dependencies import get_current_owner, get_session
 from health_api.api.errors import APIError
 from health_api.api.schemas import (
     AnalyticsAssociationCatalogResponse,
+    AnalyticsHistoryEntry,
     AnalyticsMetricCatalogResponse,
     ErrorResponse,
     ExperimentCreateRequest,
@@ -38,6 +39,7 @@ from health_api.api.schemas import (
     StoredTrendResponse,
 )
 from health_api.application.analytics_service import (
+    AnalyticsNotFound,
     ArtifactAggregate,
     StoredSignal,
     change_insight_state,
@@ -63,7 +65,7 @@ from health_api.domain.analytics import (
     TrendResult,
 )
 from health_api.domain.schemas import validate_iana_timezone
-from health_api.persistence.models import HealthObject
+from health_api.persistence.models import AnalyticsArtifact, HealthObject, HealthObjectRevision
 
 router = APIRouter(tags=["analytics"])
 
@@ -81,6 +83,46 @@ COMMON_ERRORS: dict[int | str, dict[str, Any]] = {
     },
     503: {"model": ErrorResponse, "description": "Health storage is unavailable."},
 }
+
+
+@router.get(
+    "/analytics/artifacts/{artifact_id}/history/{revision}",
+    response_model=AnalyticsHistoryEntry,
+    operation_id="getAnalyticsHistory",
+    responses=COMMON_ERRORS,
+)
+def get_analytics_history(
+    artifact_id: UUID,
+    revision: Annotated[int, Path(ge=1)],
+    owner_id: Annotated[UUID, Depends(get_current_owner)],
+    session: Annotated[Session, Depends(get_session)],
+) -> AnalyticsHistoryEntry:
+    row = session.execute(
+        select(HealthObjectRevision)
+        .join(
+            AnalyticsArtifact,
+            and_(
+                AnalyticsArtifact.owner_id == HealthObjectRevision.owner_id,
+                AnalyticsArtifact.object_id == HealthObjectRevision.object_id,
+            ),
+        )
+        .where(
+            HealthObjectRevision.owner_id == owner_id,
+            HealthObjectRevision.object_id == artifact_id,
+            HealthObjectRevision.revision == revision,
+            AnalyticsArtifact.artifact_kind.in_(
+                ("derived_signal", "insight", "recommendation", "experiment")
+            ),
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise AnalyticsNotFound
+    return AnalyticsHistoryEntry(
+        object_id=row.object_id,
+        revision=row.revision,
+        recorded_at=row.recorded_at,
+        snapshot=row.snapshot,
+    )
 
 
 def _owner_binding(owner_id: UUID) -> str:

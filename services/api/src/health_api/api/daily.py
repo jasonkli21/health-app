@@ -511,11 +511,14 @@ def get_event_history(
     session: Annotated[Session, Depends(get_session)],
     after_revision: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    revision: Annotated[int | None, Query(ge=1)] = None,
 ) -> DailyHistoryResponse:
     aggregate = get_daily_item(session, owner_id, event_id)
     if not isinstance(aggregate[1], EventItem):
         raise DailyNotFound
-    return _history_response(session, owner_id, event_id, after_revision, limit)
+    return _history_response(
+        session, owner_id, event_id, after_revision, limit, exact_revision=revision
+    )
 
 
 @router.patch(
@@ -653,11 +656,14 @@ def get_observation_history(
     session: Annotated[Session, Depends(get_session)],
     after_revision: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    revision: Annotated[int | None, Query(ge=1)] = None,
 ) -> DailyHistoryResponse:
     aggregate = get_daily_item(session, owner_id, observation_id)
     if not isinstance(aggregate[1], ObservationItem):
         raise DailyNotFound
-    return _history_response(session, owner_id, observation_id, after_revision, limit)
+    return _history_response(
+        session, owner_id, observation_id, after_revision, limit, exact_revision=revision
+    )
 
 
 @router.patch(
@@ -711,12 +717,23 @@ def _history_response(
     object_id: UUID,
     after_revision: int,
     limit: int,
+    *,
+    exact_revision: int | None = None,
 ) -> DailyHistoryResponse:
-    revisions = list_daily_history(session, owner_id, object_id, after_revision, limit + 1)
+    revisions = list_daily_history(
+        session,
+        owner_id,
+        object_id,
+        after_revision,
+        limit + 1,
+        exact_revision=exact_revision,
+    )
     has_more = len(revisions) > limit
     page = revisions[:limit]
     entries = [_entry_history(revision) for revision in page]
-    next_revision = entries[-1].revision if has_more and entries else None
+    next_revision = (
+        entries[-1].revision if has_more and entries and exact_revision is None else None
+    )
     return DailyHistoryResponse(items=entries, next_after_revision=next_revision)
 
 

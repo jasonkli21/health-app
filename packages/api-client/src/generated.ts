@@ -147,6 +147,14 @@ export interface components {
     AnalyticsAssociationCatalogResponse: {
       items: Array<components["schemas"]["AssociationPair"]>;
     };
+    AnalyticsHistoryEntry: {
+      object_id: string;
+      recorded_at: string;
+      revision: number;
+      snapshot: {
+        [key: string]: unknown;
+      };
+    };
     AnalyticsMetric:
       | "energy"
       | "exercise_duration"
@@ -477,6 +485,7 @@ export interface components {
       next_cursor: string | null;
     };
     ExperimentPayloadV1: {
+      actual_end_at?: string | null;
       baseline_start: string;
       end_date: string;
       hypothesis: string;
@@ -641,6 +650,7 @@ export interface components {
       next_cursor: string | null;
     };
     InsightPayloadV1: {
+      decision?: "dismissed" | null;
       evidence_refs: Array<components["schemas"]["InsightEvidenceReference"]>;
       expires_at: string;
       explanation: string;
@@ -1212,6 +1222,7 @@ export interface components {
     };
     RecommendationPayloadV1: {
       created_at: string;
+      decision?: "accepted" | "dismissed" | null;
       evidence_refs: Array<components["schemas"]["InsightEvidenceReference"]>;
       expected_review_context: string;
       expires_at: string;
@@ -1852,6 +1863,21 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  getAnalyticsHistory: {
+    path: {
+      artifact_id: string;
+      revision: number;
+    };
+    responses: {
+      "200": components["schemas"]["AnalyticsHistoryEntry"];
+      "401": components["schemas"]["ErrorResponse"];
+      "404": components["schemas"]["ErrorResponse"];
+      "409": components["schemas"]["ErrorResponse"];
+      "413": components["schemas"]["ErrorResponse"];
+      "422": components["schemas"]["ErrorResponse"];
+      "503": components["schemas"]["ErrorResponse"];
+    };
+  };
   getAssistantStatus: {
     responses: {
       "200": components["schemas"]["AssistantStatusResponse"];
@@ -2199,6 +2225,7 @@ export interface operations {
     query?: {
       after_revision?: number;
       limit?: number;
+      revision?: number | null;
     };
     responses: {
       "200": components["schemas"]["DailyHistoryResponse"];
@@ -2295,6 +2322,7 @@ export interface operations {
     query?: {
       after_revision?: number;
       limit?: number;
+      revision?: number | null;
     };
     responses: {
       "200": components["schemas"]["DailyHistoryResponse"];
@@ -3140,6 +3168,17 @@ export class HealthApiClient {
     return this.request<components["schemas"]["ProposalState"]>(
       "GET",
       `/action-proposals/${encodeURIComponent(path.proposal_id)}`,
+      undefined,
+      undefined,
+    );
+  }
+
+  async getAnalyticsHistory(
+    path: operations["getAnalyticsHistory"]["path"],
+  ): Promise<components["schemas"]["AnalyticsHistoryEntry"]> {
+    return this.request<components["schemas"]["AnalyticsHistoryEntry"]>(
+      "GET",
+      `/analytics/artifacts/${encodeURIComponent(path.artifact_id)}/history/${encodeURIComponent(path.revision)}`,
       undefined,
       undefined,
     );

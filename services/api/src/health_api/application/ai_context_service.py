@@ -598,6 +598,8 @@ def build_ai_context(
                 trend_start,
                 pack.today_summary_date,
                 timezone,
+                excluded_object_ids=set(request.excluded_object_ids),
+                as_of=as_of,
             )
         except AnalyticsValidationError as exc:
             raise ValueError(str(exc)) from exc

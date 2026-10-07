@@ -49,8 +49,11 @@ documents are routed only for web/shared-client work.
 
 - PostgreSQL-backed migration lifecycle, drift, query plans, ownership,
   transaction, and concurrency checks remain open across the relevant phases.
-- Phase 7 numerical goldens, revision-invalidation and race tests, query-plan
-  measurements, and device walkthrough remain open; see its release record.
+- Phase 7 now has focused snapshot, linked-severity, tracker-label, and
+  experiment-boundary regression fixtures. The complete numerical goldens,
+  AI permission/`as_of` integration coverage, PostgreSQL invalidation and race
+  tests, query-plan measurements, and device walkthrough remain open; see its
+  release record.
 - Live cloud deployment, Firebase/GCS permissions, storage/database parity,
   backup/restore, and cost checks have not been established.
 - Device review remains open for accessibility, keyboard interaction,

@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from math import fsum
 from statistics import median
-from typing import Any, Literal
+from typing import Any, Literal, cast
 from uuid import UUID, uuid5
 from zoneinfo import ZoneInfo
 
@@ -143,17 +143,17 @@ def _source(session: Session, owner_id: UUID, kind: Literal["manual", "system"])
 
 def _snapshot(obj: HealthObject, artifact: AnalyticsArtifact) -> dict[str, Any]:
     return {
-        "object_id": obj.id,
+        "object_id": str(obj.id),
         "object_type": obj.object_type,
         "domain": obj.domain,
         "status": obj.status,
         "title": obj.title,
-        "valid_from": obj.valid_from,
-        "valid_to": obj.valid_to,
-        "recorded_at": obj.recorded_at,
-        "created_at": obj.created_at,
-        "updated_at": obj.updated_at,
-        "source_id": obj.source_id,
+        "valid_from": obj.valid_from.isoformat() if obj.valid_from else None,
+        "valid_to": obj.valid_to.isoformat() if obj.valid_to else None,
+        "recorded_at": obj.recorded_at.isoformat() if obj.recorded_at else None,
+        "created_at": obj.created_at.isoformat() if obj.created_at else None,
+        "updated_at": obj.updated_at.isoformat() if obj.updated_at else None,
+        "source_id": str(obj.source_id),
         "confirmation_status": obj.confirmation_status,
         "schema_version": obj.schema_version,
         "revision": obj.revision,
@@ -334,9 +334,10 @@ def invalidate_analytics(
 ) -> None:
     """Invalidate evidence-bound outputs in the same transaction as a daily write.
 
-    A newly created row has no prior evidence edge, so callers pass ``None`` to
-    conservatively stale all current outputs for that owner. Updates and
-    archives pass changed IDs and touch only dependent snapshots.
+    A newly created row has no prior evidence edge. Updates can also introduce
+    a previously unrelated row into a saved scope, so callers use ``None`` for
+    edits and inserts. Archives may pass IDs because the old evidence edge is
+    sufficient to find every affected snapshot.
     """
     with unit_of_work(session):
         _invalidate_referenced(session, owner_id, object_ids)
@@ -370,6 +371,8 @@ def _load_inputs(
     timezone: str,
     *,
     ai_permitted_only: bool = False,
+    excluded_object_ids: set[UUID] | None = None,
+    as_of: datetime | None = None,
 ) -> tuple[list[EventInput], list[ObservationInput], dict[UUID, set[UUID]]]:
     days = (to_date - from_date).days + 1
     if from_date > to_date or days > MAX_ANALYSIS_DAYS or to_date == date.max:
@@ -385,8 +388,27 @@ def _load_inputs(
         HealthObject.owner_id == owner_id,
         HealthObject.status == "active",
     ]
+    if excluded_object_ids:
+        owner_conditions.append(HealthObject.id.not_in(excluded_object_ids))
     if ai_permitted_only:
         owner_conditions.append(HealthObject.ai_use_allowed.is_(True))
+    if as_of is not None:
+        owner_conditions.extend(
+            (
+                or_(HealthObject.valid_from.is_(None), HealthObject.valid_from <= as_of),
+                or_(HealthObject.valid_to.is_(None), HealthObject.valid_to > as_of),
+            )
+        )
+        try:
+            as_of_local_date = as_of.astimezone(ZoneInfo(timezone)).date()
+        except (OverflowError, ValueError) as exc:
+            raise AnalyticsValidationError("The selected context time is invalid.") from exc
+        event_query_end = min(end_at, as_of) if as_of < end_at else end_at
+        observation_query_end = event_query_end
+    else:
+        as_of_local_date = None
+        event_query_end = end_at
+        observation_query_end = end_at
     event_query = (
         select(HealthObject, EventItem)
         .join(
@@ -402,11 +424,11 @@ def _load_inputs(
                 and_(
                     EventItem.time_precision == "date_only",
                     EventItem.local_date >= from_date,
-                    EventItem.local_date <= to_date,
+                    EventItem.local_date <= (as_of_local_date or to_date),
                 ),
                 and_(
                     EventItem.time_precision == "instant",
-                    EventItem.occurred_at < end_at,
+                    EventItem.occurred_at < event_query_end,
                     or_(
                         and_(EventItem.ended_at.is_(None), EventItem.occurred_at >= start_at),
                         and_(EventItem.ended_at.is_not(None), EventItem.ended_at > start_at),
@@ -439,11 +461,11 @@ def _load_inputs(
                 and_(
                     ObservationItem.time_precision == "date_only",
                     ObservationItem.local_date >= from_date,
-                    ObservationItem.local_date <= to_date,
+                    ObservationItem.local_date <= (as_of_local_date or to_date),
                 ),
                 and_(
                     ObservationItem.time_precision == "instant",
-                    ObservationItem.observed_at < end_at,
+                    ObservationItem.observed_at < observation_query_end,
                     or_(
                         and_(
                             ObservationItem.interval_end.is_(None),
@@ -481,11 +503,14 @@ def _load_inputs(
                 "timezone": item.timezone,
             }
         try:
+            ended_at = item.ended_at
+            if as_of is not None and ended_at is not None and ended_at > as_of:
+                ended_at = as_of
             schema = EventSchemaV1.model_validate(
                 {
                     "domain": obj.domain,
                     "time": time_point,
-                    "ended_at": item.ended_at,
+                    "ended_at": ended_at,
                     "payload": item.payload,
                 }
             )
@@ -507,11 +532,14 @@ def _load_inputs(
                 "timezone": observation_item.timezone,
             }
         try:
+            interval_end = observation_item.interval_end
+            if as_of is not None and interval_end is not None and interval_end > as_of:
+                interval_end = as_of
             observation_schema = ObservationSchemaV1.model_validate(
                 {
                     "domain": observation_obj.domain,
                     "time": observation_time_point,
-                    "interval_end": observation_item.interval_end,
+                    "interval_end": interval_end,
                     "payload": observation_item.payload,
                 }
             )
@@ -521,13 +549,19 @@ def _load_inputs(
     links: dict[UUID, set[UUID]] = {}
     observation_ids = [obj.id for obj, _, _ in observations]
     if observation_ids:
+        event_ids = [obj.id for obj, _, _ in events]
+        link_conditions: list[Any] = [
+            EventObservationLink.owner_id == owner_id,
+            EventObservationLink.observation_object_id.in_(observation_ids),
+        ]
+        if event_ids:
+            link_conditions.append(EventObservationLink.event_object_id.in_(event_ids))
+        else:
+            return events, observations, {}
         for event_id, observation_id in session.execute(
             select(
                 EventObservationLink.event_object_id, EventObservationLink.observation_object_id
-            ).where(
-                EventObservationLink.owner_id == owner_id,
-                EventObservationLink.observation_object_id.in_(observation_ids),
-            )
+            ).where(*link_conditions)
         ).all():
             links.setdefault(event_id, set()).add(observation_id)
     return events, observations, links
@@ -587,7 +621,7 @@ def metric_definition(session: Session, owner_id: UUID, metric: str) -> MetricDe
     unit = field.unit.value if field.unit is not None else "value"
     return MetricDefinition(
         metric=metric,
-        label=f"{definition.name} · {field.label} (schema v{version})",
+        label=_tracker_metric_label(definition.name, field.label, version),
         unit=unit,
         aggregation="latest known tracker field value per local date; exact immutable schema version",
         minimum_known_days=5,
@@ -620,13 +654,22 @@ def list_metric_definitions(session: Session, owner_id: UUID) -> list[MetricDefi
             definitions.append(
                 MetricDefinition(
                     metric=metric,
-                    label=f"{definition.name} · {field.label} (schema v{schema_row.version})",
+                    label=_tracker_metric_label(definition.name, field.label, schema_row.version),
                     unit=field.unit.value if field.unit is not None else "value",
                     aggregation="latest known tracker field value per local date; exact immutable schema version",
                     minimum_known_days=5,
                 )
             )
     return definitions
+
+
+def _tracker_metric_label(name: str, field_label: str, version: int) -> str:
+    suffix = f" (schema v{version})"
+    prefix = f"{name} · {field_label}"
+    max_prefix = 80 - len(suffix)
+    if len(prefix) > max_prefix:
+        prefix = prefix[: max_prefix - 1].rstrip() + "…"
+    return prefix + suffix
 
 
 def _event_metric_rows(metric: str, events: list[EventInput]) -> list[EventInput]:
@@ -760,15 +803,48 @@ def _standard_points(
 ) -> tuple[list[DailyMetricPoint], list[EvidenceReference]]:
     relevant_events = _event_metric_rows(metric, events)
     relevant_observations = _observation_metric_rows(metric, observations)
-    refs = _evidence_refs(relevant_events, relevant_observations)
     full_events = [(obj.id, schema) for obj, _, schema in events]
     full_observations = [(obj.id, schema) for obj, _, schema in observations]
-    linked_ids = {observation_id for ids in links.values() for observation_id in ids}
+
+    def local_day(schema: EventSchemaV1 | ObservationSchemaV1) -> date:
+        time = schema.time
+        return (
+            time.local_date
+            if time.precision == "date_only"
+            else time.occurred_at.astimezone(ZoneInfo(timezone)).date()
+        )
+
+    eligible_symptom_events = {
+        object_id: local_day(schema)
+        for object_id, schema in full_events
+        if schema.domain == DailyDomain.SYMPTOMS and schema.payload.kind == "symptom"
+    }
+    observations_by_id = {object_id: schema for object_id, schema in full_observations}
+    eligible_severity_ids: set[UUID] = set()
+    for event_id, observation_ids in links.items():
+        event_day = eligible_symptom_events.get(event_id)
+        if event_day is None:
+            continue
+        for observation_id in observation_ids:
+            observation = observations_by_id.get(observation_id)
+            if (
+                observation is not None
+                and observation.payload.value.metric == MetricKey.SYMPTOM_SEVERITY
+                and local_day(observation) == event_day
+            ):
+                eligible_severity_ids.add(observation_id)
     full_observations = [
         row
         for row in full_observations
-        if row[1].payload.value.metric != MetricKey.SYMPTOM_SEVERITY or row[0] not in linked_ids
+        if row[1].payload.value.metric != MetricKey.SYMPTOM_SEVERITY
+        or row[0] in eligible_severity_ids
     ]
+    if metric == "symptom_severity":
+        eligible_ids = {object_id for object_id in eligible_severity_ids}
+        relevant_observations = [row for row in relevant_observations if row[0].id in eligible_ids]
+    elif metric == "symptom_episode_count":
+        relevant_observations = []
+    refs = _evidence_refs(relevant_events, relevant_observations)
     wanted_domain, wanted_metric = _EVENT_METRICS[metric]
     points: list[DailyMetricPoint] = []
     current = from_date
@@ -829,6 +905,8 @@ def _series(
     timezone: str,
     *,
     ai_permitted_only: bool = False,
+    excluded_object_ids: set[UUID] | None = None,
+    as_of: datetime | None = None,
 ) -> MetricSeries:
     generation = session.scalar(
         select(User.daily_sequence).where(User.id == owner_id, User.lifecycle == "active")
@@ -843,6 +921,8 @@ def _series(
         to_date,
         timezone,
         ai_permitted_only=ai_permitted_only,
+        excluded_object_ids=excluded_object_ids,
+        as_of=as_of,
     )
     return _series_from_inputs(
         metric,
@@ -1047,11 +1127,16 @@ def compute_ai_trend_preview(
     from_date: date,
     to_date: date,
     timezone: str,
-) -> TrendResult:
+    *,
+    excluded_object_ids: set[UUID] | None = None,
+    as_of: datetime | None = None,
+) -> TrendResult | None:
     """Compute one preview from explicitly AI-permitted daily inputs only."""
     tracker_parts = _tracker_metric_parts(metric)
     if tracker_parts is not None:
         tracker_id, _, _ = tracker_parts
+        if excluded_object_ids and tracker_id in excluded_object_ids:
+            return None
         tracker = session.execute(
             select(HealthObject, PlanningResource)
             .join(
@@ -1069,6 +1154,14 @@ def compute_ai_trend_preview(
                 HealthObject.ai_use_allowed.is_(True),
                 PlanningResource.resource_kind == "tracker_definition",
                 PlanningResource.lifecycle == "active",
+                *(
+                    (
+                        or_(HealthObject.valid_from.is_(None), HealthObject.valid_from <= as_of),
+                        or_(HealthObject.valid_to.is_(None), HealthObject.valid_to > as_of),
+                    )
+                    if as_of is not None
+                    else ()
+                ),
             )
         ).one_or_none()
         if tracker is None:
@@ -1083,6 +1176,8 @@ def compute_ai_trend_preview(
         to_date,
         timezone,
         ai_permitted_only=True,
+        excluded_object_ids=excluded_object_ids,
+        as_of=as_of,
     )
     if len(refs) > 100:
         raise AnalyticsValidationError(
@@ -1210,35 +1305,81 @@ def _persist_object_artifact(
     payload: dict[str, Any],
     state: str,
     dedupe_key: str | None,
+    scope_key: str | None = None,
     evidence_refs: list[InsightEvidenceReference] | None = None,
     validity: tuple[datetime | None, datetime | None] = (None, None),
 ) -> ArtifactAggregate:
     _lock_owner(session, owner_id)
     _validate_evidence_current(session, owner_id, evidence_refs or [])
+    if artifact_kind in ("insight", "recommendation"):
+        signal_ref = next(
+            (ref for ref in evidence_refs or [] if ref.object_type == "derived_signal"),
+            None,
+        )
+        if signal_ref is not None:
+            prior_decision = _prior_artifact_decision(
+                session, owner_id, artifact_kind, signal_ref.object_id
+            )
+            if prior_decision is not None:
+                payload = {**payload, "state": prior_decision, "decision": prior_decision}
+                state = prior_decision
     fingerprint = _sha256(
         {"artifact_kind": artifact_kind, "payload": payload, "dedupe_key": dedupe_key}
     )
     existing = (
         session.scalar(
-            select(AnalyticsArtifact).where(
+            select(AnalyticsArtifact)
+            .where(
                 AnalyticsArtifact.owner_id == owner_id,
                 AnalyticsArtifact.artifact_kind == artifact_kind,
                 AnalyticsArtifact.dedupe_key == dedupe_key,
             )
+            .execution_options(populate_existing=True)
+            .with_for_update()
         )
         if dedupe_key is not None
         else None
     )
     if existing is not None:
         obj = session.scalar(
-            select(HealthObject).where(
-                HealthObject.owner_id == owner_id, HealthObject.id == existing.object_id
-            )
+            select(HealthObject)
+            .where(HealthObject.owner_id == owner_id, HealthObject.id == existing.object_id)
+            .execution_options(populate_existing=True)
         )
         if obj is None:
             raise RuntimeError("analytics artifact has no canonical object")
-        if existing.state == "stale" and state in ("current", "proposed"):
-            _set_artifact_state(session, owner_id, obj, existing, state)
+        existing_payload = existing.payload
+        decision = existing_payload.get("decision")
+        if decision in ("accepted", "dismissed") or existing.state in (
+            "accepted",
+            "dismissed",
+        ):
+            return obj, existing
+        if prior_decision is not None:
+            existing.payload = {
+                **payload,
+                "state": prior_decision,
+                "decision": prior_decision,
+            }
+            existing.state = prior_decision
+            obj.title = title[:120]
+            obj.valid_from, obj.valid_to = validity
+            obj.revision += 1
+            obj.updated_at = datetime.now(UTC)
+            session.flush()
+            _append_revision(session, owner_id, obj, existing, "update")
+            session.flush()
+            return obj, existing
+        if existing.state in ("stale", "expired") and state in ("current", "proposed"):
+            existing.payload = {**payload, "state": state}
+            existing.state = state
+            existing.scope_key = scope_key
+            obj.valid_from, obj.valid_to = validity
+            obj.revision += 1
+            obj.updated_at = datetime.now(UTC)
+            session.flush()
+            _append_revision(session, owner_id, obj, existing, "update")
+            session.flush()
         return obj, existing
     if artifact_kind == "experiment":
         existing_obj = session.scalar(
@@ -1280,7 +1421,7 @@ def _persist_object_artifact(
         object_id=object_id,
         artifact_kind=artifact_kind,
         state=state,
-        scope_key=None,
+        scope_key=scope_key,
         dedupe_key=dedupe_key,
         payload=payload if artifact_kind == "experiment" else {**payload, "state": state},
     )
@@ -1302,6 +1443,61 @@ def _persist_object_artifact(
         )
     session.flush()
     return obj, artifact
+
+
+def _prior_artifact_decision(
+    session: Session,
+    owner_id: UUID,
+    kind: Literal["insight", "recommendation"],
+    signal_id: UUID,
+) -> Literal["accepted", "dismissed"] | None:
+    artifacts = session.scalars(
+        select(AnalyticsArtifact)
+        .join(
+            AnalyticsEvidence,
+            and_(
+                AnalyticsEvidence.owner_id == AnalyticsArtifact.owner_id,
+                AnalyticsEvidence.artifact_object_id == AnalyticsArtifact.object_id,
+            ),
+        )
+        .join(
+            HealthObject,
+            and_(
+                HealthObject.owner_id == AnalyticsArtifact.owner_id,
+                HealthObject.id == AnalyticsArtifact.object_id,
+            ),
+        )
+        .where(
+            AnalyticsArtifact.owner_id == owner_id,
+            AnalyticsArtifact.artifact_kind == kind,
+            AnalyticsEvidence.evidence_object_id == signal_id,
+            AnalyticsEvidence.evidence_object_type == "derived_signal",
+        )
+        .order_by(HealthObject.updated_at.desc(), HealthObject.id.desc())
+        .execution_options(populate_existing=True)
+    ).all()
+    for artifact in artifacts:
+        payload = artifact.payload
+        decision = payload.get("decision")
+        if decision == "accepted" or decision == "dismissed":
+            return cast(Literal["accepted", "dismissed"], decision)
+        if artifact.state in ("accepted", "dismissed"):
+            return cast(Literal["accepted", "dismissed"], artifact.state)
+        historical_states: list[dict[str, Any]] = list(
+            session.scalars(
+                select(HealthObjectRevision.snapshot)
+                .where(
+                    HealthObjectRevision.owner_id == owner_id,
+                    HealthObjectRevision.object_id == artifact.object_id,
+                )
+                .order_by(HealthObjectRevision.revision.desc())
+            ).all()
+        )
+        for snapshot in historical_states:
+            prior_state = snapshot.get("state")
+            if prior_state in ("accepted", "dismissed"):
+                return prior_state
+    return None
 
 
 def create_insight_from_signal(
@@ -1367,7 +1563,13 @@ def create_insight_from_signal(
             for ref in source_refs
         ],
     ]
-    dedupe_key = _sha256({"template": INSIGHT_TEMPLATE_VERSION, "signal_id": str(signal.obj.id)})
+    dedupe_key = _sha256(
+        {
+            "template": INSIGHT_TEMPLATE_VERSION,
+            "signal_id": str(signal.obj.id),
+            "signal_revision": signal.obj.revision,
+        }
+    )
     object_id = uuid5(owner_id, f"health-analytics:insight:{dedupe_key}")
     payload_model = InsightPayloadV1(
         title=title,
@@ -1422,7 +1624,13 @@ def create_coverage_recommendation_from_signal(
             for ref in trend.evidence_refs
         ],
     ]
-    dedupe_key = _sha256({"suggestion": "coverage-v1", "signal_id": str(signal.obj.id)})
+    dedupe_key = _sha256(
+        {
+            "suggestion": "coverage-v1",
+            "signal_id": str(signal.obj.id),
+            "signal_revision": signal.obj.revision,
+        }
+    )
     object_id = uuid5(owner_id, f"health-analytics:recommendation:{dedupe_key}")
     expires_at = now + timedelta(days=7)
     payload_model = RecommendationPayloadV1(
@@ -1582,30 +1790,58 @@ def list_artifacts(
         AnalyticsArtifact.artifact_kind == kind,
         HealthObject.status == "active",
     ]
-    if state is not None:
-        conditions.append(AnalyticsArtifact.state == state)
-    if after is not None:
-        after_created, after_id = after
-        conditions.append(
-            or_(
-                HealthObject.created_at < after_created,
-                and_(HealthObject.created_at == after_created, HealthObject.id < after_id),
+    now = datetime.now(UTC)
+    cursor = after
+    matched: list[ArtifactAggregate] = []
+    while len(matched) < limit:
+        batch_conditions = list(conditions)
+        if cursor is not None:
+            after_created, after_id = cursor
+            batch_conditions.append(
+                or_(
+                    HealthObject.created_at < after_created,
+                    and_(HealthObject.created_at == after_created, HealthObject.id < after_id),
+                )
             )
+        rows = list(
+            session.execute(
+                select(HealthObject, AnalyticsArtifact)
+                .join(
+                    AnalyticsArtifact,
+                    and_(
+                        AnalyticsArtifact.owner_id == HealthObject.owner_id,
+                        AnalyticsArtifact.object_id == HealthObject.id,
+                    ),
+                )
+                .where(*batch_conditions)
+                .order_by(HealthObject.created_at.desc(), HealthObject.id.desc())
+                .limit(max(limit, 50))
+            ).all()
         )
-    rows = session.execute(
-        select(HealthObject, AnalyticsArtifact)
-        .join(
-            AnalyticsArtifact,
-            and_(
-                AnalyticsArtifact.owner_id == HealthObject.owner_id,
-                AnalyticsArtifact.object_id == HealthObject.id,
-            ),
-        )
-        .where(*conditions)
-        .order_by(HealthObject.created_at.desc(), HealthObject.id.desc())
-        .limit(limit)
-    ).all()
-    return list(rows)
+        if not rows:
+            break
+        for obj, artifact in rows:
+            cursor = (obj.created_at, obj.id)
+            effective_state = artifact.state
+            if artifact.artifact_kind == "insight":
+                expiry = InsightPayloadV1.model_validate(artifact.payload).expires_at
+            elif artifact.artifact_kind == "recommendation":
+                expiry = RecommendationPayloadV1.model_validate(artifact.payload).expires_at
+            else:
+                expiry = None
+            if (
+                expiry is not None
+                and expiry <= now
+                and artifact.state not in ("expired", "dismissed", "stale")
+            ):
+                effective_state = "expired"
+            if state is None or effective_state == state:
+                matched.append((obj, artifact))
+                if len(matched) == limit:
+                    break
+        if len(rows) < max(limit, 50):
+            break
+    return matched
 
 
 def _update_artifact(
@@ -1625,16 +1861,49 @@ def _update_artifact(
         obj = session.scalar(
             select(HealthObject)
             .where(HealthObject.owner_id == owner_id, HealthObject.id == object_id)
+            .execution_options(populate_existing=True)
             .with_for_update()
         )
-        artifact = session.get(AnalyticsArtifact, (owner_id, object_id))
+        artifact = session.scalar(
+            select(AnalyticsArtifact)
+            .where(
+                AnalyticsArtifact.owner_id == owner_id,
+                AnalyticsArtifact.object_id == object_id,
+            )
+            .execution_options(populate_existing=True)
+            .with_for_update()
+        )
         if obj is None or artifact is None or artifact.artifact_kind != kind:
             raise AnalyticsNotFound
         if obj.revision != expected_revision:
             raise AnalyticsConflict("The analytics item changed. Reload it before saving.")
-        if kind == "experiment" and artifact.state == "draft" and state == "active":
+        if kind == "experiment" and artifact.state == "draft":
             experiment_payload = ExperimentPayloadV1.model_validate(payload)
-            _validate_experiment_start(session, owner_id, experiment_payload)
+            metric_definition(session, owner_id, experiment_payload.outcome_metric)
+            if state == "active":
+                _validate_experiment_start(session, owner_id, experiment_payload)
+            else:
+                _validate_experiment_reference(session, owner_id, experiment_payload)
+        if (
+            kind == "experiment"
+            and artifact.state == "active"
+            and state
+            in (
+                "completed",
+                "stopped",
+            )
+        ):
+            experiment_payload = ExperimentPayloadV1.model_validate(payload)
+            _, timezone = owner_today_settings(session, owner_id)
+            today = datetime.now(ZoneInfo(timezone)).date()
+            if today < experiment_payload.start_date:
+                raise AnalyticsValidationError(
+                    "An experiment cannot stop before its planned intervention starts."
+                )
+            actual_end = datetime.now(UTC)
+            payload = experiment_payload.model_copy(
+                update={"actual_end_at": actual_end}
+            ).model_dump(mode="json")
         if kind in ("insight", "recommendation") and artifact.state in (
             "expired",
             "stale",
@@ -1684,7 +1953,7 @@ def change_insight_state(
         object_id,
         "insight",
         expected_revision,
-        payload.model_copy(update={"state": state}).model_dump(mode="json"),
+        payload.model_copy(update={"state": state, "decision": state}).model_dump(mode="json"),
         state,
     )
 
@@ -1717,7 +1986,7 @@ def change_recommendation_state(
         object_id,
         "recommendation",
         expected_revision,
-        payload.model_copy(update={"state": state}).model_dump(mode="json"),
+        payload.model_copy(update={"state": state, "decision": state}).model_dump(mode="json"),
         state,
     )
 
@@ -1727,10 +1996,11 @@ def create_experiment(
 ) -> ArtifactAggregate:
     if payload.status != "draft":
         raise AnalyticsValidationError("New experiments must begin as drafts.")
-    metric_definition(session, owner_id, payload.outcome_metric)
-    _validate_experiment_reference(session, owner_id, payload)
     session.commit()
     with unit_of_work(session):
+        _lock_owner(session, owner_id)
+        metric_definition(session, owner_id, payload.outcome_metric)
+        _validate_experiment_reference(session, owner_id, payload)
         return _persist_object_artifact(
             session,
             owner_id,
@@ -1750,20 +2020,26 @@ def _validate_experiment_reference(
         return
     reference = payload.linked_resource
     obj = session.scalar(
-        select(HealthObject).where(
+        select(HealthObject)
+        .where(
             HealthObject.owner_id == owner_id,
             HealthObject.id == reference.object_id,
             HealthObject.status == "active",
             HealthObject.object_type == reference.object_type,
             HealthObject.revision == reference.revision,
         )
+        .execution_options(populate_existing=True)
+        .with_for_update()
     )
     resource = session.scalar(
-        select(PlanningResource).where(
+        select(PlanningResource)
+        .where(
             PlanningResource.owner_id == owner_id,
             PlanningResource.object_id == reference.object_id,
             PlanningResource.resource_kind == reference.object_type,
         )
+        .execution_options(populate_existing=True)
+        .with_for_update()
     )
     if obj is None or resource is None or resource.lifecycle != "active":
         raise AnalyticsValidationError("The linked planning item is missing, archived, or changed.")
@@ -1793,6 +2069,8 @@ def _validate_experiment_start(
                 PlanningResource.resource_kind == "tracker_definition",
                 PlanningResource.lifecycle == "active",
             )
+            .execution_options(populate_existing=True)
+            .with_for_update()
         ).one_or_none()
         if active_tracker is None:
             raise AnalyticsValidationError(
@@ -1800,6 +2078,11 @@ def _validate_experiment_start(
             )
     metric_definition(session, owner_id, payload.outcome_metric)
     _, timezone = owner_today_settings(session, owner_id)
+    today = datetime.now(ZoneInfo(timezone)).date()
+    if today < payload.start_date or today > payload.end_date:
+        raise AnalyticsValidationError(
+            "An experiment can start only during its planned intervention dates."
+        )
     _, baseline_points, _, _ = _series(
         session,
         owner_id,
@@ -1835,12 +2118,10 @@ def update_experiment(
             "baseline_start",
             "start_date",
             "end_date",
+            "actual_end_at",
         ):
             candidate[immutable] = original[immutable]
     payload = ExperimentPayloadV1.model_validate(candidate)
-    metric_definition(session, owner_id, payload.outcome_metric)
-    if current.status == "draft":
-        _validate_experiment_reference(session, owner_id, payload)
     return _update_artifact(
         session,
         owner_id,
@@ -1891,19 +2172,26 @@ def experiment_result(
     aggregate = _artifact_aggregate(session, owner_id, object_id, "experiment")
     _, artifact = aggregate
     payload = ExperimentPayloadV1.model_validate(artifact.payload)
+    if payload.status == "draft":
+        raise AnalyticsValidationError("Start the experiment before viewing its results.")
+    as_of = payload.actual_end_at or datetime.now(UTC)
+    observed_end = min(payload.end_date, as_of.astimezone(ZoneInfo(timezone)).date())
+    if observed_end < payload.start_date:
+        observed_end = payload.start_date - timedelta(days=1)
     definition, points, refs, _ = _series(
         session,
         owner_id,
         payload.outcome_metric,
         payload.baseline_start,
-        payload.end_date,
+        observed_end,
         timezone,
+        as_of=as_of,
     )
     baseline_points = [
         point for point in points if payload.baseline_start <= point.date < payload.start_date
     ]
     intervention_points = [
-        point for point in points if payload.start_date <= point.date <= payload.end_date
+        point for point in points if payload.start_date <= point.date <= observed_end
     ]
 
     def summarize_period(
@@ -1922,7 +2210,7 @@ def experiment_result(
 
     baseline = summarize_period(baseline_points, payload.baseline_start, payload.start_date)
     intervention = summarize_period(
-        intervention_points, payload.start_date, payload.end_date + timedelta(days=1)
+        intervention_points, payload.start_date, observed_end + timedelta(days=1)
     )
     difference = (
         intervention.mean - baseline.mean
@@ -1957,9 +2245,18 @@ def expire_artifact_for_response(
             locked = session.scalar(
                 select(HealthObject)
                 .where(HealthObject.owner_id == owner_id, HealthObject.id == obj.id)
+                .execution_options(populate_existing=True)
                 .with_for_update()
             )
-            current = session.get(AnalyticsArtifact, (owner_id, obj.id))
+            current = session.scalar(
+                select(AnalyticsArtifact)
+                .where(
+                    AnalyticsArtifact.owner_id == owner_id,
+                    AnalyticsArtifact.object_id == obj.id,
+                )
+                .execution_options(populate_existing=True)
+                .with_for_update()
+            )
             if locked is None or current is None:
                 raise AnalyticsNotFound
             if current.state in ("expired", "dismissed", "stale"):

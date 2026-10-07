@@ -28,7 +28,11 @@ function snapshot(entry: HistoryEntry): DailyItem {
 
 export default function DailyHistoryScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ itemId: string; type?: string }>();
+  const params = useLocalSearchParams<{
+    itemId: string;
+    type?: string;
+    revision?: string;
+  }>();
   const type = selectedType(params.type);
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [nextRevision, setNextRevision] = useState<number | null>(null);
@@ -37,7 +41,8 @@ export default function DailyHistoryScreen() {
   const [error, setError] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
   const requestScope = useRef(new RequestScope());
-  const scopeKey = `history:${type}:${params.itemId}:${refresh}`;
+  const targetRevision = params.revision ? Number(params.revision) : undefined;
+  const scopeKey = `history:${type}:${params.itemId}:${targetRevision ?? "all"}:${refresh}`;
 
   useFocusEffect(
     useCallback(() => {
@@ -53,11 +58,15 @@ export default function DailyHistoryScreen() {
             type === "event"
               ? await dailyApi.listEventHistory(
                   { event_id: params.itemId },
-                  { limit: 50 },
+                  targetRevision
+                    ? { revision: targetRevision, limit: 1 }
+                    : { limit: 50 },
                 )
               : await dailyApi.listObservationHistory(
                   { observation_id: params.itemId },
-                  { limit: 50 },
+                  targetRevision
+                    ? { revision: targetRevision, limit: 1 }
+                    : { limit: 50 },
                 );
           if (!requestScope.current.isCurrent(scope)) return;
           setEntries(result.items);
@@ -70,7 +79,7 @@ export default function DailyHistoryScreen() {
         }
       })();
       return () => requestScope.current.invalidate(scope);
-    }, [params.itemId, scopeKey, type]),
+    }, [params.itemId, scopeKey, targetRevision, type]),
   );
 
   async function loadMore() {
@@ -116,8 +125,16 @@ export default function DailyHistoryScreen() {
           onPress={() => router.back()}
         />
         <Text accessibilityRole="header" style={styles.title}>
-          Entry history
+          {targetRevision
+            ? `Evidence snapshot · revision ${targetRevision}`
+            : "Entry history"}
         </Text>
+        {targetRevision ? (
+          <Text style={styles.hint}>
+            This is the exact saved revision cited by the analysis. Current
+            edits are shown separately on the entry screen.
+          </Text>
+        ) : null}
         {error && !loading ? (
           <View>
             <StatusMessage
@@ -141,6 +158,7 @@ export default function DailyHistoryScreen() {
             <View key={entry.revision} style={styles.card}>
               <Text style={styles.revision}>
                 Revision {entry.revision} · {entry.reason}
+                {entry.revision === targetRevision ? " · cited evidence" : ""}
               </Text>
               <Text style={styles.itemTitle}>{itemTitle(item)}</Text>
               <Text style={styles.body}>{itemValue(item)}</Text>

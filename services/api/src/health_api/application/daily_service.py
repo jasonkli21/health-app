@@ -979,7 +979,8 @@ def update_daily_item(
                     proposal_id,
                 )
             session.flush()
-            invalidate_analytics(session, owner_id, object_ids={object_id})
+            # An edit can move an existing row into a scope that never cited it.
+            invalidate_analytics(session, owner_id)
             return _daily_aggregate(session, owner_id, object_id)
     except IntegrityError as exc:
         session.rollback()
@@ -1042,6 +1043,8 @@ def list_daily_history(
     object_id: UUID,
     after_revision: int,
     limit: int,
+    *,
+    exact_revision: int | None = None,
 ) -> list[HealthObjectRevision]:
     exists = session.scalar(
         select(HealthObject.id).where(
@@ -1052,15 +1055,20 @@ def list_daily_history(
     )
     if exists is None:
         raise DailyNotFound
+    revision_condition = (
+        HealthObjectRevision.revision == exact_revision
+        if exact_revision is not None
+        else HealthObjectRevision.revision > after_revision
+    )
     return list(
         session.scalars(
             select(HealthObjectRevision)
             .where(
                 HealthObjectRevision.owner_id == owner_id,
                 HealthObjectRevision.object_id == object_id,
-                HealthObjectRevision.revision > after_revision,
+                revision_condition,
             )
             .order_by(HealthObjectRevision.revision)
-            .limit(limit)
+            .limit(1 if exact_revision is not None else limit)
         )
     )

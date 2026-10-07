@@ -92,7 +92,7 @@ METRIC_CATALOG: dict[AnalyticsMetric, MetricDefinition] = {
         metric=AnalyticsMetric.SYMPTOM_SEVERITY,
         label="Latest reported symptom severity",
         unit="score",
-        aggregation="latest known linked or standalone severity per local date",
+        aggregation="latest known same-day linked severity per eligible symptom episode",
         minimum_known_days=5,
     ),
     AnalyticsMetric.SYMPTOM_EPISODE_COUNT: MetricDefinition(
@@ -278,6 +278,7 @@ class InsightPayloadV1(StrictModel):
     valid_from: datetime
     expires_at: datetime
     state: Literal["current", "stale", "dismissed", "expired"]
+    decision: Literal["dismissed"] | None = None
 
     @model_validator(mode="after")
     def validity_is_bounded(self) -> InsightPayloadV1:
@@ -306,6 +307,7 @@ class RecommendationPayloadV1(StrictModel):
     created_at: datetime
     expires_at: datetime
     state: Literal["proposed", "accepted", "dismissed", "expired", "stale"]
+    decision: Literal["accepted", "dismissed"] | None = None
     proposal_id: None = None
 
     @model_validator(mode="after")
@@ -336,6 +338,7 @@ class ExperimentPayloadV1(StrictModel):
     baseline_start: date
     start_date: date
     end_date: date
+    actual_end_at: datetime | None = None
     status: Literal["draft", "active", "completed", "stopped", "archived"] = "draft"
     notes: Annotated[StrictStr, Field(max_length=2000)] = ""
 
@@ -345,6 +348,12 @@ class ExperimentPayloadV1(StrictModel):
             raise ValueError("experiment baseline and intervention dates must be ordered")
         if (self.end_date - self.baseline_start).days + 1 > MAX_ANALYSIS_DAYS:
             raise ValueError("experiment window cannot exceed 366 days")
+        if self.actual_end_at is not None and (
+            self.actual_end_at.tzinfo is None
+            or self.actual_end_at.utcoffset() is None
+            or self.status not in ("completed", "stopped", "archived")
+        ):
+            raise ValueError("actual experiment end must be an aware terminal boundary")
         return self
 
 

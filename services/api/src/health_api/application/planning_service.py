@@ -43,6 +43,7 @@ from health_api.persistence.models import (
     PlanningScheduleIdentity,
     Source,
     TrackerSchemaVersion,
+    User,
 )
 
 PlanningKind = Literal["goal", "regimen", "plan", "context", "tracker_definition"]
@@ -65,6 +66,11 @@ _ACTIVE_LIFECYCLES = {
     "context": "active",
     "tracker_definition": "active",
 }
+
+
+def _lock_planning_owner(session: Session, owner_id: UUID) -> None:
+    if session.scalar(select(User.id).where(User.id == owner_id).with_for_update()) is None:
+        raise PlanningNotFound
 
 
 def _domain_for_payload(kind: str, payload: PlanningPayload) -> str:
@@ -494,6 +500,7 @@ def update_planning_resource(
 ) -> PlanningAggregate:
     payload = _payload(kind, input_payload)
     with unit_of_work(session):
+        _lock_planning_owner(session, owner_id)
         obj = session.scalar(
             select(HealthObject)
             .where(HealthObject.owner_id == owner_id, HealthObject.id == object_id)
@@ -593,6 +600,7 @@ def transition_planning_resource(
     lifecycle: str,
 ) -> PlanningAggregate:
     with session.begin():
+        _lock_planning_owner(session, owner_id)
         obj = session.scalar(
             select(HealthObject)
             .where(HealthObject.owner_id == owner_id, HealthObject.id == object_id)
@@ -638,6 +646,7 @@ def archive_planning_resource(
     session: Session, owner_id: UUID, object_id: UUID, kind: PlanningKind, expected_revision: int
 ) -> PlanningAggregate:
     with session.begin():
+        _lock_planning_owner(session, owner_id)
         obj = session.scalar(
             select(HealthObject)
             .where(HealthObject.owner_id == owner_id, HealthObject.id == object_id)
@@ -687,6 +696,7 @@ def reorder_plan_items(
     item_ids: list[UUID],
 ) -> PlanningAggregate:
     with session.begin():
+        _lock_planning_owner(session, owner_id)
         obj = session.scalar(
             select(HealthObject)
             .where(HealthObject.owner_id == owner_id, HealthObject.id == plan_id)

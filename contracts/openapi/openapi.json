@@ -203,7 +203,11 @@
           },
           "sections": {
             "items": {
-              "enum": ["entries", "today_summaries", "trends"],
+              "enum": [
+                "entries",
+                "today_summaries",
+                "trends"
+              ],
               "type": "string"
             },
             "title": "Sections",
@@ -358,7 +362,11 @@
           },
           "sections": {
             "items": {
-              "enum": ["entries", "today_summaries", "trends"],
+              "enum": [
+                "entries",
+                "today_summaries",
+                "trends"
+              ],
               "type": "string"
             },
             "maxItems": 3,
@@ -409,7 +417,10 @@
             "title": "Trend Metric"
           }
         },
-        "required": ["task", "resource_types"],
+        "required": [
+          "task",
+          "resource_types"
+        ],
         "title": "AIContextRequest",
         "type": "object"
       },
@@ -460,7 +471,10 @@
             "title": "Title"
           }
         },
-        "required": ["object_id", "revision"],
+        "required": [
+          "object_id",
+          "revision"
+        ],
         "title": "AIEvidenceReference",
         "type": "object"
       },
@@ -487,7 +501,10 @@
             "title": "Next Cursor"
           }
         },
-        "required": ["items", "next_cursor"],
+        "required": [
+          "items",
+          "next_cursor"
+        ],
         "title": "AISearchResponse",
         "type": "object"
       },
@@ -582,7 +599,10 @@
           "time_precision": {
             "anyOf": [
               {
-                "enum": ["instant", "date_only"],
+                "enum": [
+                  "instant",
+                  "date_only"
+                ],
                 "type": "string"
               },
               {
@@ -659,8 +679,43 @@
             "type": "array"
           }
         },
-        "required": ["items"],
+        "required": [
+          "items"
+        ],
         "title": "AnalyticsAssociationCatalogResponse",
+        "type": "object"
+      },
+      "AnalyticsHistoryEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "object_id": {
+            "format": "uuid",
+            "title": "Object Id",
+            "type": "string"
+          },
+          "recorded_at": {
+            "format": "date-time",
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "snapshot": {
+            "additionalProperties": true,
+            "title": "Snapshot",
+            "type": "object"
+          }
+        },
+        "required": [
+          "object_id",
+          "revision",
+          "recorded_at",
+          "snapshot"
+        ],
+        "title": "AnalyticsHistoryEntry",
         "type": "object"
       },
       "AnalyticsMetric": {
@@ -691,7 +746,9 @@
             "type": "array"
           }
         },
-        "required": ["items"],
+        "required": [
+          "items"
+        ],
         "title": "AnalyticsMetricCatalogResponse",
         "type": "object"
       },
@@ -708,7 +765,10 @@
             "$ref": "#/components/schemas/AIContextRequest"
           }
         },
-        "required": ["message", "scope"],
+        "required": [
+          "message",
+          "scope"
+        ],
         "title": "AssistantMessageRequest",
         "type": "object"
       },
@@ -773,7 +833,10 @@
         "additionalProperties": false,
         "properties": {
           "adapter_status": {
-            "enum": ["disabled", "ready"],
+            "enum": [
+              "disabled",
+              "ready"
+            ],
             "title": "Adapter Status",
             "type": "string"
           },
@@ -833,7 +896,11 @@
             "$ref": "#/components/schemas/AnalyticsMetric"
           }
         },
-        "required": ["id", "first", "second"],
+        "required": [
+          "id",
+          "first",
+          "second"
+        ],
         "title": "AssociationPair",
         "type": "object"
       },
@@ -895,7 +962,11 @@
             "title": "Rho"
           },
           "status": {
-            "enum": ["available", "insufficient_data", "constant_series"],
+            "enum": [
+              "available",
+              "insufficient_data",
+              "constant_series"
+            ],
             "title": "Status",
             "type": "string"
           },
@@ -940,12 +1011,18 @@
             "type": "boolean"
           }
         },
-        "required": ["type", "value"],
+        "required": [
+          "type",
+          "value"
+        ],
         "title": "BooleanValue",
         "type": "object"
       },
       "ConfirmationStatus": {
-        "enum": ["unconfirmed", "user_confirmed"],
+        "enum": [
+          "unconfirmed",
+          "user_confirmed"
+        ],
         "title": "ConfirmationStatus",
         "type": "string"
       },
@@ -983,12 +1060,18 @@
             "title": "Notes"
           }
         },
-        "required": ["id", "context"],
+        "required": [
+          "id",
+          "context"
+        ],
         "title": "ContextCreateRequest",
         "type": "object"
       },
       "ContextLifecycle": {
-        "enum": ["active", "ended"],
+        "enum": [
+          "active",
+          "ended"
+        ],
         "title": "ContextLifecycle",
         "type": "string"
       },
@@ -1056,7 +1139,10 @@
             "title": "Start At"
           }
         },
-        "required": ["label", "context_type"],
+        "required": [
+          "label",
+          "context_type"
+        ],
         "title": "ContextPayloadV1",
         "type": "object"
       },
@@ -1083,7 +1169,9 @@
             "type": "string"
           }
         },
-        "required": ["object_id"],
+        "required": [
+          "object_id"
+        ],
         "title": "ContextRelation",
         "type": "object"
       },
@@ -1158,7 +1246,10 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": ["active", "archived"],
+            "enum": [
+              "active",
+              "archived"
+            ],
             "title": "Status",
             "type": "string"
           },
@@ -1223,7 +1314,13 @@
         "type": "object"
       },
       "ContextType": {
-        "enum": ["travel", "illness", "recovery", "schedule_change", "other"],
+        "enum": [
+          "travel",
+          "illness",
+          "recovery",
+          "schedule_change",
+          "other"
+        ],
         "title": "ContextType",
         "type": "string"
       },
@@ -1261,7 +1358,10 @@
             "type": "integer"
           }
         },
-        "required": ["expected_revision", "context"],
+        "required": [
+          "expected_revision",
+          "context"
+        ],
         "title": "ContextUpdateRequest",
         "type": "object"
       },
@@ -1279,7 +1379,10 @@
             "type": "integer"
           }
         },
-        "required": ["known_count", "total_count"],
+        "required": [
+          "known_count",
+          "total_count"
+        ],
         "title": "CoverageV1",
         "type": "object"
       },
@@ -1314,12 +1417,23 @@
             "type": "object"
           }
         },
-        "required": ["metric", "tracker_id", "schema_version", "values"],
+        "required": [
+          "metric",
+          "tracker_id",
+          "schema_version",
+          "values"
+        ],
         "title": "CustomTrackerValueV1",
         "type": "object"
       },
       "DailyDomain": {
-        "enum": ["nutrition", "exercise", "sleep", "symptoms", "measurements"],
+        "enum": [
+          "nutrition",
+          "exercise",
+          "sleep",
+          "symptoms",
+          "measurements"
+        ],
         "title": "DailyDomain",
         "type": "string"
       },
@@ -1376,7 +1490,11 @@
             "type": "array"
           }
         },
-        "required": ["events", "observations", "created"],
+        "required": [
+          "events",
+          "observations",
+          "created"
+        ],
         "title": "DailyEntryCreateResponse",
         "type": "object"
       },
@@ -1397,7 +1515,10 @@
             "type": "string"
           }
         },
-        "required": ["id", "event"],
+        "required": [
+          "id",
+          "event"
+        ],
         "title": "DailyEventCreateRequest",
         "type": "object"
       },
@@ -1423,7 +1544,10 @@
             "title": "Next Cursor"
           }
         },
-        "required": ["items", "next_cursor"],
+        "required": [
+          "items",
+          "next_cursor"
+        ],
         "title": "DailyEventListResponse",
         "type": "object"
       },
@@ -1499,7 +1623,10 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": ["active", "archived"],
+            "enum": [
+              "active",
+              "archived"
+            ],
             "title": "Status",
             "type": "string"
           },
@@ -1579,7 +1706,10 @@
             "type": "integer"
           }
         },
-        "required": ["expected_revision", "event"],
+        "required": [
+          "expected_revision",
+          "event"
+        ],
         "title": "DailyEventUpdateRequest",
         "type": "object"
       },
@@ -1604,7 +1734,11 @@
             "title": "Proposal Id"
           },
           "reason": {
-            "enum": ["create", "update", "archive"],
+            "enum": [
+              "create",
+              "update",
+              "archive"
+            ],
             "title": "Reason",
             "type": "string"
           },
@@ -1669,7 +1803,10 @@
             "title": "Next After Revision"
           }
         },
-        "required": ["items", "next_after_revision"],
+        "required": [
+          "items",
+          "next_after_revision"
+        ],
         "title": "DailyHistoryResponse",
         "type": "object"
       },
@@ -1693,7 +1830,10 @@
             "type": "string"
           }
         },
-        "required": ["event_id", "observation_id"],
+        "required": [
+          "event_id",
+          "observation_id"
+        ],
         "title": "DailyLinkRequest",
         "type": "object"
       },
@@ -1764,7 +1904,10 @@
             "$ref": "#/components/schemas/ObservationSchemaV1"
           }
         },
-        "required": ["id", "observation"],
+        "required": [
+          "id",
+          "observation"
+        ],
         "title": "DailyObservationCreateRequest",
         "type": "object"
       },
@@ -1790,7 +1933,10 @@
             "title": "Next Cursor"
           }
         },
-        "required": ["items", "next_cursor"],
+        "required": [
+          "items",
+          "next_cursor"
+        ],
         "title": "DailyObservationListResponse",
         "type": "object"
       },
@@ -1858,7 +2004,10 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": ["active", "archived"],
+            "enum": [
+              "active",
+              "archived"
+            ],
             "title": "Status",
             "type": "string"
           },
@@ -1937,7 +2086,10 @@
             "$ref": "#/components/schemas/ObservationSchemaV1"
           }
         },
-        "required": ["expected_revision", "observation"],
+        "required": [
+          "expected_revision",
+          "observation"
+        ],
         "title": "DailyObservationUpdateRequest",
         "type": "object"
       },
@@ -1978,7 +2130,11 @@
             "type": "string"
           }
         },
-        "required": ["precision", "local_date", "timezone"],
+        "required": [
+          "precision",
+          "local_date",
+          "timezone"
+        ],
         "title": "DateOnlyTimePoint",
         "type": "object"
       },
@@ -1986,7 +2142,11 @@
         "additionalProperties": false,
         "properties": {
           "unit": {
-            "enum": ["m", "km", "mi"],
+            "enum": [
+              "m",
+              "km",
+              "mi"
+            ],
             "title": "Unit",
             "type": "string"
           },
@@ -1994,7 +2154,10 @@
             "$ref": "#/components/schemas/FiniteDailyNumber"
           }
         },
-        "required": ["value", "unit"],
+        "required": [
+          "value",
+          "unit"
+        ],
         "title": "DistanceQuantity",
         "type": "object"
       },
@@ -2002,7 +2165,10 @@
         "additionalProperties": false,
         "properties": {
           "unit": {
-            "enum": ["min", "h"],
+            "enum": [
+              "min",
+              "h"
+            ],
             "title": "Unit",
             "type": "string"
           },
@@ -2010,7 +2176,10 @@
             "$ref": "#/components/schemas/FiniteDailyNumber"
           }
         },
-        "required": ["value", "unit"],
+        "required": [
+          "value",
+          "unit"
+        ],
         "title": "DurationQuantity",
         "type": "object"
       },
@@ -2018,7 +2187,10 @@
         "additionalProperties": false,
         "properties": {
           "unit": {
-            "enum": ["kcal", "kJ"],
+            "enum": [
+              "kcal",
+              "kJ"
+            ],
             "title": "Unit",
             "type": "string"
           },
@@ -2026,7 +2198,10 @@
             "$ref": "#/components/schemas/FiniteDailyNumber"
           }
         },
-        "required": ["value", "unit"],
+        "required": [
+          "value",
+          "unit"
+        ],
         "title": "EnergyQuantity",
         "type": "object"
       },
@@ -2040,7 +2215,10 @@
             "$ref": "#/components/schemas/FiniteDailyNumber"
           }
         },
-        "required": ["value", "unit"],
+        "required": [
+          "value",
+          "unit"
+        ],
         "title": "EnteredQuantity",
         "type": "object"
       },
@@ -2074,7 +2252,11 @@
             "type": "string"
           }
         },
-        "required": ["code", "message", "request_id"],
+        "required": [
+          "code",
+          "message",
+          "request_id"
+        ],
         "title": "ErrorResponse",
         "type": "object"
       },
@@ -2112,7 +2294,11 @@
             "type": "array"
           }
         },
-        "required": ["action", "event", "event_id"],
+        "required": [
+          "action",
+          "event",
+          "event_id"
+        ],
         "title": "EventCreateCommand",
         "type": "object"
       },
@@ -2136,7 +2322,10 @@
             "type": "array"
           }
         },
-        "required": ["action", "event"],
+        "required": [
+          "action",
+          "event"
+        ],
         "title": "EventCreateDraft",
         "type": "object"
       },
@@ -2200,7 +2389,11 @@
             "$ref": "#/components/schemas/DailyTimePoint"
           }
         },
-        "required": ["domain", "time", "payload"],
+        "required": [
+          "domain",
+          "time",
+          "payload"
+        ],
         "title": "EventSchemaV1",
         "type": "object"
       },
@@ -2228,7 +2421,12 @@
             "type": "string"
           }
         },
-        "required": ["object_id", "revision", "object_type", "title"],
+        "required": [
+          "object_id",
+          "revision",
+          "object_type",
+          "title"
+        ],
         "title": "EvidenceDetail",
         "type": "object"
       },
@@ -2246,7 +2444,10 @@
             "type": "integer"
           }
         },
-        "required": ["object_id", "revision"],
+        "required": [
+          "object_id",
+          "revision"
+        ],
         "title": "EvidenceReference",
         "type": "object"
       },
@@ -2262,7 +2463,10 @@
             "type": "string"
           }
         },
-        "required": ["id", "experiment"],
+        "required": [
+          "id",
+          "experiment"
+        ],
         "title": "ExperimentCreateRequest",
         "type": "object"
       },
@@ -2288,13 +2492,28 @@
             "title": "Next Cursor"
           }
         },
-        "required": ["next_cursor", "items"],
+        "required": [
+          "next_cursor",
+          "items"
+        ],
         "title": "ExperimentListResponse",
         "type": "object"
       },
       "ExperimentPayloadV1": {
         "additionalProperties": false,
         "properties": {
+          "actual_end_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual End At"
+          },
           "baseline_start": {
             "format": "date",
             "title": "Baseline Start",
@@ -2345,7 +2564,13 @@
           },
           "status": {
             "default": "draft",
-            "enum": ["draft", "active", "completed", "stopped", "archived"],
+            "enum": [
+              "draft",
+              "active",
+              "completed",
+              "stopped",
+              "archived"
+            ],
             "title": "Status",
             "type": "string"
           }
@@ -2427,7 +2652,11 @@
             "type": "string"
           },
           "object_type": {
-            "enum": ["goal", "plan", "tracker_definition"],
+            "enum": [
+              "goal",
+              "plan",
+              "tracker_definition"
+            ],
             "title": "Object Type",
             "type": "string"
           },
@@ -2437,7 +2666,11 @@
             "type": "integer"
           }
         },
-        "required": ["object_id", "object_type", "revision"],
+        "required": [
+          "object_id",
+          "object_type",
+          "revision"
+        ],
         "title": "ExperimentReference",
         "type": "object"
       },
@@ -2469,7 +2702,13 @@
             "type": "string"
           },
           "state": {
-            "enum": ["draft", "active", "completed", "stopped", "archived"],
+            "enum": [
+              "draft",
+              "active",
+              "completed",
+              "stopped",
+              "archived"
+            ],
             "title": "State",
             "type": "string"
           },
@@ -2575,7 +2814,10 @@
             "$ref": "#/components/schemas/ExperimentResult"
           }
         },
-        "required": ["experiment", "result"],
+        "required": [
+          "experiment",
+          "result"
+        ],
         "title": "ExperimentResultResponse",
         "type": "object"
       },
@@ -2588,12 +2830,20 @@
             "type": "integer"
           },
           "state": {
-            "enum": ["active", "completed", "stopped", "archived"],
+            "enum": [
+              "active",
+              "completed",
+              "stopped",
+              "archived"
+            ],
             "title": "State",
             "type": "string"
           }
         },
-        "required": ["expected_revision", "state"],
+        "required": [
+          "expected_revision",
+          "state"
+        ],
         "title": "ExperimentStateRequest",
         "type": "object"
       },
@@ -2609,7 +2859,10 @@
             "$ref": "#/components/schemas/ExperimentPayloadV1"
           }
         },
-        "required": ["expected_revision", "experiment"],
+        "required": [
+          "expected_revision",
+          "experiment"
+        ],
         "title": "ExperimentUpdateRequest",
         "type": "object"
       },
@@ -2625,7 +2878,10 @@
             "type": "string"
           }
         },
-        "required": ["field", "message"],
+        "required": [
+          "field",
+          "message"
+        ],
         "title": "FieldError",
         "type": "object"
       },
@@ -2636,7 +2892,11 @@
         "type": "number"
       },
       "GoalComparator": {
-        "enum": ["at_least", "at_most", "equal"],
+        "enum": [
+          "at_least",
+          "at_most",
+          "equal"
+        ],
         "title": "GoalComparator",
         "type": "string"
       },
@@ -2669,7 +2929,11 @@
             "title": "Notes"
           }
         },
-        "required": ["action", "goal", "id"],
+        "required": [
+          "action",
+          "goal",
+          "id"
+        ],
         "title": "GoalCreateCommand",
         "type": "object"
       },
@@ -2697,7 +2961,10 @@
             "title": "Notes"
           }
         },
-        "required": ["action", "goal"],
+        "required": [
+          "action",
+          "goal"
+        ],
         "title": "GoalCreateDraft",
         "type": "object"
       },
@@ -2735,7 +3002,10 @@
             "title": "Notes"
           }
         },
-        "required": ["id", "goal"],
+        "required": [
+          "id",
+          "goal"
+        ],
         "title": "GoalCreateRequest",
         "type": "object"
       },
@@ -2752,7 +3022,11 @@
         "type": "string"
       },
       "GoalLifecycle": {
-        "enum": ["active", "paused", "completed"],
+        "enum": [
+          "active",
+          "paused",
+          "completed"
+        ],
         "title": "GoalLifecycle",
         "type": "string"
       },
@@ -2805,7 +3079,13 @@
           "target_period": {
             "anyOf": [
               {
-                "enum": ["day", "week", "month", "year", "once"],
+                "enum": [
+                  "day",
+                  "week",
+                  "month",
+                  "year",
+                  "once"
+                ],
                 "type": "string"
               },
               {
@@ -2815,7 +3095,10 @@
             "title": "Target Period"
           }
         },
-        "required": ["label", "domain"],
+        "required": [
+          "label",
+          "domain"
+        ],
         "title": "GoalPayloadV1",
         "type": "object"
       },
@@ -2890,7 +3173,10 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": ["active", "archived"],
+            "enum": [
+              "active",
+              "archived"
+            ],
             "title": "Status",
             "type": "string"
           },
@@ -2976,7 +3262,12 @@
             "type": "string"
           }
         },
-        "required": ["action", "object_id", "expected_revision", "goal"],
+        "required": [
+          "action",
+          "object_id",
+          "expected_revision",
+          "goal"
+        ],
         "title": "GoalUpdateCommand",
         "type": "object"
       },
@@ -3014,7 +3305,10 @@
             "$ref": "#/components/schemas/GoalPayloadV1"
           }
         },
-        "required": ["expected_revision", "goal"],
+        "required": [
+          "expected_revision",
+          "goal"
+        ],
         "title": "GoalUpdateRequest",
         "type": "object"
       },
@@ -3027,7 +3321,11 @@
             "type": "string"
           },
           "object_type": {
-            "enum": ["derived_signal", "event", "observation"],
+            "enum": [
+              "derived_signal",
+              "event",
+              "observation"
+            ],
             "title": "Object Type",
             "type": "string"
           },
@@ -3037,7 +3335,11 @@
             "type": "integer"
           }
         },
-        "required": ["object_id", "revision", "object_type"],
+        "required": [
+          "object_id",
+          "revision",
+          "object_type"
+        ],
         "title": "InsightEvidenceReference",
         "type": "object"
       },
@@ -3078,7 +3380,11 @@
             "type": "string"
           }
         },
-        "required": ["from_date", "to_date", "timezone"],
+        "required": [
+          "from_date",
+          "to_date",
+          "timezone"
+        ],
         "title": "InsightGenerateRequest",
         "type": "object"
       },
@@ -3114,7 +3420,12 @@
             "type": "array"
           }
         },
-        "required": ["signals", "associations", "insights", "recommendations"],
+        "required": [
+          "signals",
+          "associations",
+          "insights",
+          "recommendations"
+        ],
         "title": "InsightGenerateResponse",
         "type": "object"
       },
@@ -3140,13 +3451,28 @@
             "title": "Next Cursor"
           }
         },
-        "required": ["next_cursor", "items"],
+        "required": [
+          "next_cursor",
+          "items"
+        ],
         "title": "InsightListResponse",
         "type": "object"
       },
       "InsightPayloadV1": {
         "additionalProperties": false,
         "properties": {
+          "decision": {
+            "anyOf": [
+              {
+                "const": "dismissed",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision"
+          },
           "evidence_refs": {
             "items": {
               "$ref": "#/components/schemas/InsightEvidenceReference"
@@ -3174,7 +3500,11 @@
             "type": "string"
           },
           "kind": {
-            "enum": ["trend", "association", "coverage"],
+            "enum": [
+              "trend",
+              "association",
+              "coverage"
+            ],
             "title": "Kind",
             "type": "string"
           },
@@ -3185,7 +3515,12 @@
             "type": "string"
           },
           "state": {
-            "enum": ["current", "stale", "dismissed", "expired"],
+            "enum": [
+              "current",
+              "stale",
+              "dismissed",
+              "expired"
+            ],
             "title": "State",
             "type": "string"
           },
@@ -3249,7 +3584,12 @@
             "type": "string"
           },
           "state": {
-            "enum": ["current", "stale", "dismissed", "expired"],
+            "enum": [
+              "current",
+              "stale",
+              "dismissed",
+              "expired"
+            ],
             "title": "State",
             "type": "string"
           },
@@ -3291,7 +3631,10 @@
             "type": "string"
           }
         },
-        "required": ["expected_revision", "state"],
+        "required": [
+          "expected_revision",
+          "state"
+        ],
         "title": "InsightStateRequest",
         "type": "object"
       },
@@ -3313,7 +3656,11 @@
             "type": "string"
           }
         },
-        "required": ["precision", "occurred_at", "timezone"],
+        "required": [
+          "precision",
+          "occurred_at",
+          "timezone"
+        ],
         "title": "InstantTimePoint",
         "type": "object"
       },
@@ -3365,7 +3712,10 @@
             "title": "Lifecycle"
           }
         },
-        "required": ["expected_revision", "lifecycle"],
+        "required": [
+          "expected_revision",
+          "lifecycle"
+        ],
         "title": "LifecycleUpdateRequest",
         "type": "object"
       },
@@ -3404,7 +3754,10 @@
             "type": "string"
           }
         },
-        "required": ["kind", "label"],
+        "required": [
+          "kind",
+          "label"
+        ],
         "title": "MealEventV1",
         "type": "object"
       },
@@ -3450,7 +3803,11 @@
             "$ref": "#/components/schemas/FiniteDailyNumber"
           }
         },
-        "required": ["metric", "value", "unit"],
+        "required": [
+          "metric",
+          "value",
+          "unit"
+        ],
         "title": "MeasurementValueV1",
         "type": "object"
       },
@@ -3606,7 +3963,12 @@
             "$ref": "#/components/schemas/FiniteDailyNumber"
           }
         },
-        "required": ["metric", "comparator", "value", "unit"],
+        "required": [
+          "metric",
+          "comparator",
+          "value",
+          "unit"
+        ],
         "title": "MetricTarget",
         "type": "object"
       },
@@ -3622,7 +3984,10 @@
             "$ref": "#/components/schemas/FiniteProfileNumber"
           }
         },
-        "required": ["type", "value"],
+        "required": [
+          "type",
+          "value"
+        ],
         "title": "NumberValue",
         "type": "object"
       },
@@ -3633,7 +3998,9 @@
             "$ref": "#/components/schemas/ObservationValueV1"
           }
         },
-        "required": ["value"],
+        "required": [
+          "value"
+        ],
         "title": "ObservationPayloadV1",
         "type": "object"
       },
@@ -3672,7 +4039,11 @@
             "$ref": "#/components/schemas/DailyTimePoint"
           }
         },
-        "required": ["domain", "time", "payload"],
+        "required": [
+          "domain",
+          "time",
+          "payload"
+        ],
         "title": "ObservationSchemaV1",
         "type": "object"
       },
@@ -3758,12 +4129,19 @@
             "title": "Rescheduled At"
           },
           "state": {
-            "enum": ["completed", "skipped", "rescheduled"],
+            "enum": [
+              "completed",
+              "skipped",
+              "rescheduled"
+            ],
             "title": "State",
             "type": "string"
           }
         },
-        "required": ["expected_schedule_revision", "state"],
+        "required": [
+          "expected_schedule_revision",
+          "state"
+        ],
         "title": "OccurrenceActionRequest",
         "type": "object"
       },
@@ -3823,7 +4201,11 @@
             "type": "integer"
           },
           "state": {
-            "enum": ["completed", "skipped", "rescheduled"],
+            "enum": [
+              "completed",
+              "skipped",
+              "rescheduled"
+            ],
             "title": "State",
             "type": "string"
           },
@@ -3854,7 +4236,11 @@
             "type": "string"
           },
           "action": {
-            "enum": ["completed", "skipped", "rescheduled"],
+            "enum": [
+              "completed",
+              "skipped",
+              "rescheduled"
+            ],
             "title": "Action",
             "type": "string"
           },
@@ -3940,7 +4326,10 @@
             "title": "Next After Revision"
           }
         },
-        "required": ["items", "next_after_revision"],
+        "required": [
+          "items",
+          "next_after_revision"
+        ],
         "title": "OccurrenceHistoryResponse",
         "type": "object"
       },
@@ -3955,7 +4344,9 @@
             "type": "array"
           }
         },
-        "required": ["items"],
+        "required": [
+          "items"
+        ],
         "title": "OccurrenceListResponse",
         "type": "object"
       },
@@ -3968,7 +4359,11 @@
             "type": "boolean"
           },
           "dst_resolution": {
-            "enum": ["exact", "earlier_offset", "next_valid_time"],
+            "enum": [
+              "exact",
+              "earlier_offset",
+              "next_valid_time"
+            ],
             "title": "Dst Resolution",
             "type": "string"
           },
@@ -4062,7 +4457,12 @@
             "type": "integer"
           },
           "state": {
-            "enum": ["unknown", "completed", "skipped", "rescheduled"],
+            "enum": [
+              "unknown",
+              "completed",
+              "skipped",
+              "rescheduled"
+            ],
             "title": "State",
             "type": "string"
           },
@@ -4124,7 +4524,12 @@
             "title": "Percent Change"
           }
         },
-        "required": ["before", "after", "mean_difference", "percent_change"],
+        "required": [
+          "before",
+          "after",
+          "mean_difference",
+          "percent_change"
+        ],
         "title": "PeriodComparison",
         "type": "object"
       },
@@ -4169,7 +4574,13 @@
             "type": "string"
           }
         },
-        "required": ["from_date", "to_date", "known_days", "mean", "median"],
+        "required": [
+          "from_date",
+          "to_date",
+          "known_days",
+          "mean",
+          "median"
+        ],
         "title": "PeriodSummary",
         "type": "object"
       },
@@ -4210,7 +4621,11 @@
             "type": "array"
           }
         },
-        "required": ["action", "plan", "id"],
+        "required": [
+          "action",
+          "plan",
+          "id"
+        ],
         "title": "PlanCreateCommand",
         "type": "object"
       },
@@ -4238,7 +4653,10 @@
             "$ref": "#/components/schemas/PlanPayloadV1"
           }
         },
-        "required": ["action", "plan"],
+        "required": [
+          "action",
+          "plan"
+        ],
         "title": "PlanCreateDraft",
         "type": "object"
       },
@@ -4276,7 +4694,10 @@
             "$ref": "#/components/schemas/PlanPayloadV1"
           }
         },
-        "required": ["id", "plan"],
+        "required": [
+          "id",
+          "plan"
+        ],
         "title": "PlanCreateRequest",
         "type": "object"
       },
@@ -4310,17 +4731,29 @@
             "title": "Reference Id"
           }
         },
-        "required": ["id", "kind", "label"],
+        "required": [
+          "id",
+          "kind",
+          "label"
+        ],
         "title": "PlanItemInput",
         "type": "object"
       },
       "PlanItemKind": {
-        "enum": ["goal", "regimen", "task"],
+        "enum": [
+          "goal",
+          "regimen",
+          "task"
+        ],
         "title": "PlanItemKind",
         "type": "string"
       },
       "PlanLifecycle": {
-        "enum": ["active", "paused", "completed"],
+        "enum": [
+          "active",
+          "paused",
+          "completed"
+        ],
         "title": "PlanLifecycle",
         "type": "string"
       },
@@ -4365,7 +4798,10 @@
             "type": "array"
           }
         },
-        "required": ["expected_revision", "item_ids"],
+        "required": [
+          "expected_revision",
+          "item_ids"
+        ],
         "title": "PlanOrderRequest",
         "type": "object"
       },
@@ -4411,7 +4847,9 @@
             "title": "Start Date"
           }
         },
-        "required": ["label"],
+        "required": [
+          "label"
+        ],
         "title": "PlanPayloadV1",
         "type": "object"
       },
@@ -4486,7 +4924,10 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": ["active", "archived"],
+            "enum": [
+              "active",
+              "archived"
+            ],
             "title": "Status",
             "type": "string"
           },
@@ -4580,7 +5021,12 @@
             "type": "array"
           }
         },
-        "required": ["action", "object_id", "expected_revision", "plan"],
+        "required": [
+          "action",
+          "object_id",
+          "expected_revision",
+          "plan"
+        ],
         "title": "PlanUpdateCommand",
         "type": "object"
       },
@@ -4614,7 +5060,12 @@
             "type": "array"
           }
         },
-        "required": ["action", "object_id", "expected_revision", "plan"],
+        "required": [
+          "action",
+          "object_id",
+          "expected_revision",
+          "plan"
+        ],
         "title": "PlanUpdateCommand",
         "type": "object"
       },
@@ -4652,7 +5103,10 @@
             "$ref": "#/components/schemas/PlanPayloadV1"
           }
         },
-        "required": ["expected_revision", "plan"],
+        "required": [
+          "expected_revision",
+          "plan"
+        ],
         "title": "PlanUpdateRequest",
         "type": "object"
       },
@@ -4677,7 +5131,11 @@
             "title": "Proposal Id"
           },
           "reason": {
-            "enum": ["create", "update", "archive"],
+            "enum": [
+              "create",
+              "update",
+              "archive"
+            ],
             "title": "Reason",
             "type": "string"
           },
@@ -4729,7 +5187,10 @@
             "title": "Next After Revision"
           }
         },
-        "required": ["items", "next_after_revision"],
+        "required": [
+          "items",
+          "next_after_revision"
+        ],
         "title": "PlanningHistoryResponse",
         "type": "object"
       },
@@ -4771,12 +5232,19 @@
             "title": "Next Cursor"
           }
         },
-        "required": ["items", "next_cursor"],
+        "required": [
+          "items",
+          "next_cursor"
+        ],
         "title": "PlanningListResponse",
         "type": "object"
       },
       "ProfileCategory": {
-        "enum": ["background", "constraints", "preferences"],
+        "enum": [
+          "background",
+          "constraints",
+          "preferences"
+        ],
         "title": "ProfileCategory",
         "type": "string"
       },
@@ -4795,7 +5263,10 @@
             "type": "string"
           }
         },
-        "required": ["id", "title"],
+        "required": [
+          "id",
+          "title"
+        ],
         "title": "ProfileContextReference",
         "type": "object"
       },
@@ -4855,7 +5326,11 @@
             "title": "Valid To"
           }
         },
-        "required": ["action", "profile", "id"],
+        "required": [
+          "action",
+          "profile",
+          "id"
+        ],
         "title": "ProfileCreateCommand",
         "type": "object"
       },
@@ -4910,7 +5385,10 @@
             "title": "Valid To"
           }
         },
-        "required": ["action", "profile"],
+        "required": [
+          "action",
+          "profile"
+        ],
         "title": "ProfileCreateDraft",
         "type": "object"
       },
@@ -4971,7 +5449,10 @@
             ]
           }
         },
-        "required": ["id", "profile"],
+        "required": [
+          "id",
+          "profile"
+        ],
         "title": "ProfileCreateRequest",
         "type": "object"
       },
@@ -4996,7 +5477,11 @@
             "title": "Proposal Id"
           },
           "reason": {
-            "enum": ["create", "update", "archive"],
+            "enum": [
+              "create",
+              "update",
+              "archive"
+            ],
             "title": "Reason",
             "type": "string"
           },
@@ -5046,7 +5531,10 @@
             "title": "Next After Revision"
           }
         },
-        "required": ["items", "next_after_revision"],
+        "required": [
+          "items",
+          "next_after_revision"
+        ],
         "title": "ProfileHistoryResponse",
         "type": "object"
       },
@@ -5116,7 +5604,10 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": ["active", "archived"],
+            "enum": [
+              "active",
+              "archived"
+            ],
             "title": "Status",
             "type": "string"
           },
@@ -5180,7 +5671,11 @@
         "type": "object"
       },
       "ProfileKind": {
-        "enum": ["fact", "constraint", "preference"],
+        "enum": [
+          "fact",
+          "constraint",
+          "preference"
+        ],
         "title": "ProfileKind",
         "type": "string"
       },
@@ -5211,7 +5706,11 @@
             "title": "Next Cursor"
           }
         },
-        "required": ["items", "as_of", "next_cursor"],
+        "required": [
+          "items",
+          "as_of",
+          "next_cursor"
+        ],
         "title": "ProfileListResponse",
         "type": "object"
       },
@@ -5294,7 +5793,9 @@
             "title": "Valid To"
           }
         },
-        "required": ["expected_revision"],
+        "required": [
+          "expected_revision"
+        ],
         "title": "ProfilePatchRequest",
         "type": "object"
       },
@@ -5331,7 +5832,13 @@
             ]
           }
         },
-        "required": ["kind", "category", "key", "label", "value"],
+        "required": [
+          "kind",
+          "category",
+          "key",
+          "label",
+          "value"
+        ],
         "title": "ProfilePayloadV1",
         "type": "object"
       },
@@ -5347,7 +5854,10 @@
             "type": "boolean"
           }
         },
-        "required": ["ai_use_allowed", "cross_domain_use_allowed"],
+        "required": [
+          "ai_use_allowed",
+          "cross_domain_use_allowed"
+        ],
         "title": "ProfilePermissions",
         "type": "object"
       },
@@ -5378,7 +5888,11 @@
             "type": "string"
           }
         },
-        "required": ["id", "kind", "name"],
+        "required": [
+          "id",
+          "kind",
+          "name"
+        ],
         "title": "ProfileSource",
         "type": "object"
       },
@@ -5473,7 +5987,12 @@
             "title": "Valid To"
           }
         },
-        "required": ["action", "object_id", "expected_revision", "profile"],
+        "required": [
+          "action",
+          "object_id",
+          "expected_revision",
+          "profile"
+        ],
         "title": "ProfileUpdateCommand",
         "type": "object"
       },
@@ -5552,7 +6071,9 @@
             "type": "boolean"
           }
         },
-        "required": ["proposal"],
+        "required": [
+          "proposal"
+        ],
         "title": "ProposalApplyResponse",
         "type": "object"
       },
@@ -5616,7 +6137,12 @@
             "type": "string"
           }
         },
-        "required": ["object_id", "object_type", "title", "revision"],
+        "required": [
+          "object_id",
+          "object_type",
+          "title",
+          "revision"
+        ],
         "title": "ProposalChangeReview",
         "type": "object"
       },
@@ -5693,7 +6219,10 @@
             "type": "string"
           }
         },
-        "required": ["commands", "id"],
+        "required": [
+          "commands",
+          "id"
+        ],
         "title": "ProposalCreateRequest",
         "type": "object"
       },
@@ -5770,7 +6299,10 @@
             "type": "string"
           }
         },
-        "required": ["commands", "expected_revision"],
+        "required": [
+          "commands",
+          "expected_revision"
+        ],
         "title": "ProposalEditRequest",
         "type": "object"
       },
@@ -5788,7 +6320,13 @@
             "type": "object"
           },
           "event": {
-            "enum": ["created", "edited", "applied", "rejected", "expired"],
+            "enum": [
+              "created",
+              "edited",
+              "applied",
+              "rejected",
+              "expired"
+            ],
             "title": "Event",
             "type": "string"
           },
@@ -5803,7 +6341,12 @@
             "type": "string"
           }
         },
-        "required": ["event", "proposal_revision", "actor_id", "recorded_at"],
+        "required": [
+          "event",
+          "proposal_revision",
+          "actor_id",
+          "recorded_at"
+        ],
         "title": "ProposalHistoryEntry",
         "type": "object"
       },
@@ -5829,7 +6372,9 @@
             "title": "Next Cursor"
           }
         },
-        "required": ["items"],
+        "required": [
+          "items"
+        ],
         "title": "ProposalHistoryResponse",
         "type": "object"
       },
@@ -5855,7 +6400,10 @@
             "title": "Next Cursor"
           }
         },
-        "required": ["items", "next_cursor"],
+        "required": [
+          "items",
+          "next_cursor"
+        ],
         "title": "ProposalListResponse",
         "type": "object"
       },
@@ -5880,7 +6428,9 @@
             "title": "Reason"
           }
         },
-        "required": ["proposal_revision"],
+        "required": [
+          "proposal_revision"
+        ],
         "title": "ProposalRejectRequest",
         "type": "object"
       },
@@ -5910,7 +6460,11 @@
             "type": "integer"
           }
         },
-        "required": ["object_id", "object_type", "revision"],
+        "required": [
+          "object_id",
+          "object_type",
+          "revision"
+        ],
         "title": "ProposalResult",
         "type": "object"
       },
@@ -6000,7 +6554,10 @@
             "type": "object"
           },
           "origin": {
-            "enum": ["user", "ai"],
+            "enum": [
+              "user",
+              "ai"
+            ],
             "title": "Origin",
             "type": "string"
           },
@@ -6064,7 +6621,13 @@
             "type": "integer"
           },
           "state": {
-            "enum": ["pending", "applied", "rejected", "expired", "superseded"],
+            "enum": [
+              "pending",
+              "applied",
+              "rejected",
+              "expired",
+              "superseded"
+            ],
             "title": "State",
             "type": "string"
           },
@@ -6114,7 +6677,10 @@
             "type": "string"
           },
           "origin": {
-            "enum": ["user", "ai"],
+            "enum": [
+              "user",
+              "ai"
+            ],
             "title": "Origin",
             "type": "string"
           },
@@ -6129,7 +6695,13 @@
             "type": "integer"
           },
           "state": {
-            "enum": ["pending", "applied", "rejected", "expired", "superseded"],
+            "enum": [
+              "pending",
+              "applied",
+              "rejected",
+              "expired",
+              "superseded"
+            ],
             "title": "State",
             "type": "string"
           },
@@ -6168,7 +6740,11 @@
             "$ref": "#/components/schemas/FiniteProfileNumber"
           }
         },
-        "required": ["type", "value", "unit"],
+        "required": [
+          "type",
+          "value",
+          "unit"
+        ],
         "title": "QuantityValue",
         "type": "object"
       },
@@ -6194,7 +6770,10 @@
             "title": "Next Cursor"
           }
         },
-        "required": ["next_cursor", "items"],
+        "required": [
+          "next_cursor",
+          "items"
+        ],
         "title": "RecommendationListResponse",
         "type": "object"
       },
@@ -6205,6 +6784,21 @@
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "enum": [
+                  "accepted",
+                  "dismissed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision"
           },
           "evidence_refs": {
             "items": {
@@ -6248,7 +6842,13 @@
             "type": "string"
           },
           "state": {
-            "enum": ["proposed", "accepted", "dismissed", "expired", "stale"],
+            "enum": [
+              "proposed",
+              "accepted",
+              "dismissed",
+              "expired",
+              "stale"
+            ],
             "title": "State",
             "type": "string"
           },
@@ -6307,7 +6907,13 @@
             "type": "string"
           },
           "state": {
-            "enum": ["proposed", "accepted", "dismissed", "expired", "stale"],
+            "enum": [
+              "proposed",
+              "accepted",
+              "dismissed",
+              "expired",
+              "stale"
+            ],
             "title": "State",
             "type": "string"
           },
@@ -6344,12 +6950,18 @@
             "type": "integer"
           },
           "state": {
-            "enum": ["accepted", "dismissed"],
+            "enum": [
+              "accepted",
+              "dismissed"
+            ],
             "title": "State",
             "type": "string"
           }
         },
-        "required": ["expected_revision", "state"],
+        "required": [
+          "expected_revision",
+          "state"
+        ],
         "title": "RecommendationStateRequest",
         "type": "object"
       },
@@ -6387,17 +6999,29 @@
             "$ref": "#/components/schemas/RegimenPayloadV1"
           }
         },
-        "required": ["id", "regimen"],
+        "required": [
+          "id",
+          "regimen"
+        ],
         "title": "RegimenCreateRequest",
         "type": "object"
       },
       "RegimenKind": {
-        "enum": ["habit", "medication", "supplement", "activity"],
+        "enum": [
+          "habit",
+          "medication",
+          "supplement",
+          "activity"
+        ],
         "title": "RegimenKind",
         "type": "string"
       },
       "RegimenLifecycle": {
-        "enum": ["active", "paused", "completed"],
+        "enum": [
+          "active",
+          "paused",
+          "completed"
+        ],
         "title": "RegimenLifecycle",
         "type": "string"
       },
@@ -6464,7 +7088,10 @@
             "title": "Start Date"
           }
         },
-        "required": ["label", "kind"],
+        "required": [
+          "label",
+          "kind"
+        ],
         "title": "RegimenPayloadV1",
         "type": "object"
       },
@@ -6539,7 +7166,10 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": ["active", "archived"],
+            "enum": [
+              "active",
+              "archived"
+            ],
             "title": "Status",
             "type": "string"
           },
@@ -6637,7 +7267,10 @@
             "$ref": "#/components/schemas/RegimenPayloadV1"
           }
         },
-        "required": ["expected_revision", "regimen"],
+        "required": [
+          "expected_revision",
+          "regimen"
+        ],
         "title": "RegimenUpdateRequest",
         "type": "object"
       },
@@ -6660,7 +7293,10 @@
             "type": "number"
           }
         },
-        "required": ["date", "mean"],
+        "required": [
+          "date",
+          "mean"
+        ],
         "title": "RollingMeanPoint",
         "type": "object"
       },
@@ -6716,7 +7352,12 @@
             "type": "array"
           }
         },
-        "required": ["start_date", "local_time", "timezone", "recurrence"],
+        "required": [
+          "start_date",
+          "local_time",
+          "timezone",
+          "recurrence"
+        ],
         "title": "ScheduleDefinitionV1",
         "type": "object"
       },
@@ -6744,12 +7385,18 @@
             "$ref": "#/components/schemas/ScheduleDefinitionV1"
           }
         },
-        "required": ["effective_from", "schedule"],
+        "required": [
+          "effective_from",
+          "schedule"
+        ],
         "title": "ScheduleEditRequest",
         "type": "object"
       },
       "ScheduleRecurrence": {
-        "enum": ["daily", "weekly"],
+        "enum": [
+          "daily",
+          "weekly"
+        ],
         "title": "ScheduleRecurrence",
         "type": "string"
       },
@@ -6813,7 +7460,9 @@
             "title": "Quality"
           }
         },
-        "required": ["kind"],
+        "required": [
+          "kind"
+        ],
         "title": "SleepEventV1",
         "type": "object"
       },
@@ -6840,12 +7489,20 @@
             "type": "string"
           },
           "state": {
-            "enum": ["current", "stale"],
+            "enum": [
+              "current",
+              "stale"
+            ],
             "title": "State",
             "type": "string"
           }
         },
-        "required": ["id", "revision", "state", "result"],
+        "required": [
+          "id",
+          "revision",
+          "state",
+          "result"
+        ],
         "title": "StoredAssociationResponse",
         "type": "object"
       },
@@ -6872,12 +7529,20 @@
             "type": "string"
           },
           "state": {
-            "enum": ["current", "stale"],
+            "enum": [
+              "current",
+              "stale"
+            ],
             "title": "State",
             "type": "string"
           }
         },
-        "required": ["id", "revision", "state", "result"],
+        "required": [
+          "id",
+          "revision",
+          "state",
+          "result"
+        ],
         "title": "StoredTrendResponse",
         "type": "object"
       },
@@ -6896,7 +7561,10 @@
             "type": "string"
           }
         },
-        "required": ["kind", "label"],
+        "required": [
+          "kind",
+          "label"
+        ],
         "title": "SymptomEventV1",
         "type": "object"
       },
@@ -6921,7 +7589,10 @@
             "type": "integer"
           }
         },
-        "required": ["metric", "value"],
+        "required": [
+          "metric",
+          "value"
+        ],
         "title": "SymptomSeverityV1",
         "type": "object"
       },
@@ -6943,7 +7614,10 @@
             "type": "array"
           }
         },
-        "required": ["type", "value"],
+        "required": [
+          "type",
+          "value"
+        ],
         "title": "TextListValue",
         "type": "object"
       },
@@ -6961,7 +7635,10 @@
             "type": "string"
           }
         },
-        "required": ["type", "value"],
+        "required": [
+          "type",
+          "value"
+        ],
         "title": "TextValue",
         "type": "object"
       },
@@ -7150,7 +7827,11 @@
             "title": "Notes"
           }
         },
-        "required": ["action", "definition", "id"],
+        "required": [
+          "action",
+          "definition",
+          "id"
+        ],
         "title": "TrackerCreateCommand",
         "type": "object"
       },
@@ -7178,7 +7859,10 @@
             "title": "Notes"
           }
         },
-        "required": ["action", "definition"],
+        "required": [
+          "action",
+          "definition"
+        ],
         "title": "TrackerCreateDraft",
         "type": "object"
       },
@@ -7216,7 +7900,10 @@
             "title": "Notes"
           }
         },
-        "required": ["id", "definition"],
+        "required": [
+          "id",
+          "definition"
+        ],
         "title": "TrackerCreateRequest",
         "type": "object"
       },
@@ -7242,12 +7929,23 @@
             "type": "string"
           }
         },
-        "required": ["name", "domain", "fields"],
+        "required": [
+          "name",
+          "domain",
+          "fields"
+        ],
         "title": "TrackerDefinitionV1",
         "type": "object"
       },
       "TrackerFieldKind": {
-        "enum": ["text", "number", "boolean", "enum", "date", "quantity"],
+        "enum": [
+          "text",
+          "number",
+          "boolean",
+          "enum",
+          "date",
+          "quantity"
+        ],
         "title": "TrackerFieldKind",
         "type": "string"
       },
@@ -7294,7 +7992,11 @@
             ]
           }
         },
-        "required": ["id", "label", "kind"],
+        "required": [
+          "id",
+          "label",
+          "kind"
+        ],
         "title": "TrackerFieldV1",
         "type": "object"
       },
@@ -7374,7 +8076,10 @@
             "$ref": "#/components/schemas/ProfileSource"
           },
           "status": {
-            "enum": ["active", "archived"],
+            "enum": [
+              "active",
+              "archived"
+            ],
             "title": "Status",
             "type": "string"
           },
@@ -7461,7 +8166,10 @@
             "title": "Next After Version"
           }
         },
-        "required": ["items", "next_after_version"],
+        "required": [
+          "items",
+          "next_after_version"
+        ],
         "title": "TrackerSchemaVersionListResponse",
         "type": "object"
       },
@@ -7482,7 +8190,11 @@
             "type": "integer"
           }
         },
-        "required": ["version", "definition", "created_at"],
+        "required": [
+          "version",
+          "definition",
+          "created_at"
+        ],
         "title": "TrackerSchemaVersionResponse",
         "type": "object"
       },
@@ -7520,7 +8232,10 @@
             "type": "integer"
           }
         },
-        "required": ["expected_revision", "definition"],
+        "required": [
+          "expected_revision",
+          "definition"
+        ],
         "title": "TrackerUpdateRequest",
         "type": "object"
       },
@@ -7719,7 +8434,10 @@
             "type": "string"
           }
         },
-        "required": ["kind", "label"],
+        "required": [
+          "kind",
+          "label"
+        ],
         "title": "WorkoutEventV1",
         "type": "object"
       },
@@ -7732,7 +8450,10 @@
             "type": "string"
           },
           "object_type": {
-            "enum": ["event", "observation"],
+            "enum": [
+              "event",
+              "observation"
+            ],
             "title": "Object Type",
             "type": "string"
           },
@@ -7742,7 +8463,11 @@
             "type": "integer"
           }
         },
-        "required": ["object_id", "revision", "object_type"],
+        "required": [
+          "object_id",
+          "revision",
+          "object_type"
+        ],
         "title": "EvidenceReference",
         "type": "object"
       },
@@ -7760,7 +8485,10 @@
             "type": "integer"
           }
         },
-        "required": ["object_id", "revision"],
+        "required": [
+          "object_id",
+          "revision"
+        ],
         "title": "EvidenceReference",
         "type": "object"
       }
@@ -7925,7 +8653,9 @@
           }
         ],
         "summary": "List Proposals",
-        "tags": ["action proposals"]
+        "tags": [
+          "action proposals"
+        ]
       },
       "post": {
         "operationId": "createActionProposal",
@@ -8037,7 +8767,9 @@
           }
         ],
         "summary": "Create Proposal",
-        "tags": ["action proposals"]
+        "tags": [
+          "action proposals"
+        ]
       }
     },
     "/action-proposals/{proposal_id}": {
@@ -8143,7 +8875,9 @@
           }
         ],
         "summary": "Get Proposal",
-        "tags": ["action proposals"]
+        "tags": [
+          "action proposals"
+        ]
       },
       "patch": {
         "operationId": "editActionProposal",
@@ -8257,7 +8991,9 @@
           }
         ],
         "summary": "Edit Proposal",
-        "tags": ["action proposals"]
+        "tags": [
+          "action proposals"
+        ]
       }
     },
     "/action-proposals/{proposal_id}/apply": {
@@ -8373,7 +9109,9 @@
           }
         ],
         "summary": "Apply Proposal",
-        "tags": ["action proposals"]
+        "tags": [
+          "action proposals"
+        ]
       }
     },
     "/action-proposals/{proposal_id}/history": {
@@ -8508,7 +9246,9 @@
           }
         ],
         "summary": "Get Proposal History",
-        "tags": ["action proposals"]
+        "tags": [
+          "action proposals"
+        ]
       }
     },
     "/action-proposals/{proposal_id}/reject": {
@@ -8624,7 +9364,9 @@
           }
         ],
         "summary": "Reject Proposal",
-        "tags": ["action proposals"]
+        "tags": [
+          "action proposals"
+        ]
       }
     },
     "/ai/context": {
@@ -8698,7 +9440,117 @@
           }
         ],
         "summary": "Preview Ai Context",
-        "tags": ["assistant"]
+        "tags": [
+          "assistant"
+        ]
+      }
+    },
+    "/analytics/artifacts/{artifact_id}/history/{revision}": {
+      "get": {
+        "operationId": "getAnalyticsHistory",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "artifact_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Artifact Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revision",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Revision",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsHistoryEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required or invalid."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The owner-scoped analytics item was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics item changed or its state conflicts."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the 65,536 byte limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The analytics request is invalid or exceeds its bounds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health storage is unavailable."
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Get Analytics History",
+        "tags": [
+          "analytics"
+        ]
       }
     },
     "/analytics/associations/catalog": {
@@ -8782,7 +9634,9 @@
           }
         ],
         "summary": "Association Catalog",
-        "tags": ["analytics"]
+        "tags": [
+          "analytics"
+        ]
       }
     },
     "/analytics/catalog": {
@@ -8866,7 +9720,9 @@
           }
         ],
         "summary": "Analytics Catalog",
-        "tags": ["analytics"]
+        "tags": [
+          "analytics"
+        ]
       }
     },
     "/assistant/messages": {
@@ -8940,7 +9796,9 @@
           }
         ],
         "summary": "Send Assistant Message",
-        "tags": ["assistant"]
+        "tags": [
+          "assistant"
+        ]
       }
     },
     "/assistant/status": {
@@ -8974,7 +9832,9 @@
           }
         ],
         "summary": "Assistant Status",
-        "tags": ["assistant"]
+        "tags": [
+          "assistant"
+        ]
       }
     },
     "/associations": {
@@ -9115,7 +9975,9 @@
           }
         ],
         "summary": "Get Associations",
-        "tags": ["analytics"]
+        "tags": [
+          "analytics"
+        ]
       }
     },
     "/contexts": {
@@ -9236,7 +10098,9 @@
           }
         ],
         "summary": "List Contexts",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       },
       "post": {
         "operationId": "createContext",
@@ -9308,7 +10172,9 @@
           }
         ],
         "summary": "Create Context",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/contexts/{context_id}": {
@@ -9394,7 +10260,9 @@
           }
         ],
         "summary": "Archive Context",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       },
       "get": {
         "operationId": "getContext",
@@ -9468,7 +10336,9 @@
           }
         ],
         "summary": "Get Context",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       },
       "patch": {
         "operationId": "updateContext",
@@ -9552,7 +10422,9 @@
           }
         ],
         "summary": "Update Context",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/contexts/{context_id}/history": {
@@ -9651,7 +10523,9 @@
           }
         ],
         "summary": "Context History",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/contexts/{context_id}/lifecycle": {
@@ -9737,7 +10611,9 @@
           }
         ],
         "summary": "Transition Context",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/daily-entries": {
@@ -9831,7 +10707,9 @@
           }
         ],
         "summary": "Create Compound Daily Entry",
-        "tags": ["daily"]
+        "tags": [
+          "daily"
+        ]
       }
     },
     "/events": {
@@ -9977,7 +10855,9 @@
           }
         ],
         "summary": "List Events",
-        "tags": ["daily"]
+        "tags": [
+          "daily"
+        ]
       },
       "post": {
         "operationId": "createEvent",
@@ -10069,7 +10949,9 @@
           }
         ],
         "summary": "Create Event",
-        "tags": ["daily"]
+        "tags": [
+          "daily"
+        ]
       }
     },
     "/events/{event_id}": {
@@ -10175,7 +11057,9 @@
           }
         ],
         "summary": "Delete Event",
-        "tags": ["daily"]
+        "tags": [
+          "daily"
+        ]
       },
       "get": {
         "operationId": "getEvent",
@@ -10259,7 +11143,9 @@
           }
         ],
         "summary": "Get Event",
-        "tags": ["daily"]
+        "tags": [
+          "daily"
+        ]
       },
       "patch": {
         "operationId": "updateEvent",
@@ -10363,7 +11249,9 @@
           }
         ],
         "summary": "Patch Event",
-        "tags": ["daily"]
+        "tags": [
+          "daily"
+        ]
       }
     },
     "/events/{event_id}/history": {
@@ -10401,6 +11289,23 @@
               "minimum": 1,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "revision",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Revision"
             }
           }
         ],
@@ -10472,7 +11377,9 @@
           }
         ],
         "summary": "Get Event History",
-        "tags": ["daily"]
+        "tags": [
+          "daily"
+        ]
       }
     },
     "/experiments": {
@@ -10610,7 +11517,9 @@
           }
         ],
         "summary": "Get Experiments",
-        "tags": ["analytics"]
+        "tags": [
+          "analytics"
+        ]
       },
       "post": {
         "operationId": "createExperiment",
@@ -10702,7 +11611,9 @@
           }
         ],
         "summary": "Post Experiment",
-        "tags": ["analytics"]
+        "tags": [
+          "analytics"
+        ]
       }
     },
     "/experiments/{experiment_id}": {
@@ -10798,7 +11709,9 @@
           }
         ],
         "summary": "Get Experiment",
-        "tags": ["analytics"]
+        "tags": [
+          "analytics"
+        ]
       },
       "patch": {
         "operationId": "updateExperiment",
@@ -10902,7 +11815,9 @@
           }
         ],
         "summary": "Patch Experiment",
-        "tags": ["analytics"]
+        "tags": [
+          "analytics"
+        ]
       }
     },
     "/experiments/{experiment_id}/results": {
@@ -11015,7 +11930,9 @@
           }
         ],
         "summary": "Get Experiment Results",
-        "tags": ["analytics"]
+        "tags": [
+          "analytics"
+        ]
       }
     },
     "/experiments/{experiment_id}/state": {
@@ -11121,7 +12038,9 @@
           }
         ],
         "summary": "Patch Experiment State",
-        "tags": ["analytics"]
+        "tags": [
+          "analytics"
+        ]
       }
     },
     "/goals": {
@@ -11242,7 +12161,9 @@
           }
         ],
         "summary": "List Goals",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       },
       "post": {
         "operationId": "createGoal",
@@ -11314,7 +12235,9 @@
           }
         ],
         "summary": "Create Goal",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/goals/{goal_id}": {
@@ -11400,7 +12323,9 @@
           }
         ],
         "summary": "Archive Goal",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       },
       "get": {
         "operationId": "getGoal",
@@ -11474,7 +12399,9 @@
           }
         ],
         "summary": "Get Goal",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       },
       "patch": {
         "operationId": "updateGoal",
@@ -11558,7 +12485,9 @@
           }
         ],
         "summary": "Update Goal",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/goals/{goal_id}/history": {
@@ -11657,7 +12586,9 @@
           }
         ],
         "summary": "Goal History",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/goals/{goal_id}/lifecycle": {
@@ -11743,7 +12674,9 @@
           }
         ],
         "summary": "Transition Goal",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/healthz": {
@@ -11767,7 +12700,9 @@
           }
         },
         "summary": "Healthcheck",
-        "tags": ["system"]
+        "tags": [
+          "system"
+        ]
       }
     },
     "/insights": {
@@ -11781,7 +12716,12 @@
             "schema": {
               "anyOf": [
                 {
-                  "enum": ["current", "stale", "dismissed", "expired"],
+                  "enum": [
+                    "current",
+                    "stale",
+                    "dismissed",
+                    "expired"
+                  ],
                   "type": "string"
                 },
                 {
@@ -11899,7 +12839,9 @@
           }
         ],
         "summary": "Get Insights",
-        "tags": ["analytics"]
+        "tags": [
+          "analytics"
+        ]
       }
     },
     "/insights/refresh": {
@@ -11993,7 +12935,9 @@
           }
         ],
         "summary": "Refresh Insights",
-        "tags": ["analytics"]
+        "tags": [
+          "analytics"
+        ]
       }
     },
     "/insights/{insight_id}": {
@@ -12089,7 +13033,9 @@
           }
         ],
         "summary": "Get Insight",
-        "tags": ["analytics"]
+        "tags": [
+          "analytics"
+        ]
       }
     },
     "/insights/{insight_id}/state": {
@@ -12195,7 +13141,9 @@
           }
         ],
         "summary": "Patch Insight State",
-        "tags": ["analytics"]
+        "tags": [
+          "analytics"
+        ]
       }
     },
     "/observations": {
@@ -12341,7 +13289,9 @@
           }
         ],
         "summary": "List Observations",
-        "tags": ["daily"]
+        "tags": [
+          "daily"
+        ]
       },
       "post": {
         "operationId": "createObservation",
@@ -12433,7 +13383,9 @@
           }
         ],
         "summary": "Create Observation",
-        "tags": ["daily"]
+        "tags": [
+          "daily"
+        ]
       }
     },
     "/observations/{observation_id}": {
@@ -12539,7 +13491,9 @@
           }
         ],
         "summary": "Delete Observation",
-        "tags": ["daily"]
+        "tags": [
+          "daily"
+        ]
       },
       "get": {
         "operationId": "getObservation",
@@ -12623,7 +13577,9 @@
           }
         ],
         "summary": "Get Observation",
-        "tags": ["daily"]
+        "tags": [
+          "daily"
+        ]
       },
       "patch": {
         "operationId": "updateObservation",
@@ -12727,7 +13683,9 @@
           }
         ],
         "summary": "Patch Observation",
-        "tags": ["daily"]
+        "tags": [
+          "daily"
+        ]
       }
     },
     "/observations/{observation_id}/history": {
@@ -12765,6 +13723,23 @@
               "minimum": 1,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "revision",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Revision"
             }
           }
         ],
@@ -12836,7 +13811,9 @@
           }
         ],
         "summary": "Get Observation History",
-        "tags": ["daily"]
+        "tags": [
+          "daily"
+        ]
       }
     },
     "/plan-occurrences/{occurrence_key}": {
@@ -12921,7 +13898,9 @@
           }
         ],
         "summary": "Update Occurrence",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/plan-occurrences/{occurrence_key}/history": {
@@ -13019,7 +13998,9 @@
           }
         ],
         "summary": "Occurrence History",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/plans": {
@@ -13140,7 +14121,9 @@
           }
         ],
         "summary": "List Plans",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       },
       "post": {
         "operationId": "createPlan",
@@ -13212,7 +14195,9 @@
           }
         ],
         "summary": "Create Plan",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/plans/{plan_id}": {
@@ -13298,7 +14283,9 @@
           }
         ],
         "summary": "Archive Plan",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       },
       "get": {
         "operationId": "getPlan",
@@ -13372,7 +14359,9 @@
           }
         ],
         "summary": "Get Plan",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       },
       "patch": {
         "operationId": "updatePlan",
@@ -13456,7 +14445,9 @@
           }
         ],
         "summary": "Update Plan",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/plans/{plan_id}/history": {
@@ -13555,7 +14546,9 @@
           }
         ],
         "summary": "Plan History",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/plans/{plan_id}/items/order": {
@@ -13641,7 +14634,9 @@
           }
         ],
         "summary": "Reorder Plan",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/plans/{plan_id}/items/{item_id}/schedule": {
@@ -13735,7 +14730,9 @@
           }
         ],
         "summary": "Plan Item Schedule",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       },
       "put": {
         "operationId": "editPlanItemSchedule",
@@ -13829,7 +14826,9 @@
           }
         ],
         "summary": "Edit Plan Item Schedule",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/plans/{plan_id}/lifecycle": {
@@ -13915,7 +14914,9 @@
           }
         ],
         "summary": "Transition Plan",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/plans/{plan_id}/occurrences": {
@@ -14021,7 +15022,9 @@
           }
         ],
         "summary": "Plan Occurrences",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/profile": {
@@ -14149,7 +15152,9 @@
           }
         ],
         "summary": "List Profiles",
-        "tags": ["profile"]
+        "tags": [
+          "profile"
+        ]
       },
       "post": {
         "operationId": "createProfileItem",
@@ -14241,7 +15246,9 @@
           }
         ],
         "summary": "Create Profile",
-        "tags": ["profile"]
+        "tags": [
+          "profile"
+        ]
       }
     },
     "/profile/{item_id}": {
@@ -14347,7 +15354,9 @@
           }
         ],
         "summary": "Delete Profile",
-        "tags": ["profile"]
+        "tags": [
+          "profile"
+        ]
       },
       "get": {
         "operationId": "getProfileItem",
@@ -14431,7 +15440,9 @@
           }
         ],
         "summary": "Get Profile",
-        "tags": ["profile"]
+        "tags": [
+          "profile"
+        ]
       },
       "patch": {
         "operationId": "updateProfileItem",
@@ -14535,7 +15546,9 @@
           }
         ],
         "summary": "Patch Profile",
-        "tags": ["profile"]
+        "tags": [
+          "profile"
+        ]
       }
     },
     "/profile/{item_id}/history": {
@@ -14644,7 +15657,9 @@
           }
         ],
         "summary": "Get Profile History",
-        "tags": ["profile"]
+        "tags": [
+          "profile"
+        ]
       }
     },
     "/recommendations": {
@@ -14782,7 +15797,9 @@
           }
         ],
         "summary": "Get Recommendations",
-        "tags": ["analytics"]
+        "tags": [
+          "analytics"
+        ]
       }
     },
     "/recommendations/{recommendation_id}": {
@@ -14878,7 +15895,9 @@
           }
         ],
         "summary": "Get Recommendation",
-        "tags": ["analytics"]
+        "tags": [
+          "analytics"
+        ]
       }
     },
     "/recommendations/{recommendation_id}/state": {
@@ -14984,7 +16003,9 @@
           }
         ],
         "summary": "Patch Recommendation State",
-        "tags": ["analytics"]
+        "tags": [
+          "analytics"
+        ]
       }
     },
     "/regimens": {
@@ -15105,7 +16126,9 @@
           }
         ],
         "summary": "List Regimens",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       },
       "post": {
         "operationId": "createRegimen",
@@ -15177,7 +16200,9 @@
           }
         ],
         "summary": "Create Regimen",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/regimens/{regimen_id}": {
@@ -15263,7 +16288,9 @@
           }
         ],
         "summary": "Archive Regimen",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       },
       "get": {
         "operationId": "getRegimen",
@@ -15337,7 +16364,9 @@
           }
         ],
         "summary": "Get Regimen",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       },
       "patch": {
         "operationId": "updateRegimen",
@@ -15421,7 +16450,9 @@
           }
         ],
         "summary": "Update Regimen",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/regimens/{regimen_id}/history": {
@@ -15520,7 +16551,9 @@
           }
         ],
         "summary": "Regimen History",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/regimens/{regimen_id}/lifecycle": {
@@ -15606,7 +16639,9 @@
           }
         ],
         "summary": "Transition Regimen",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/regimens/{regimen_id}/occurrences": {
@@ -15712,7 +16747,9 @@
           }
         ],
         "summary": "Regimen Occurrences",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/regimens/{regimen_id}/schedule": {
@@ -15796,7 +16833,9 @@
           }
         ],
         "summary": "Regimen Schedule",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       },
       "put": {
         "operationId": "editRegimenSchedule",
@@ -15880,7 +16919,9 @@
           }
         ],
         "summary": "Edit Regimen Schedule",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/search": {
@@ -16003,7 +17044,9 @@
           }
         ],
         "summary": "Search Ai Eligible Health Data",
-        "tags": ["assistant"]
+        "tags": [
+          "assistant"
+        ]
       }
     },
     "/today": {
@@ -16133,7 +17176,9 @@
           }
         ],
         "summary": "Get Today",
-        "tags": ["daily"]
+        "tags": [
+          "daily"
+        ]
       }
     },
     "/trackers": {
@@ -16238,7 +17283,9 @@
           }
         ],
         "summary": "List Trackers",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       },
       "post": {
         "operationId": "createTracker",
@@ -16310,7 +17357,9 @@
           }
         ],
         "summary": "Create Tracker",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/trackers/{tracker_id}": {
@@ -16396,7 +17445,9 @@
           }
         ],
         "summary": "Archive Tracker",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       },
       "get": {
         "operationId": "getTracker",
@@ -16470,7 +17521,9 @@
           }
         ],
         "summary": "Get Tracker",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       },
       "patch": {
         "operationId": "updateTracker",
@@ -16554,7 +17607,9 @@
           }
         ],
         "summary": "Update Tracker",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/trackers/{tracker_id}/history": {
@@ -16653,7 +17708,9 @@
           }
         ],
         "summary": "Tracker History",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/trackers/{tracker_id}/versions": {
@@ -16752,7 +17809,9 @@
           }
         ],
         "summary": "Tracker Versions",
-        "tags": ["planning"]
+        "tags": [
+          "planning"
+        ]
       }
     },
     "/trends": {
@@ -16886,7 +17945,9 @@
           }
         ],
         "summary": "Get Trend",
-        "tags": ["analytics"]
+        "tags": [
+          "analytics"
+        ]
       }
     }
   }

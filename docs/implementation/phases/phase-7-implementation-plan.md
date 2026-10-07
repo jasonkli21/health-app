@@ -46,6 +46,28 @@ invalidation hook in the same transaction as imported changes. See [Phase 7
 release evidence](../evidence/phase-7-release.md) for commands run and gates
 that remain open.
 
+The October 7 independent review follow-up tightens those contracts: trend
+previews apply request exclusions to source rows and tracker definitions, use
+the context `as_of` instant and envelope validity, and clip crossing intervals
+at that instant. Date-only entries are eligible only through the `as_of` local
+calendar date. Symptom severity uses only active same-day severity observations
+linked to active symptom Events; unrated episodes remain in the denominator.
+Daily edits conservatively invalidate all current analytics because an edit can
+move a previously unreferenced row into a saved scope.
+
+Insight and recommendation identity includes the exact signal revision.
+Recomputation retains prior snapshots and carries accepted/dismissed decisions
+to a new artifact for the same signal identity. Explicit refresh after expiry
+renews an unchanged, undecided artifact by appending a revision; it preserves
+expired history and exact evidence. Effective expiry is applied before list
+state filtering and pagination.
+
+Experiment `end_date` remains the planned inclusive end. Completion or stop
+records an aware `actual_end_at`; results clip source intervals at that
+instant, and date-only values follow the requested local calendar date because
+they have no time-of-day precision. Draft results are unavailable. Experiment
+and planning writes share owner-first locking.
+
 ## Goal / scope
 
 **Deliver:** deterministic derived signals/trends and modest association analysis first; evidence-linked insight/recommendation objects with uncertainty/expiry; transparent Insights surface and manual experiments. Optional AI explains supported results through Personal AI, without becoming numerical/domain authority.

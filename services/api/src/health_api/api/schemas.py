@@ -544,6 +544,13 @@ class DailyHistoryResponse(StrictModel):
     next_after_revision: int | None
 
 
+class AnalyticsHistoryEntry(StrictModel):
+    object_id: UUID
+    revision: Annotated[int, Field(ge=1)]
+    recorded_at: datetime
+    snapshot: dict[str, Any]
+
+
 class ProfileContextReference(StrictModel):
     id: UUID
     title: Annotated[str, Field(min_length=1, max_length=120)]
