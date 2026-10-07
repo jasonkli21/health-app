@@ -10,6 +10,42 @@ Every HTTP response includes a server-generated `X-Request-ID`. Errors use `{ "c
 
 Times must include a UTC offset and are normalized to UTC. Validity is half-open: `valid_from <= as_of < valid_to`, with either endpoint nullable. Required `profile.value: null` means unknown; it differs from numeric zero and boolean false. A missing PATCH field preserves the stored value, while an explicit null clears optional notes, metadata, or validity endpoints. Profile payload and permission fields reject explicit null. Permission flags default to false.
 
+## Phase 9 account data and domain erasure
+
+`GET /exports/current` returns a no-store, versioned JSON snapshot of the
+authenticated owner's current relational data in one repeatable-read database
+transaction. It includes every current health-domain table with `owner_id`,
+including provenance, permissions, revisions, proposal receipts, HealthKit
+import identities and preferences. Internal deletion-job state and the
+erasure ledger are excluded; deletion status has its own endpoint. It excludes
+provider credentials and signed URLs. The manifest states that original
+record files are not included because document ingress is not enabled.
+Synchronous exports are bounded to 100,000 rows and 20 MiB; larger snapshots
+return 413 until a durable export worker is available.
+
+`POST /deletion-requests` requires a unique `request_id`, the exact
+`DELETE MY HEALTH DATA` confirmation, and a Firebase token whose `auth_time` is
+within five minutes. Local development uses its server-configured principal
+and explicit confirmation. The server commits a durable owner write freeze
+before private object cleanup. Each request removes at most 1,000 current or
+noncurrent object generations and 10,000 relational rows, with each relational
+batch capped at 1,000 rows. A `running` response means submit the same request
+again to continue; `GET /deletion-requests/{request_id}` exposes only the
+health-free state, timestamps, and a sanitized error code. A failed request can
+also be retried with the same request body; a completed request replays its
+status.
+
+The shared Firebase identity and minimal owner erasure marker remain as inputs
+for a future restore replay step. The marker alone does not stop an older
+database backup from restoring erased domain data; no backup/restore pipeline
+or replay runner is implemented. Domain erasure does not delete Firebase or
+other-app accounts. This local API implementation does not establish a real
+Neon/GCS restore drill or external-copy erasure.
+
+Document upload, view, extraction, and lab import routes are not present. They
+remain disabled until the file validation/quarantine and extraction-retention
+contracts in the Phase 9 plan have verified external implementations.
+
 ## Profile v1 routes
 
 | Method and path                                 | Operation ID         | Behavior                                                                                                    |

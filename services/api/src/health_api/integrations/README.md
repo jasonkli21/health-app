@@ -26,3 +26,9 @@ bucket, validation/quarantine, retention policy, and a reviewable record
 lifecycle before a product route is enabled. Use synthetic payloads in
 [object-storage tests](../../../tests/test_object_storage.py); do not put
 real health documents in fixtures or logs.
+
+Phase 9 adds owner-prefix cleanup for erasure. It removes only opaque `.blob`
+objects under the configured owner's namespace, uses GCS generation
+preconditions, includes noncurrent GCS generations, and handles at most 1,000
+objects per call. A larger namespace or storage failure leaves the deletion job
+retryable; the API does not report completion before object cleanup succeeds.

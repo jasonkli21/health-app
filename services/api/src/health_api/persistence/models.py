@@ -46,7 +46,10 @@ class User(Base):
     daily_sequence: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
 
     __table_args__ = (
-        CheckConstraint("lifecycle IN ('active', 'disabled')", name="ck_users_lifecycle"),
+        CheckConstraint(
+            "lifecycle IN ('active', 'disabled', 'deleting', 'erased')",
+            name="ck_users_lifecycle",
+        ),
         CheckConstraint("daily_sequence >= 0", name="ck_users_daily_sequence"),
     )
 
@@ -1413,4 +1416,66 @@ class HealthRelationship(Base):
         ),
         Index("ix_health_relationships_owner_from", "owner_id", "from_object_id"),
         Index("ix_health_relationships_owner_to", "owner_id", "to_object_id"),
+    )
+
+
+class OwnerDeletionJob(Base):
+    """Durable, health-free status for one explicit owner erasure request."""
+
+    __tablename__ = "owner_deletion_jobs"
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    owner_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="running")
+    error_code: Mapped[str | None] = mapped_column(String(48))
+    requested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["owner_id"], ["users.id"], ondelete="RESTRICT", name="fk_owner_deletion_jobs_owner"
+        ),
+        UniqueConstraint("owner_id", "id", name="uq_owner_deletion_jobs_owner_id"),
+        CheckConstraint(
+            "status IN ('running', 'failed', 'completed')", name="ck_owner_deletion_jobs_status"
+        ),
+        CheckConstraint(
+            "(status = 'completed') = (completed_at IS NOT NULL)",
+            name="ck_owner_deletion_jobs_completed_at",
+        ),
+        CheckConstraint(
+            "error_code IS NULL OR error_code IN "
+            "('object_storage_unavailable', 'database_cleanup_failed')",
+            name="ck_owner_deletion_jobs_error_code",
+        ),
+        Index("ix_owner_deletion_jobs_owner_requested", "owner_id", "requested_at"),
+    )
+
+
+class OwnerErasureLedger(Base):
+    """Minimal erasure marker for a future isolated backup-restore replay step."""
+
+    __tablename__ = "owner_erasure_ledger"
+
+    owner_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    erased_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    retention_policy: Mapped[str] = mapped_column(
+        String(48), nullable=False, server_default="until_backup_policy_is_verified"
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["owner_id"], ["users.id"], ondelete="RESTRICT", name="fk_owner_erasure_ledger_owner"
+        ),
+        CheckConstraint(
+            "retention_policy = 'until_backup_policy_is_verified'",
+            name="ck_owner_erasure_ledger_retention_policy",
+        ),
     )

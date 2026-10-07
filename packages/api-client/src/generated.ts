@@ -720,6 +720,9 @@ export interface components {
       resource_type: "steps" | "heart_rate_summary";
       revision: number;
     };
+    HTTPValidationError: {
+      detail?: Array<components["schemas"]["ValidationError"]>;
+    };
     InsightEvidenceReference: {
       object_id: string;
       object_type: "derived_signal" | "event" | "observation";
@@ -928,6 +931,20 @@ export interface components {
       schedule_revision: number;
       state: "unknown" | "completed" | "skipped" | "rescheduled";
       timezone: string;
+    };
+    OwnerDeletionRequest: {
+      confirmation: "DELETE MY HEALTH DATA";
+      request_id: string;
+    };
+    OwnerDeletionResponse: {
+      completed_at: string | null;
+      error_code:
+        | "object_storage_unavailable"
+        | "database_cleanup_failed"
+        | null;
+      request_id: string;
+      requested_at: string;
+      status: "running" | "failed" | "completed";
     };
     PeriodComparison: {
       after: components["schemas"]["PeriodSummary"];
@@ -1589,6 +1606,13 @@ export interface components {
       unit: string;
     };
     UTCInstant: string;
+    ValidationError: {
+      ctx?: Record<string, never>;
+      input?: unknown;
+      loc: Array<string | number>;
+      msg: string;
+      type: string;
+    };
     WorkoutEventV1: {
       distance?: components["schemas"]["DistanceQuantity"] | null;
       duration?: components["schemas"]["DurationQuantity"] | null;
@@ -1953,6 +1977,9 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  exportCurrentOwnerData: {
+    responses: { "200": Record<string, never> };
+  };
   getActionProposal: {
     path: {
       proposal_id: string;
@@ -2121,6 +2148,15 @@ export interface operations {
       "413": components["schemas"]["ErrorResponse"];
       "422": components["schemas"]["ErrorResponse"];
       "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  getOwnerDataDeletionStatus: {
+    path: {
+      request_id: string;
+    };
+    responses: {
+      "200": components["schemas"]["OwnerDeletionResponse"];
+      "422": components["schemas"]["HTTPValidationError"];
     };
   };
   getPlan: {
@@ -2751,6 +2787,13 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  requestOwnerDataDeletion: {
+    requestBody: components["schemas"]["OwnerDeletionRequest"];
+    responses: {
+      "202": components["schemas"]["OwnerDeletionResponse"];
+      "422": components["schemas"]["HTTPValidationError"];
+    };
+  };
   searchAIEligibleHealthData: {
     query: {
       q: string;
@@ -3312,6 +3355,15 @@ export class HealthApiClient {
     );
   }
 
+  async exportCurrentOwnerData(): Promise<Record<string, never>> {
+    return this.request<Record<string, never>>(
+      "GET",
+      `/exports/current`,
+      undefined,
+      undefined,
+    );
+  }
+
   async getActionProposal(
     path: operations["getActionProposal"]["path"],
   ): Promise<components["schemas"]["ProposalState"]> {
@@ -3448,6 +3500,17 @@ export class HealthApiClient {
     return this.request<components["schemas"]["DailyObservationResponse"]>(
       "GET",
       `/observations/${encodeURIComponent(path.observation_id)}`,
+      undefined,
+      undefined,
+    );
+  }
+
+  async getOwnerDataDeletionStatus(
+    path: operations["getOwnerDataDeletionStatus"]["path"],
+  ): Promise<components["schemas"]["OwnerDeletionResponse"]> {
+    return this.request<components["schemas"]["OwnerDeletionResponse"]>(
+      "GET",
+      `/deletion-requests/${encodeURIComponent(path.request_id)}`,
       undefined,
       undefined,
     );
@@ -3918,6 +3981,17 @@ export class HealthApiClient {
     return this.request<components["schemas"]["PlanResponse"]>(
       "PUT",
       `/plans/${encodeURIComponent(path.plan_id)}/items/order`,
+      undefined,
+      requestBody,
+    );
+  }
+
+  async requestOwnerDataDeletion(
+    requestBody: operations["requestOwnerDataDeletion"]["requestBody"],
+  ): Promise<components["schemas"]["OwnerDeletionResponse"]> {
+    return this.request<components["schemas"]["OwnerDeletionResponse"]>(
+      "POST",
+      `/deletion-requests`,
       undefined,
       requestBody,
     );

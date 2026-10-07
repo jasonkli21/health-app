@@ -16,10 +16,16 @@ key can bind to the one canonical applied result. Phase 7 revision
 aggregate source preferences, and additive Observation metrics. Follow-up
 revision `20261007a0b1` adds bounded aggregate source revisions, deletion
 identities without fabricated health objects, user-archive protection, and
-step bounds/date-only checks; it is the current head. The Phase 8 downgrade
+step bounds/date-only checks. Phase 9 revision `20261007b1c2` adds durable
+owner deletion status, a health-free erasure-intent ledger, lifecycle
+states for deletion, and database write guards for every current owner table;
+it is the current head. The Phase 8 downgrade
 refuses when imported identities, batch history, or unrepresentable aggregate
 revision state exists. Phase 7 downgrade refuses when alternate receipt keys
 have already been accepted for one proposal revision.
+Phase 9 downgrade refuses after any deletion state has been written, because
+removing the write freeze would reopen owner writes and removing the ledger
+would discard erasure intent needed by a future restore-replay process.
 The API never calls `metadata.create_all()` and never runs migrations during a
 request or startup.
 

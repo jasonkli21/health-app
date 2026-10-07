@@ -4,6 +4,39 @@
 
 Check [current state](../../current-state.md) for delivery status and open gates. This plan defines intended scope; it is not evidence of delivery or authorization to begin work. Before implementation or a follow-up, inspect current code, preceding release/review evidence, accepted ADRs and contracts, and external dependencies. Reconcile material drift here before coding.
 
+### Reconciliation for the local account-data foundation (October 7, 2026)
+
+The repository currently has only private object-storage primitives. It has no
+record lifecycle, malware scanner/quarantine service, isolated file parser, or
+approved Personal AI extraction protocol/retention policy. P9.2/P9.3 document
+upload, view, extraction, and lab-import routes therefore remain absent; local
+signature checks alone would not satisfy the plan's scanner/parser gate. The
+20 MiB synchronous export cap is implemented as a small-export boundary; a
+durable export task is still required for larger snapshots.
+
+The first local P9.4 slice implements repeatable-read owner JSON export and an
+explicit recent-auth domain-erasure request. The erasure freezes writes in
+PostgreSQL before cleanup, removes private object generations in retryable
+batches of at most 1,000, and deletes owner rows in reverse dependency order
+with at most 1,000 rows per transaction and 10,000 rows per request. A `running`
+response means the same idempotent request should be submitted again; the
+health-free status can be read independently. The deletion status is durable,
+but processing is request-driven rather than a background worker. The owner
+UUID, Firebase subject mapping, and a health-free erasure marker remain until
+backup retention is verified; they preserve erasure intent in the current
+database. The marker alone does not suppress an older database restore. The
+mobile screen clears the account's saved consent and
+indexed checkpoints after server completion; no native HealthKit adapter
+currently writes checkpoints, so device/account-switch acceptance remains
+open. Encrypted portable backups, a restore drill, and external-copy deletion
+remain required. The ledger remains in the current database as erasure intent;
+without a separate restore replay process it does not prevent an older database
+backup from resurrecting the owner.
+
+This reconciliation describes a local foundation, not P9.4 acceptance or
+Phase 9 completion. Do not enable document ingress or claim complete erasure,
+recovery, cloud, device, or whole-system acceptance from this slice.
+
 ## User outcome and boundary
 
 **Deliver:** private document records, bounded lab extraction as reviewed proposals, structured imported Observations, provenance/evidence; owner-scoped export, tested backups/restore and deletion; security/integrity/performance/E2E hardening of the entire mobile/backend roadmap.

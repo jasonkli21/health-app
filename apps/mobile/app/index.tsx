@@ -83,6 +83,13 @@ export default function HomeScreen() {
         >
           Health connections
         </Link>
+        <Link
+          accessibilityRole="button"
+          style={styles.secondaryLink}
+          href="/account-data"
+        >
+          Your data
+        </Link>
       </View>
     </SafeAreaView>
   );

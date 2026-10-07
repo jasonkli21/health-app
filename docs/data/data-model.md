@@ -144,6 +144,31 @@ Today/trend inputs ignore unselected aggregate installations. Phase 9 erasure
 must remove owner-scoped import receipts/identities/preferences, secure local
 checkpoints, and local consent before preventing automatic re-import.
 
+## Phase 9 account export and erasure state
+
+`owner_deletion_jobs` stores only a client-generated request UUID, the owner
+UUID, lifecycle status, timestamps, and a fixed sanitized error code. It does
+not store health content. The job commits the owner's `deleting` lifecycle
+before object cleanup; PostgreSQL write triggers take a shared lock on the
+owner row and reject new owner-scoped inserts/updates after that transition.
+On successful cleanup, owner-domain rows are deleted in reverse foreign-key
+dependency order, and the account is marked `erased`.
+
+`owner_erasure_ledger` retains only the owner UUID and erasure time as input for
+a future isolated backup-restore replay step. The owner row is retained with
+UTC timezone, zero daily sequence, erased lifecycle, and its provider identity
+mapping. The marker alone does not suppress an older database restore; no
+restore replay runner exists. Its expiry remains unset until backup retention
+and restore behavior can establish a safe policy.
+
+The JSON export uses one repeatable-read snapshot across all current
+health-domain tables with an `owner_id` column. Internal deletion-job state and
+the erasure ledger are excluded; deletion status has its own endpoint. Its
+explicit inventory must be reconciled whenever a new owner table is added.
+Original document files and provider identity mappings are excluded; file
+records are not yet implemented, and the manifest records that omission. The
+current data model has no record or extraction subtype.
+
 ## Phase 1 Profile v1 contract
 
 Phase 1 registers only `profile_item` schema version 1. Its payload has `kind`, `category`, stable lower-case `key`, display `label`, and a required `value`. A JSON `null` value means unknown. Tagged values are `text`, `boolean`, finite `number`, finite `quantity` with a supported unit, and a bounded `text_list`. `false` and `0` remain known values. Extra payload fields and unregistered type/version pairs are rejected. Category and kind must agree: fact/background, constraint/constraints, preference/preferences.

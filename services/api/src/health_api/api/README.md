@@ -58,6 +58,19 @@ content hash plus `confirmation: explicit_user_save`; retries replay a durable
 owner-scoped command receipt. See the root API contract and Phase 6 release
 evidence for all fields and current external gates.
 
+## Account data and erasure
+
+`account_data.py` exposes a bounded repeatable-read JSON export and explicit
+owner erasure request/status routes. The application layer owns the current
+owner-table inventory and dependency-ordered cleanup. Erasure requires exact
+confirmation and recent Firebase authentication; PostgreSQL triggers freeze
+owner writes once the durable deletion job commits. Private object cleanup is
+generation-conditional and retryable. The Firebase identity and health-free
+erasure marker remain as inputs for a future restore replay step; the marker
+alone does not prevent restoring an older database backup. Record ingress,
+external AI retention deletion, and actual cloud restore remain outside this
+release.
+
 ## Optional HealthKit import
 
 `healthkit_imports.py` exposes owner-authenticated normalized batches,

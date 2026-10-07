@@ -29,3 +29,15 @@ unique by owner/idempotency key and by owner/proposal/revision. SQL echo is off
 so bound health values do not reach routine logs. Keep additional query/use-case
 rules in the application layer and add new subtype tables only in their owning
 phase.
+
+Phase 9 adds `owner_deletion_jobs` and `owner_erasure_ledger`. The former keeps
+only the authenticated request ID, lifecycle status, timestamps, and
+sanitized failure code. The latter retains the owner UUID and erasure time as
+input for a future isolated restore-replay step while backup retention is
+unverified. The marker alone does not suppress an older database restore; no
+restore replay runner is implemented.
+Migration `20261007b1c2` adds database write guards to every current
+owner-scoped table: inserts and updates take a shared owner-row lock and reject
+owners whose lifecycle is no longer active. Deletes remain available to the
+erasure transaction. Keep both the ORM inventory and migration trigger list in
+sync when a future phase adds an owner table.

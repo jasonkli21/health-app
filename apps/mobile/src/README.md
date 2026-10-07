@@ -8,3 +8,10 @@ Native-only integrations such as HealthKit must stay behind mobile-specific adap
 trends, bounded same-day associations, evidence-linked insight/recommendation
 history, and manual experiment drafts/results. `CurrentInsightCards` adds at
 most three current, unexpired insights to Today and links to the full surface.
+
+`features/account-data` uses the generated Phase 9 API client for owner JSON
+export and explicit domain deletion. A deletion request ID is kept in secure
+storage until the server reports completion; then the app removes the
+account-scoped HealthKit consent and indexed checkpoint entries before
+signing out. The share sheet is user-directed and may retain its own export
+copy. This does not erase Apple Health originals or external service copies.

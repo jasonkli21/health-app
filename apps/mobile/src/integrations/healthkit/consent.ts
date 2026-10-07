@@ -4,6 +4,14 @@ import { secureKeySegment } from "./secureKey";
 import type { HealthKitResourceType } from "./types";
 
 const DEFAULT_LOOKBACK_DAYS = 30;
+const RESOURCE_TYPES: HealthKitResourceType[] = [
+  "workouts",
+  "sleep",
+  "steps",
+  "weight",
+  "resting_heart_rate",
+  "heart_rate_summary",
+];
 
 function consentKey(
   ownerId: string,
@@ -64,5 +72,17 @@ export class HealthKitConsentStore {
     if (!Number.isInteger(value) || value < 1 || value > 90)
       throw new Error("Initial import lookback must be between 1 and 90 days.");
     await SecureStore.setItemAsync(lookbackKey(ownerId), String(value));
+  }
+
+  async clearOwner(ownerId: string): Promise<void> {
+    for (const resourceType of RESOURCE_TYPES) {
+      const scope = `${secureKeySegment(ownerId)}.${resourceType}`;
+      HealthKitConsentStore.versions.set(
+        scope,
+        (HealthKitConsentStore.versions.get(scope) ?? 0) + 1,
+      );
+      await SecureStore.deleteItemAsync(consentKey(ownerId, resourceType));
+    }
+    await SecureStore.deleteItemAsync(lookbackKey(ownerId));
   }
 }

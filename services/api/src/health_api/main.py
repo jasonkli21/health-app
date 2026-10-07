@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from health_api.api.account_data import router as account_data_router
 from health_api.api.ai import router as ai_router
 from health_api.api.analytics import router as analytics_router
 from health_api.api.daily import router as daily_router
@@ -52,7 +53,8 @@ def create_app(
         title="Personal Health API",
         version="1.0.0",
         description=(
-            "Owner-scoped Profile, daily Event/Observation, planning, and read-only Assistant APIs. "
+            "Owner-scoped account data, Profile, daily Event/Observation, planning, and read-only "
+            "Assistant APIs. "
             "Identity is resolved from server configuration or verified Firebase bearer tokens. "
             "Request bodies are limited to 65,536 bytes except normalized HealthKit batches, "
             "which are limited to 1,048,576 bytes."
@@ -88,6 +90,7 @@ def create_app(
     app.include_router(proposals_router)
     app.include_router(analytics_router)
     app.include_router(healthkit_import_router)
+    app.include_router(account_data_router)
 
     @app.get("/healthz", tags=["system"], operation_id="healthcheck")
     def healthcheck() -> dict[str, str]:

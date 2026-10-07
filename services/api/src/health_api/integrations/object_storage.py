@@ -34,6 +34,10 @@ class ObjectStorageUnavailable(ObjectStorageError):
     """The adapter or its backing service is unavailable."""
 
 
+class ObjectCleanupPending(ObjectStorageError):
+    """A bounded owner-prefix cleanup batch completed and more work remains."""
+
+
 @dataclass(frozen=True)
 class StoredObjectRef:
     object_id: UUID
@@ -53,6 +57,8 @@ class ObjectStorage(Protocol):
     def get(self, owner_id: UUID, object_id: UUID) -> StoredObject: ...
 
     def delete(self, owner_id: UUID, object_id: UUID) -> bool: ...
+
+    def delete_owner(self, owner_id: UUID) -> None: ...
 
 
 _CONTENT_TYPE = re.compile(r"[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+\Z")
@@ -171,6 +177,38 @@ class LocalObjectStorage:
                 if exc.errno == errno.ELOOP:
                     raise ObjectStorageUnavailable from None
                 raise ObjectStorageUnavailable from None
+        finally:
+            os.close(objects_fd)
+
+    def delete_owner(self, owner_id: UUID) -> None:
+        """Delete at most 1,000 opaque objects; retries safely finish larger namespaces."""
+        try:
+            objects_fd = self._open_owner_objects(owner_id, create=False)
+        except ObjectNotFound:
+            return
+        try:
+            names: list[str] = []
+            more_objects = False
+            with os.scandir(objects_fd) as entries:
+                for entry in entries:
+                    if not re.fullmatch(r"[0-9a-f]{32}\.blob", entry.name):
+                        raise ObjectStorageUnavailable
+                    if len(names) == 1000:
+                        more_objects = True
+                        break
+                    names.append(entry.name)
+            batch = names
+            for name in batch:
+                try:
+                    os.unlink(name, dir_fd=objects_fd)
+                except FileNotFoundError:
+                    continue
+                except OSError:
+                    raise ObjectStorageUnavailable from None
+            if more_objects:
+                raise ObjectCleanupPending
+        except OSError:
+            raise ObjectStorageUnavailable from None
         finally:
             os.close(objects_fd)
 
@@ -328,6 +366,57 @@ class GCSObjectStorage:
             if _looks_like_not_found(exc):
                 return False
             raise ObjectStorageUnavailable from None
+
+    def delete_owner(self, owner_id: UUID) -> None:
+        """Delete a bounded prefix batch with generation preconditions; repeat until empty."""
+        prefix = f"owners/{owner_id.hex}/objects/"
+        try:
+            blobs = list(
+                self._bucket.list_blobs(
+                    prefix=prefix,
+                    max_results=1001,
+                    versions=True,
+                    timeout=self.timeout_seconds,
+                    retry=None,
+                )
+            )
+            batch = blobs[:1000]
+            for blob in batch:
+                name = getattr(blob, "name", "")
+                if not name.startswith(prefix) or not re.fullmatch(
+                    r"owners/[0-9a-f]{32}/objects/[0-9a-f]{32}\.blob", name
+                ):
+                    raise ObjectStorageUnavailable
+                generation = int(blob.generation)
+                try:
+                    blob.delete(
+                        if_generation_match=generation,
+                        timeout=self.timeout_seconds,
+                        retry=None,
+                    )
+                except (
+                    GoogleAPICallError,
+                    GoogleAuthError,
+                    OSError,
+                    TimeoutError,
+                    TypeError,
+                    ValueError,
+                ) as exc:
+                    if not _looks_like_not_found(exc):
+                        raise ObjectStorageUnavailable from None
+        except ObjectStorageUnavailable:
+            raise
+        except (
+            GoogleAPICallError,
+            GoogleAuthError,
+            OSError,
+            TimeoutError,
+            TypeError,
+            ValueError,
+        ):
+            raise ObjectStorageUnavailable from None
+        if len(blobs) > len(batch):
+            raise ObjectCleanupPending
 
 
 def create_object_storage(settings: Settings) -> ObjectStorage:

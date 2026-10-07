@@ -10,7 +10,12 @@ from sqlalchemy.orm import Session
 
 
 def resolve_provider_identity(
-    session: Session, *, issuer: str, subject: str, display_timezone: str
+    session: Session,
+    *,
+    issuer: str,
+    subject: str,
+    display_timezone: str,
+    allow_erasure_status: bool = False,
 ) -> UUID | None:
     """Create one principal on first login, safely coalescing concurrent attempts."""
     if not issuer or len(issuer) > 256 or not subject or len(subject) > 128:
@@ -20,7 +25,10 @@ def resolve_provider_identity(
         current = session.get(ProviderIdentity, (issuer, subject))
         if current is not None:
             owner = session.get(User, current.user_id)
-            if owner is None or owner.lifecycle != "active":
+            allowed_lifecycle = {"active"}
+            if allow_erasure_status:
+                allowed_lifecycle.update({"deleting", "erased"})
+            if owner is None or owner.lifecycle not in allowed_lifecycle:
                 return None
             return owner.id
 
@@ -45,7 +53,10 @@ def resolve_provider_identity(
             if current is None:
                 return None
             owner = session.get(User, current.user_id)
-            if owner is None or owner.lifecycle != "active":
+            allowed_lifecycle = {"active"}
+            if allow_erasure_status:
+                allowed_lifecycle.update({"deleting", "erased"})
+            if owner is None or owner.lifecycle not in allowed_lifecycle:
                 return None
             return owner.id
 

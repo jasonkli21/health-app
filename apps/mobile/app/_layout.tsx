@@ -51,6 +51,7 @@ export default function RootLayout() {
         <Stack.Screen name="planning/occurrence-history" />
         <Stack.Screen name="assistant" />
         <Stack.Screen name="healthkit" />
+        <Stack.Screen name="account-data" />
         <Stack.Screen name="profile/new" />
         <Stack.Screen name="profile/[itemId]" />
         <Stack.Screen name="profile/[itemId]/edit" />

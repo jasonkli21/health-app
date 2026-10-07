@@ -4,6 +4,17 @@ This is a personal project, not a claim of formal HIPAA compliance. Health data 
 
 Baseline: no DB credentials on clients; TLS; private object storage; short-lived signed URLs; opaque object keys; separated environments; least privilege; per-user ownership checks; no routine logging of sensitive health payloads; export/deletion before maturity.
 
+Phase 9 adds a no-store owner JSON export with repeatable-read consistency and
+row/byte bounds. Domain deletion requires explicit confirmation and, in
+Firebase mode, a verified token with `auth_time` no older than five minutes.
+The request commits an owner write freeze before it removes private object
+generations and relational history/import/proposal data. A health-free owner
+marker and Firebase subject mapping remain as inputs for a future restore
+replay step. The marker alone does not stop an older database backup from
+restoring deleted data; no restore pipeline exists. Domain deletion does not
+remove a Firebase identity, Apple HealthKit originals, or external Personal AI
+copies.
+
 Health objects should be designed for AI-use and future cross-domain-use permissions. Distinguish user-entered, imported, extracted, and derived information.
 
 The future web client follows the same rule: no direct Neon access from browser code and no bypass of the Health API authorization boundary.

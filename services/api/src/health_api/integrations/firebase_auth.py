@@ -20,6 +20,7 @@ class VerifierUnavailable(Exception):
 class VerifiedIdentity:
     issuer: str
     subject: str
+    auth_time: int | None = None
 
 
 class IdentityVerifier(Protocol):
@@ -80,6 +81,7 @@ class FirebaseTokenVerifier:
             issuer = claims.get("iss")
             audience = claims.get("aud")
             subject = claims.get("sub")
+            auth_time = claims.get("auth_time")
             if (
                 issuer != expected_issuer
                 or audience != self.project_id
@@ -88,7 +90,9 @@ class FirebaseTokenVerifier:
                 or len(subject) > 128
             ):
                 raise TokenVerificationError
-            return VerifiedIdentity(issuer=issuer, subject=subject)
+            if isinstance(auth_time, bool) or not isinstance(auth_time, int):
+                auth_time = None
+            return VerifiedIdentity(issuer=issuer, subject=subject, auth_time=auth_time)
         except (TokenVerificationError, VerifierUnavailable):
             raise
         except Exception as exc:

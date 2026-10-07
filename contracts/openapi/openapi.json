@@ -3061,6 +3061,19 @@
         "title": "GoalUpdateRequest",
         "type": "object"
       },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
       "HealthKitImportBatchRequest": {
         "additionalProperties": false,
         "properties": {
@@ -4672,6 +4685,80 @@
           "linked_event_id"
         ],
         "title": "OccurrenceResponse",
+        "type": "object"
+      },
+      "OwnerDeletionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmation": {
+            "const": "DELETE MY HEALTH DATA",
+            "title": "Confirmation",
+            "type": "string"
+          },
+          "request_id": {
+            "format": "uuid",
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": ["request_id", "confirmation"],
+        "title": "OwnerDeletionRequest",
+        "type": "object"
+      },
+      "OwnerDeletionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "object_storage_unavailable",
+                  "database_cleanup_failed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "request_id": {
+            "format": "uuid",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "requested_at": {
+            "format": "date-time",
+            "title": "Requested At",
+            "type": "string"
+          },
+          "status": {
+            "enum": ["running", "failed", "completed"],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "status",
+          "requested_at",
+          "completed_at",
+          "error_code"
+        ],
+        "title": "OwnerDeletionResponse",
         "type": "object"
       },
       "PeriodComparison": {
@@ -8303,6 +8390,42 @@
         "format": "date-time",
         "type": "string"
       },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": ["loc", "msg", "type"],
+        "title": "ValidationError",
+        "type": "object"
+      },
       "WorkoutEventV1": {
         "additionalProperties": false,
         "properties": {
@@ -8393,7 +8516,7 @@
     }
   },
   "info": {
-    "description": "Owner-scoped Profile, daily Event/Observation, planning, and read-only Assistant APIs. Identity is resolved from server configuration or verified Firebase bearer tokens. Request bodies are limited to 65,536 bytes except normalized HealthKit batches, which are limited to 1,048,576 bytes.",
+    "description": "Owner-scoped account data, Profile, daily Event/Observation, planning, and read-only Assistant APIs. Identity is resolved from server configuration or verified Firebase bearer tokens. Request bodies are limited to 65,536 bytes except normalized HealthKit batches, which are limited to 1,048,576 bytes.",
     "title": "Personal Health API",
     "version": "1.0.0"
   },
@@ -10559,6 +10682,96 @@
         "tags": ["daily"]
       }
     },
+    "/deletion-requests": {
+      "post": {
+        "operationId": "requestOwnerDataDeletion",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerDeletionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerDeletionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Request Owner Data Deletion",
+        "tags": ["account-data"]
+      }
+    },
+    "/deletion-requests/{request_id}": {
+      "get": {
+        "operationId": "getOwnerDataDeletionStatus",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerDeletionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Get Owner Data Deletion Status",
+        "tags": ["account-data"]
+      }
+    },
     "/events": {
       "get": {
         "operationId": "listEvents",
@@ -11864,6 +12077,30 @@
         ],
         "summary": "Patch Experiment State",
         "tags": ["analytics"]
+      }
+    },
+    "/exports/current": {
+      "get": {
+        "operationId": "exportCurrentOwnerData",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Export Current Owner Data",
+        "tags": ["account-data"]
       }
     },
     "/goals": {

@@ -8,7 +8,9 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 
-def ensure_local_principal(session: Session, settings: Settings) -> UUID | None:
+def ensure_local_principal(
+    session: Session, settings: Settings, *, allow_erasure_status: bool = False
+) -> UUID | None:
     principal_id = settings.local_principal_id
     if principal_id is None:
         return None
@@ -20,8 +22,14 @@ def ensure_local_principal(session: Session, settings: Settings) -> UUID | None:
             .on_conflict_do_nothing(index_elements=[User.id])
         )
         principal = session.get(User, principal_id)
-        if principal is None or principal.lifecycle != "active":
+        allowed_lifecycle = {"active"}
+        if allow_erasure_status:
+            allowed_lifecycle.update({"deleting", "erased"})
+        if principal is None or principal.lifecycle not in allowed_lifecycle:
             return None
-        if principal.display_timezone != settings.local_principal_timezone:
+        if (
+            principal.lifecycle == "active"
+            and principal.display_timezone != settings.local_principal_timezone
+        ):
             principal.display_timezone = settings.local_principal_timezone
     return principal_id

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from time import time
 from typing import Annotated, cast
 from uuid import UUID
 
@@ -48,10 +49,16 @@ def get_current_owner(
     settings: Annotated[Settings, Depends(get_settings)],
     authorization: Annotated[HTTPAuthorizationCredentials | None, Security(_bearer_scheme)] = None,
 ) -> UUID:
+    allow_erasure_status = request.url.path == "/deletion-requests" or request.url.path.startswith(
+        "/deletion-requests/"
+    )
     if settings.auth_mode == "dev":
-        owner_id = ensure_local_principal(session, settings)
+        owner_id = ensure_local_principal(
+            session, settings, allow_erasure_status=allow_erasure_status
+        )
         if owner_id is None:
             raise APIError(401, "principal_unavailable", "Local principal is unavailable.")
+        request.state.auth_time = int(time())
         return owner_id
 
     token = _bearer_token(authorization.credentials if authorization is not None else None)
@@ -72,7 +79,9 @@ def get_current_owner(
         issuer=identity.issuer,
         subject=identity.subject,
         display_timezone=settings.local_principal_timezone,
+        allow_erasure_status=allow_erasure_status,
     )
+    request.state.auth_time = identity.auth_time
     if owner_id is None:
         raise APIError(401, "principal_unavailable", "The authenticated account is unavailable.")
     return owner_id
