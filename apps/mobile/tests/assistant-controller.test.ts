@@ -309,4 +309,91 @@ describe("Assistant controller request wiring", () => {
       expect(controller.searchError).toBeNull();
     },
   );
+
+  it("rejects an in-flight search across blur and refocus", async () => {
+    const oldSearch = deferred<{
+      items: { object_id: string }[];
+      next_cursor: null;
+    }>();
+    const currentSearch = deferred<{
+      items: { object_id: string }[];
+      next_cursor: null;
+    }>();
+    api.assistantApi.searchAIEligibleHealthData
+      .mockReturnValueOnce(oldSearch.promise)
+      .mockReturnValueOnce(currentSearch.promise);
+
+    let controller = renderController();
+    controller.toggleResourceType("event", true);
+    controller = renderController();
+    controller.changeSearchText("walk");
+    controller = renderController();
+    const oldRequest = controller.search();
+    controller = renderController();
+    expect(controller.busy).toBe(true);
+
+    hooks.blur();
+    controller = renderController();
+    expect(controller.busy).toBe(false);
+    hooks.focus();
+    controller = renderController();
+
+    const currentRequest = controller.search();
+    controller = renderController();
+    expect(controller.busy).toBe(true);
+    oldSearch.resolve({ items: [{ object_id: "stale" }], next_cursor: null });
+    await oldRequest;
+    controller = renderController();
+    expect(controller.busy).toBe(true);
+    expect(controller.visibleSearchResults).toEqual([]);
+
+    currentSearch.resolve({
+      items: [{ object_id: "current" }],
+      next_cursor: null,
+    });
+    await currentRequest;
+    controller = renderController();
+    expect(controller.busy).toBe(false);
+    expect(
+      controller.visibleSearchResults.map(({ object_id }) => object_id),
+    ).toEqual(["current"]);
+  });
+
+  it("rejects an in-flight preview across blur and refocus", async () => {
+    const oldPreview = deferred<{ marker: string }>();
+    const currentPreview = deferred<{ marker: string }>();
+    api.assistantApi.previewAIContext
+      .mockReturnValueOnce(oldPreview.promise)
+      .mockReturnValueOnce(currentPreview.promise);
+
+    let controller = renderController();
+    controller.toggleResourceType("event", true);
+    controller = renderController();
+    const oldRequest = controller.previewContext();
+    controller = renderController();
+    expect(controller.busy).toBe(true);
+
+    hooks.blur();
+    controller = renderController();
+    expect(controller.busy).toBe(false);
+    hooks.focus();
+    controller = renderController();
+
+    const currentRequest = controller.previewContext();
+    controller = renderController();
+    expect(controller.busy).toBe(true);
+    oldPreview.resolve({ marker: "stale" });
+    await oldRequest;
+    controller = renderController();
+    expect(controller.busy).toBe(true);
+    expect(controller.pack).toBeNull();
+    expect(controller.previewIsCurrent).toBe(false);
+
+    currentPreview.resolve({ marker: "current" });
+    await currentRequest;
+    controller = renderController();
+    expect(controller.busy).toBe(false);
+    expect(controller.pack).toEqual({ marker: "current" });
+    expect(controller.previewIsCurrent).toBe(true);
+  });
 });

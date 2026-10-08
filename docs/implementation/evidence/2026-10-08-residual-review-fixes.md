@@ -74,3 +74,28 @@ provider initialization/validation, and the production Docker build remain
 unverified. No Terraform probe configuration changed. Live cloud, Neon,
 Firebase, GCS, Cloud Run, native device, accessibility, and Personal AI gates
 remain external and unverified.
+
+## Confirmatory verification follow-up
+
+The independent verification pass found that the committed controller tests
+did not exercise an in-flight search or preview across blur/refocus. Two
+controller-level deferred-response regressions were added for those paths;
+both verify that stale results stay excluded and an older completion cannot
+clear a newer request's busy state.
+
+On the follow-up working tree, `vitest run --passWithNoTests` passed 32 files
+and 154 tests; mobile TypeScript passed, and ESLint reported zero errors with
+the same six existing warnings listed above. Prettier, scaffold verification,
+OpenAPI/client generation after formatting, generated-artifact drift, API
+client typecheck, Ruff, Ruff format, and mypy passed. Expo iOS export also
+passed as a JavaScript bundle check only. API tests without a database passed
+172 tests and skipped the 71 PostgreSQL cases.
+
+A second disposable database startup attempt with the installed PostgreSQL
+16.15 binaries failed during `initdb` because the host could not allocate
+shared memory. A retry with the installed PostgreSQL 17 binaries and an
+`mmap` dynamic shared-memory setting failed at the same bootstrap allocation.
+The R3/R4 database regressions, migration/model agreement, and PostgreSQL 17
+full-suite result therefore remain unverified. Terraform and Docker remain
+unavailable, so provider validation and the production image build remain
+unverified.
