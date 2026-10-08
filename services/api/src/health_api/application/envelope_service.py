@@ -6,12 +6,11 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from uuid import UUID
 
+from health_api.application.errors import DailyNotFound
+from health_api.persistence.models import DailySnapshotMarker, Source, User
 from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
-
-from health_api.application.errors import DailyNotFound
-from health_api.persistence.models import DailySnapshotMarker, Source, User
 
 
 @contextmanager

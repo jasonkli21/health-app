@@ -6,8 +6,6 @@ from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import Field, StrictInt, StrictStr, StringConstraints
-
 from health_api.domain.planning import GoalPayloadV1, PlanPayloadV1, TrackerDefinitionV1
 from health_api.domain.schemas import (
     EventSchemaV1,
@@ -17,6 +15,7 @@ from health_api.domain.schemas import (
     ProfilePayloadV1,
     StrictModel,
 )
+from pydantic import Field, StrictInt, StrictStr, StringConstraints
 
 MAX_PROPOSAL_COMMANDS = 10
 MAX_PROPOSAL_BYTES = 65_536

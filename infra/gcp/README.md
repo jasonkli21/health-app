@@ -15,8 +15,14 @@ IDs and numeric version IDs for pooled and direct Neon URLs, maximum Cloud Run
 instances, and the runtime API connection budget. Select a Neon pooled endpoint
 for runtime and a direct endpoint for migrations; both must use
 `sslmode=verify-full`. The migration direct connection is short-lived and must
-fit separately within Neon plan limits. Set `DATABASE_CONNECTION_BUDGET` to the
-approved runtime pool allocation; Terraform and cloud startup check
+fit separately within Neon plan limits. Runtime pool checkout and connection
+establishment are capped at one second. Idle pooled connections receive a
+one-second PostgreSQL statement timeout for SQLAlchemy pre-ping; checkout
+overrides it to zero only for the current transaction, and `/readyz` applies its own one-second
+transaction-local timeout to `SELECT 1`. These bounds leave room inside the
+five-second startup/readiness probe for a replacement connection and request
+overhead. Set `DATABASE_CONNECTION_BUDGET` to the approved runtime pool
+allocation; Terraform and cloud startup check
 `2 × max instances × (pool size + overflow)` to allow old and new Cloud Run
 revisions to overlap during rollout. The defaults are one worker,
 pool 5, overflow 0 and concurrency 8. These are provisional caps, not measured
@@ -27,8 +33,8 @@ does not present a Google Cloud Run invoker identity token. This disables Cloud
 Run's invoker IAM check; every Profile/daily domain request still requires a
 Firebase ID bearer token validated by the API. `/healthz` is intentionally
 public, dependency-free process liveness. `/readyz` is also public and checks
-only whether the canonical Health database can execute `SELECT 1`; it returns
-a generic ready/unavailable status. Neither endpoint returns health data,
+only whether the canonical Health database can execute a bounded `SELECT 1`;
+it returns a generic ready/unavailable status. Neither endpoint returns health data,
 connection details, or credentials. No other domain route is anonymous.
 The runtime service account can read only the pooled DB secret, read Firebase
 Auth user records for revocation checks, and use private objects in the one
@@ -123,7 +129,9 @@ expand/migrate/contract sequence across separately reviewed releases.
 On Firebase verifier, Neon, or GCS outage, domain APIs fail closed with
 sanitized 503 responses. `/healthz` remains process liveness; `/readyz` reports
 only canonical database availability and does not represent Firebase, GCS, or
-general dependency health. Check operational metrics and Cloud Run logs without
+general dependency health. Readiness query timeouts roll back and release the
+checked-out connection, and the generic 503 contains no SQL or connection
+details. Check operational metrics and Cloud Run logs without
 logging tokens, request bodies, health values, SQL parameters or secret values.
 If the job fails, do not deploy the candidate API revision. Preserve the prior
 serving image and investigate only with approved synthetic staging data.

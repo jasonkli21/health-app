@@ -5,16 +5,15 @@ from collections.abc import AsyncIterator
 from threading import Event
 from uuid import UUID, uuid4
 
+import health_api.api.daily as daily_api
 import pytest
 import pytest_asyncio
 from fastapi import FastAPI
+from health_api.config.settings import Settings
+from health_api.main import create_app
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
-
-import health_api.api.daily as daily_api
-from health_api.config.settings import Settings
-from health_api.main import create_app
 
 OWNER_ID = UUID("00000000-0000-0000-0000-000000000811")
 

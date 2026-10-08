@@ -10,8 +10,6 @@ from typing import Annotated, Any, Literal, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response
-from sqlalchemy.orm import Session
-
 from health_api.api.dependencies import get_current_owner, get_session, get_settings
 from health_api.api.errors import APIError
 from health_api.api.schemas import ErrorResponse
@@ -38,6 +36,7 @@ from health_api.domain.proposals import (
     ProposalRejectRequest,
     ProposalState,
 )
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/action-proposals", tags=["action proposals"])
 COMMON_ERRORS: dict[int | str, dict[str, Any]] = {

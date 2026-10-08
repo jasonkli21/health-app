@@ -30,6 +30,13 @@ so bound health values do not reach routine logs. Keep additional query/use-case
 rules in the application layer and add new subtype tables only in their owning
 phase.
 
+The engine caps pool checkout and PostgreSQL connection establishment at one
+second. Pooled connections carry a one-second statement timeout while idle so
+SQLAlchemy's pre-ping is bounded; checkout clears that idle-only setting before
+application work inside the current transaction, and rollback restores it.
+`/readyz` separately uses a one-second transaction-local timeout for its
+read-only `SELECT 1` probe.
+
 Phase 9 adds `owner_deletion_jobs` and `owner_erasure_ledger`. The former keeps
 only the authenticated request ID, lifecycle status, timestamps, and
 sanitized failure code. The latter retains the owner UUID and erasure time as

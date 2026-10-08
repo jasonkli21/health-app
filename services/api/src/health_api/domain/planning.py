@@ -9,16 +9,6 @@ from math import isfinite
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import (
-    BaseModel,
-    Field,
-    StrictBool,
-    StrictInt,
-    StrictStr,
-    StringConstraints,
-    model_validator,
-)
-
 from health_api.domain.schemas import (
     DailyDomain,
     FiniteDailyNumber,
@@ -27,6 +17,15 @@ from health_api.domain.schemas import (
     ProfileUnit,
     StrictModel,
     validate_iana_timezone,
+)
+from pydantic import (
+    BaseModel,
+    Field,
+    StrictBool,
+    StrictInt,
+    StrictStr,
+    StringConstraints,
+    model_validator,
 )
 
 

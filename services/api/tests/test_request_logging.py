@@ -2,13 +2,19 @@ from __future__ import annotations
 
 import json
 from io import StringIO
+from pathlib import Path
 from unittest.mock import patch
 from uuid import UUID
 
+from alembic import command
+from alembic.config import Config
 from fastapi.testclient import TestClient
 from health_api.api.middleware import request_logger
 from health_api.main import create_app
+from sqlalchemy import Engine
 from sqlalchemy.exc import SQLAlchemyError
+
+ROOT = Path(__file__).resolve().parents[3]
 
 
 def test_request_logs_are_structured_and_exclude_request_data() -> None:
@@ -99,3 +105,41 @@ def test_invalid_or_oversized_request_id_is_replaced() -> None:
     UUID(generated_id)
     record = json.loads(output.getvalue())
     assert record["request_id"] == generated_id
+
+
+def test_migration_setup_preserves_request_logging(postgres_engine: Engine) -> None:
+    config = Config(str(ROOT / "alembic.ini"))
+    with postgres_engine.begin() as connection:
+        config.attributes["connection"] = connection
+        command.upgrade(config, "head")
+
+    assert not request_logger.disabled
+    app = create_app(engine=postgres_engine)
+
+    @app.get("/migration-log/{item_id}")
+    async def migration_log_error(item_id: str) -> None:
+        raise SQLAlchemyError("SECRET_SQL SECRET_BODY")
+
+    output = StringIO()
+    handler = request_logger.handlers[0]
+    with patch.object(handler, "stream", output), TestClient(app) as client:
+        responses = [
+            client.get("/healthz", headers={"X-Request-ID": "migration.req_123"}),
+            client.get("/migration-log/SECRET_PATH?cursor=SECRET_QUERY"),
+            client.post("/migration-log/SECRET_PATH", content="SECRET_BODY" * 10000),
+        ]
+
+    lines = output.getvalue().splitlines()
+    records = [json.loads(line) for line in lines]
+    assert [response.status_code for response in responses] == [200, 503, 413]
+    assert len(records) == 3
+    assert [record["event"] for record in records] == [
+        "http_request_completed",
+        "http_request_completed",
+        "http_request_rejected",
+    ]
+    assert records[0]["request_id"] == "migration.req_123"
+    assert records[1]["route"] == "/migration-log/{item_id}"
+    assert records[2]["body_limit_bytes"] == 65_536
+    assert all("SECRET" not in line for line in lines)
+    assert all("SECRET" not in response.text for response in responses)

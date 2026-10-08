@@ -12,8 +12,6 @@ from typing import Annotated, Any
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from pydantic import Field
-
 from health_api.domain.daily import (
     TODAY_METHOD_VERSION,
     UNIT_CONVERSION_VERSION,
@@ -33,6 +31,7 @@ from health_api.domain.schemas import (
     ObservationSchemaV1,
     StrictModel,
 )
+from pydantic import Field
 
 
 class CoverageV1(StrictModel):

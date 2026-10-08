@@ -10,10 +10,6 @@ from typing import Annotated, Any, Literal, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Path, Query, Response
-from pydantic import ValidationError
-from sqlalchemy import and_, select
-from sqlalchemy.orm import Session
-
 from health_api.api.dependencies import get_current_owner, get_session
 from health_api.api.errors import APIError
 from health_api.api.schemas import (
@@ -66,6 +62,9 @@ from health_api.domain.analytics import (
 )
 from health_api.domain.schemas import validate_iana_timezone
 from health_api.persistence.models import AnalyticsArtifact, HealthObject, HealthObjectRevision
+from pydantic import ValidationError
+from sqlalchemy import and_, select
+from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["analytics"])
 

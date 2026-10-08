@@ -10,9 +10,6 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response
-from pydantic import AwareDatetime, ValidationError
-from sqlalchemy.orm import Session
-
 from health_api.api.dependencies import get_current_owner, get_session
 from health_api.api.errors import APIError
 from health_api.api.schemas import (
@@ -36,6 +33,8 @@ from health_api.application.profile_service import (
 )
 from health_api.domain.schemas import ProfileCategory, ProfileMetadata, ProfileValidity
 from health_api.persistence.models import HealthObjectRevision
+from pydantic import AwareDatetime, ValidationError
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/profile", tags=["profile"])
 COMMON_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {

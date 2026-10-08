@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from time import time
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
@@ -28,7 +28,7 @@ from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["account-data"])
 
-COMMON_ERRORS: dict[int, dict[str, object]] = {
+COMMON_ERRORS: dict[int | str, dict[str, Any]] = {
     401: {"model": ErrorResponse, "description": "Authentication is required or recent."},
     404: {"model": ErrorResponse, "description": "Owner data or deletion request was not found."},
     409: {

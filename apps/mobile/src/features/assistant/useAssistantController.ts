@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { SetStateAction } from "react";
 import { useFocusEffect } from "expo-router";
 import type { components } from "@personal-health/api-client";
 import { ApiError } from "@personal-health/api-client";
@@ -17,8 +18,6 @@ import {
   mergeProposalSummaries,
 } from "./api";
 import {
-  canAcceptPreviewResponse,
-  canAcceptSearchResponse,
   initialProposalEditorState,
   isOlderProposal,
   mergeAssistantSearchPage,
@@ -28,6 +27,11 @@ import {
   replaceProposalSummary,
 } from "./state";
 import type { ResourceType, TaskKind } from "./state";
+import {
+  AssistantRequestOwnership,
+  runOwnedAssistantRequest,
+} from "./requestOwnership";
+import { ProposalPageCoordinator, runProposalPageLoad } from "./proposalPages";
 
 function requestMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -91,14 +95,15 @@ export function useAssistantController() {
   const proposalRationaleDraft = proposalEditor.rationale;
   const proposalCommandDraft = proposalEditor.commands;
   const proposalEvidenceDraft = proposalEditor.evidence;
-  const [proposalStateFilter, setProposalStateFilter] = useState<
+  const [proposalStateFilter, setProposalStateFilterState] = useState<
     "pending" | "applied" | "rejected" | "expired" | "superseded"
   >("pending");
   const [proposalCursor, setProposalCursor] = useState<string | null>(null);
   const [proposalHasMore, setProposalHasMore] = useState(false);
   const viewGeneration = useRef(0);
   const proposalDataGeneration = useRef(0);
-  const searchGeneration = useRef(0);
+  const [requests] = useState(() => new AssistantRequestOwnership());
+  const [proposalPages] = useState(() => new ProposalPageCoordinator());
   const [searchStale, setSearchStale] = useState(false);
 
   const scopeTask =
@@ -125,17 +130,22 @@ export function useAssistantController() {
     ],
   );
   const currentScopeKey = JSON.stringify(scope);
-  const currentScopeKeyRef = useRef(currentScopeKey);
   useLayoutEffect(() => {
-    currentScopeKeyRef.current = currentScopeKey;
-  }, [currentScopeKey]);
+    requests.changeKey("preview", currentScopeKey);
+    requests.changeKey("message", currentScopeKey);
+  }, [currentScopeKey, requests]);
   const previewIsCurrent = previewKey === currentScopeKey;
   const currentSearchKey = JSON.stringify([searchText.trim(), resourceTypes]);
-  const currentSearchKeyRef = useRef(currentSearchKey);
   const visibleSearchResults =
     searchResultKey === currentSearchKey ? searchResults : [];
   const visibleSearchCursor =
     searchResultKey === currentSearchKey ? searchCursor : null;
+
+  function invalidateScopeRequests() {
+    const previewInvalidated = requests.invalidate("preview");
+    const messageInvalidated = requests.invalidate("message");
+    if (previewInvalidated || messageInvalidated) setBusy(requests.busy);
+  }
 
   const loadStatus = useCallback(async () => {
     try {
@@ -147,47 +157,49 @@ export function useAssistantController() {
   }, []);
 
   const loadProposals = useCallback(
-    async (append = false, filter = proposalStateFilter) => {
-      const generation = viewGeneration.current;
-      const dataGeneration = proposalDataGeneration.current;
-      try {
-        setProposalsLoading(true);
-        setProposalError(null);
-        const result = await listActionProposals(
-          filter,
-          append ? (proposalCursor ?? undefined) : undefined,
-        );
-        if (
-          viewGeneration.current === generation &&
-          proposalDataGeneration.current === dataGeneration
-        ) {
-          setProposals((current) => {
-            return mergeProposalSummaries(append ? current : [], result.items);
-          });
-          setProposalCursor(result.next_cursor);
+    (append = false) =>
+      runProposalPageLoad({
+        coordinator: proposalPages,
+        append,
+        dataGeneration: proposalDataGeneration.current,
+        getDataGeneration: () => proposalDataGeneration.current,
+        load: listActionProposals,
+        onPage: (result, shouldAppend) => {
+          setProposals((current) =>
+            mergeProposalSummaries(shouldAppend ? current : [], result.items),
+          );
           setProposalHasMore(result.next_cursor !== null);
-        }
-      } catch (error) {
-        if (
-          viewGeneration.current === generation &&
-          proposalDataGeneration.current === dataGeneration
-        )
-          setProposalError(requestMessage(error));
-      } finally {
-        if (
-          viewGeneration.current === generation &&
-          proposalDataGeneration.current === dataGeneration
-        )
-          setProposalsLoading(false);
-      }
-    },
-    [proposalCursor, proposalStateFilter],
+        },
+        onLoading: setProposalsLoading,
+        onErrorMessage: setProposalError,
+        onCursor: setProposalCursor,
+        requestMessage,
+      }),
+    [proposalPages],
   );
+
+  const selectProposalFilter = useCallback(
+    (filter: typeof proposalStateFilter) => {
+      proposalPages.setFilter(filter);
+      setProposalStateFilterState(filter);
+      setProposals([]);
+      setProposalDetails({});
+      setProposalHasMore(false);
+      void loadProposals(false);
+    },
+    [loadProposals, proposalPages],
+  );
+
+  const refreshProposals = useCallback(() => {
+    void loadProposals(false);
+  }, [loadProposals]);
 
   useFocusEffect(
     useCallback(() => {
       viewGeneration.current += 1;
-      searchGeneration.current += 1;
+      requests.focusChanged();
+      setBusy(false);
+      proposalPages.focus();
       setPreviewKey(null);
       setSearchStale(true);
       const generation = viewGeneration.current;
@@ -197,26 +209,36 @@ export function useAssistantController() {
       void loadProposals(false);
       return () => {
         if (viewGeneration.current === generation) viewGeneration.current += 1;
-        searchGeneration.current += 1;
+        requests.focusChanged();
+        setBusy(false);
+        proposalPages.blur();
+        setProposalsLoading(false);
         setPreviewKey(null);
         setSearchStale(true);
       };
-    }, [loadProposals, loadStatus]),
+    }, [loadProposals, loadStatus, proposalPages, requests]),
   );
 
   function toggleResourceType(resourceType: ResourceType, enabled: boolean) {
     const next = enabled
       ? [...resourceTypes, resourceType]
       : resourceTypes.filter((value) => value !== resourceType);
-    currentSearchKeyRef.current = JSON.stringify([searchText.trim(), next]);
-    searchGeneration.current += 1;
+    invalidateScopeRequests();
+    const invalidated = requests.changeKey(
+      "search",
+      JSON.stringify([searchText.trim(), next]),
+    );
+    if (invalidated) setBusy(requests.busy);
     setResourceTypes(next);
     setReply(null);
   }
 
   function changeSearchText(value: string) {
-    currentSearchKeyRef.current = JSON.stringify([value.trim(), resourceTypes]);
-    searchGeneration.current += 1;
+    const invalidated = requests.changeKey(
+      "search",
+      JSON.stringify([value.trim(), resourceTypes]),
+    );
+    if (invalidated) setBusy(requests.busy);
     setSearchText(value);
   }
 
@@ -227,38 +249,21 @@ export function useAssistantController() {
       );
       return;
     }
-    setBusy(true);
-    const generation = viewGeneration.current;
     const previewScopeKey = currentScopeKey;
     setPreviewError(null);
     setReply(null);
-    try {
-      const result = await assistantApi.previewAIContext(scope);
-      if (
-        canAcceptPreviewResponse({
-          currentGeneration: viewGeneration.current,
-          requestGeneration: generation,
-          currentScopeKey: currentScopeKeyRef.current,
-          requestScopeKey: previewScopeKey,
-        })
-      ) {
+    await runOwnedAssistantRequest({
+      ownership: requests,
+      kind: "preview",
+      key: previewScopeKey,
+      request: () => assistantApi.previewAIContext(scope),
+      onSuccess: (result) => {
         setPack(result);
         setPreviewKey(previewScopeKey);
-      }
-    } catch (error) {
-      if (
-        canAcceptPreviewResponse({
-          currentGeneration: viewGeneration.current,
-          requestGeneration: generation,
-          currentScopeKey: currentScopeKeyRef.current,
-          requestScopeKey: previewScopeKey,
-        })
-      ) {
-        setPreviewError(requestMessage(error));
-      }
-    } finally {
-      if (viewGeneration.current === generation) setBusy(false);
-    }
+      },
+      onError: (error) => setPreviewError(requestMessage(error)),
+      onBusyChange: setBusy,
+    });
   }
 
   async function search(append = false) {
@@ -270,25 +275,20 @@ export function useAssistantController() {
       setSearchError("Choose at least one health item type to search.");
       return;
     }
-    const generation = ++searchGeneration.current;
     const queryKey = currentSearchKey;
-    setBusy(true);
     setSearchError(null);
-    try {
-      const result = await assistantApi.searchAIEligibleHealthData({
-        q: searchText.trim(),
-        types: resourceTypes.join(","),
-        limit: 20,
-        cursor: append ? searchCursor : undefined,
-      });
-      if (
-        canAcceptSearchResponse({
-          currentGeneration: searchGeneration.current,
-          requestGeneration: generation,
-          currentQueryKey: currentSearchKeyRef.current,
-          requestQueryKey: queryKey,
-        })
-      ) {
+    await runOwnedAssistantRequest({
+      ownership: requests,
+      kind: "search",
+      key: queryKey,
+      request: () =>
+        assistantApi.searchAIEligibleHealthData({
+          q: searchText.trim(),
+          types: resourceTypes.join(","),
+          limit: 20,
+          cursor: append ? searchCursor : undefined,
+        }),
+      onSuccess: (result) => {
         setSearchResults((current) => {
           return mergeAssistantSearchPage({
             current,
@@ -301,42 +301,38 @@ export function useAssistantController() {
         setSearchResultKey(queryKey);
         setSearchCursor(result.next_cursor);
         setSearchStale(false);
-      }
-    } catch (error) {
-      if (searchGeneration.current === generation) {
+      },
+      onError: (error) => {
         setSearchError(requestMessage(error));
         setSearchErrorKey(queryKey);
         setSearchStale(true);
-      }
-    } finally {
-      if (searchGeneration.current === generation) setBusy(false);
-    }
+      },
+      onBusyChange: setBusy,
+    });
   }
 
   async function sendMessage() {
     if (!status?.enabled || !message.trim() || resourceTypes.length === 0)
       return;
-    setBusy(true);
-    const generation = viewGeneration.current;
     setPreviewError(null);
     setReply(null);
-    try {
-      const result = await assistantApi.sendAssistantMessage({
-        message: message.trim(),
-        scope,
-      });
-      if (viewGeneration.current === generation) setReply(result);
-    } catch (error) {
-      if (viewGeneration.current === generation) {
-        setPreviewError(requestMessage(error));
-      }
-    } finally {
-      if (viewGeneration.current === generation) setBusy(false);
-    }
+    const messageScopeKey = currentScopeKey;
+    await runOwnedAssistantRequest({
+      ownership: requests,
+      kind: "message",
+      key: messageScopeKey,
+      request: () =>
+        assistantApi.sendAssistantMessage({ message: message.trim(), scope }),
+      onSuccess: setReply,
+      onError: (error) => setPreviewError(requestMessage(error)),
+      onBusyChange: setBusy,
+    });
   }
 
   function replaceProposal(updated: components["schemas"]["ProposalState"]) {
     proposalDataGeneration.current += 1;
+    proposalPages.invalidate();
+    setProposalsLoading(false);
     setProposalDetails((current) => {
       const previous = current[updated.id];
       return previous && isOlderProposal(previous, updated)
@@ -589,21 +585,36 @@ export function useAssistantController() {
     proposalCursor,
     proposalHasMore,
     searchStale,
-    setDomains,
-    setExcludedObjectIds,
-    setTask,
-    setTaskKind,
-    setLookbackDays,
-    setMessage,
-    setProposalStateFilter,
-    setProposalCursor,
-    setProposalHasMore,
-    setProposals,
-    setProposalDetails,
+    setProposalStateFilter: selectProposalFilter,
+    refreshProposals,
     loadStatus,
     loadProposals,
     toggleResourceType,
     changeSearchText,
+    setDomains: (value: SetStateAction<string[]>) => {
+      invalidateScopeRequests();
+      setDomains(value);
+    },
+    setExcludedObjectIds: (value: SetStateAction<string[]>) => {
+      invalidateScopeRequests();
+      setExcludedObjectIds(value);
+    },
+    setTask: (value: SetStateAction<string>) => {
+      invalidateScopeRequests();
+      setTask(value);
+    },
+    setTaskKind: (value: SetStateAction<TaskKind>) => {
+      invalidateScopeRequests();
+      setTaskKind(value);
+    },
+    setLookbackDays: (value: SetStateAction<7 | 30 | 90>) => {
+      invalidateScopeRequests();
+      setLookbackDays(value);
+    },
+    setMessage: (value: SetStateAction<string>) => {
+      invalidateScopeRequests();
+      setMessage(value);
+    },
     previewContext,
     search,
     sendMessage,

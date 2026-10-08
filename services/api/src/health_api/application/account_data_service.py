@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, date, datetime
 from io import StringIO
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from health_api.integrations.object_storage import (
@@ -15,6 +15,7 @@ from health_api.integrations.object_storage import (
 )
 from health_api.persistence.models import Base, OwnerDeletionJob, OwnerErasureLedger, User
 from sqlalchemy import Select, literal_column, select, text
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
 _INTERNAL_OWNER_TABLES = {"owner_deletion_jobs", "owner_erasure_ledger"}
@@ -110,7 +111,7 @@ def export_owner_snapshot(session: Session, owner_id: UUID) -> str:
             for piece in encoder.iterencode(value):
                 write(piece)
 
-        created_at = session.execute(text("SELECT transaction_timestamp()")).scalar_one()
+        created_at: datetime = session.execute(text("SELECT transaction_timestamp()")).scalar_one()
         owner_payload = {
             "id": str(user.id),
             "display_timezone": user.display_timezone,
@@ -192,15 +193,15 @@ def begin_owner_deletion(session: Session, owner_id: UUID, request_id: UUID) -> 
         session.execute(
             text("SELECT pg_advisory_xact_lock(:request_lock)"), {"request_lock": request_lock}
         )
-        job = session.get(OwnerDeletionJob, request_id)
-        if job is not None:
-            if job.owner_id != owner_id:
+        existing_job = session.get(OwnerDeletionJob, request_id)
+        if existing_job is not None:
+            if existing_job.owner_id != owner_id:
                 raise AccountDataNotFound
-            if job.status != "completed":
-                job.status = "running"
-                job.error_code = None
-                job.updated_at = datetime.now(UTC)
-            return job
+            if existing_job.status != "completed":
+                existing_job.status = "running"
+                existing_job.error_code = None
+                existing_job.updated_at = datetime.now(UTC)
+            return existing_job
 
         user = session.execute(
             select(User).where(User.id == owner_id).with_for_update()
@@ -209,15 +210,15 @@ def begin_owner_deletion(session: Session, owner_id: UUID, request_id: UUID) -> 
             raise AccountDataNotFound
         # Check again after owner serialization for deployments where request
         # IDs are allocated before the lock is acquired.
-        job = session.get(OwnerDeletionJob, request_id)
-        if job is not None:
-            if job.owner_id != owner_id:
+        existing_job = session.get(OwnerDeletionJob, request_id)
+        if existing_job is not None:
+            if existing_job.owner_id != owner_id:
                 raise AccountDataNotFound
-            if job.status != "completed":
-                job.status = "running"
-                job.error_code = None
-                job.updated_at = datetime.now(UTC)
-            return job
+            if existing_job.status != "completed":
+                existing_job.status = "running"
+                existing_job.error_code = None
+                existing_job.updated_at = datetime.now(UTC)
+            return existing_job
         if user.lifecycle != "active":
             raise AccountDataConflict
 
@@ -276,7 +277,7 @@ def process_owner_deletion(
                 batch_size = min(_ERASURE_BATCH_SIZE, remaining_budget)
                 with session.begin():
                     session.execute(text("SET LOCAL statement_timeout = '2s'"))
-                    job = session.execute(
+                    locked_job = session.execute(
                         select(OwnerDeletionJob)
                         .where(
                             OwnerDeletionJob.id == request_id,
@@ -287,15 +288,15 @@ def process_owner_deletion(
                     user = session.execute(
                         select(User).where(User.id == owner_id).with_for_update()
                     ).scalar_one_or_none()
-                    if job is None or user is None:
+                    if locked_job is None or user is None:
                         raise AccountDataNotFound
-                    if job.status == "completed":
-                        return job
+                    if locked_job.status == "completed":
+                        return locked_job
                     if user.lifecycle not in {"deleting", "erased"}:
                         raise AccountDataConflict
 
                     primary_key = list(table.primary_key.columns)
-                    batch_query = (
+                    batch_query: Select[Any] = (
                         select(literal_column("ctid"))
                         .select_from(table)
                         .where(table.c.owner_id == owner_id)
@@ -303,8 +304,11 @@ def process_owner_deletion(
                     if primary_key:
                         batch_query = batch_query.order_by(*primary_key)
                     batch_ctids = batch_query.limit(batch_size)
-                    result = session.execute(
-                        table.delete().where(literal_column("ctid").in_(batch_ctids))
+                    result = cast(
+                        CursorResult[Any],
+                        session.execute(
+                            table.delete().where(literal_column("ctid").in_(batch_ctids))
+                        ),
                     )
                     deleted = result.rowcount or 0
                 remaining_budget -= deleted
@@ -315,7 +319,7 @@ def process_owner_deletion(
 
         with session.begin():
             session.execute(text("SET LOCAL statement_timeout = '2s'"))
-            job = session.execute(
+            locked_job = session.execute(
                 select(OwnerDeletionJob)
                 .where(OwnerDeletionJob.id == request_id, OwnerDeletionJob.owner_id == owner_id)
                 .with_for_update()
@@ -323,10 +327,10 @@ def process_owner_deletion(
             user = session.execute(
                 select(User).where(User.id == owner_id).with_for_update()
             ).scalar_one_or_none()
-            if job is None or user is None:
+            if locked_job is None or user is None:
                 raise AccountDataNotFound
-            if job.status == "completed":
-                return job
+            if locked_job.status == "completed":
+                return locked_job
             if user.lifecycle not in {"deleting", "erased"}:
                 raise AccountDataConflict
             if session.get(OwnerErasureLedger, owner_id) is None:
@@ -334,12 +338,12 @@ def process_owner_deletion(
             user.lifecycle = "erased"
             user.display_timezone = "UTC"
             user.daily_sequence = 0
-            job.status = "completed"
-            job.error_code = None
-            job.completed_at = datetime.now(UTC)
-            job.updated_at = job.completed_at
+            locked_job.status = "completed"
+            locked_job.error_code = None
+            locked_job.completed_at = datetime.now(UTC)
+            locked_job.updated_at = locked_job.completed_at
             session.flush()
-            return job
+            return locked_job
     except (AccountDataNotFound, AccountDataConflict):
         raise
     except Exception:  # noqa: BLE001 - keep cleanup details out of health-domain responses

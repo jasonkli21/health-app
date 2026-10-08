@@ -9,9 +9,8 @@ from statistics import median
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import Field, StrictInt, StrictStr, model_validator
-
 from health_api.domain.schemas import StrictModel
+from pydantic import Field, StrictInt, StrictStr, model_validator
 
 TREND_METHOD_VERSION = "trend-v1"
 ASSOCIATION_METHOD_VERSION = "spearman-sameday-v1"

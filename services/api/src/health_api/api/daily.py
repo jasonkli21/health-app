@@ -11,9 +11,6 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query, Response
-from pydantic import ValidationError
-from sqlalchemy.orm import Session
-
 from health_api.api.dependencies import get_current_owner, get_session
 from health_api.api.errors import APIError
 from health_api.api.schemas import (
@@ -72,6 +69,8 @@ from health_api.persistence.models import (
     ObservationItem,
     Source,
 )
+from pydantic import ValidationError
+from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["daily"])
 

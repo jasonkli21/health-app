@@ -28,7 +28,7 @@ scope decisions; they are not findings.
    configured SQLAlchemy engine uses ordinary JSON serialization, unlike the
    existing daily/profile snapshot builders that stringify these values.
    `json.dumps(_snapshot(...))` reproduces `TypeError: Object of type UUID is
-   not JSON serializable`. Flushing history therefore fails for new signals,
+not JSON serializable`. Flushing history therefore fails for new signals,
    experiments, insights/recommendations and subsequent state revisions. The
    SQLAlchemy error handler turns the failure into 503 and the transaction rolls
    back. **Fix:** produce a validated JSON-safe snapshot consistent with the
@@ -66,7 +66,7 @@ scope decisions; they are not findings.
 4. **P1 — Symptom severity drops the very observations it must analyze.**
    **Files:** `application/analytics_service.py:752` (`_standard_points`);
    `application/today_service.py` (`summarize_today_snapshot`).
-   The filter keeps severity observations whose IDs are *not* linked, reversing
+   The filter keeps severity observations whose IDs are _not_ linked, reversing
    Today's eligibility rule. Ordinary daily saves require severity to be linked
    to a symptom Event, so valid severity trends become null; associated insights
    and experiment outcomes become unavailable. A synthetic episode with linked

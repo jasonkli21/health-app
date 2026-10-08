@@ -114,7 +114,8 @@ def create_app(
     def readinesscheck() -> JSONResponse:
         """Check canonical database availability without returning connection details."""
         try:
-            with database_engine.connect() as connection:
+            with database_engine.connect() as connection, connection.begin():
+                connection.execute(text("SET LOCAL statement_timeout = '1000ms'"))
                 connection.execute(text("SELECT 1")).scalar_one()
         except SQLAlchemyError:
             return JSONResponse(status_code=503, content={"status": "unavailable"})

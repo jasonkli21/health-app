@@ -4,8 +4,6 @@ from datetime import date
 from uuid import UUID, uuid4
 
 import pytest
-from pydantic import ValidationError
-
 from health_api.application.healthkit_import_service import (
     HealthKitImportValidationError,
     _validate_entry,
@@ -15,6 +13,7 @@ from health_api.domain.healthkit_imports import (
     HealthKitImportEntry,
     HealthKitImportMetadata,
 )
+from pydantic import ValidationError
 
 INSTALLATION_ID = UUID("4bcf0eac-f815-4a88-bb6d-d10c477b8eab")
 POLICY_VERSION = "healthkit-v1"

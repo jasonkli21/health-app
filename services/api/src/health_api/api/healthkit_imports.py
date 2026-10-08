@@ -6,8 +6,6 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Response
-from sqlalchemy.orm import Session
-
 from health_api.api.dependencies import get_current_owner, get_session
 from health_api.api.errors import APIError
 from health_api.api.schemas import (
@@ -28,6 +26,7 @@ from health_api.domain.healthkit_imports import (
     HealthKitSourcePreferenceRequest,
     HealthKitSourcePreferenceResponse,
 )
+from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["healthkit-imports"])
 

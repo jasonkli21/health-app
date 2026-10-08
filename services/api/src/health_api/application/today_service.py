@@ -7,10 +7,6 @@ from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import and_, or_, select, text
-from sqlalchemy.orm import Session, aliased
-from sqlalchemy.sql.elements import ColumnElement
-
 from health_api.application.errors import DailyNotFound, DailySnapshotLimitExceeded
 from health_api.domain.daily import local_day_bounds
 from health_api.domain.daily_rollups import DailyProvenance, MetricSummaryV1, summarize_today
@@ -29,6 +25,9 @@ from health_api.persistence.models import (
     ProfileItem,
     User,
 )
+from sqlalchemy import and_, or_, select, text
+from sqlalchemy.orm import Session, aliased
+from sqlalchemy.sql.elements import ColumnElement
 
 MAX_TODAY_OBJECTS = 10_000
 MAX_PROFILE_CONTEXT_REFERENCES = 100

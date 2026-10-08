@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, Protocol, cast
 
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.schema import Index
@@ -28,14 +28,22 @@ _EXPECTED_AI_PAYLOAD_TOKENS = (
 )
 
 
+class _ExpressionCompiler(Protocol):
+    def __call__(self, *, dialect: Any, compile_kwargs: dict[str, bool]) -> Any: ...
+
+
 def _expression_tokens(index: Index) -> tuple[str, ...] | None:
     if len(index.expressions) != 1:
         return None
-    expression = str(
-        index.expressions[0].compile(
-            dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
+    index_expression = index.expressions[0]
+    if isinstance(index_expression, str):
+        expression = index_expression
+    else:
+        dialect = postgresql.dialect()  # type: ignore[no-untyped-call]
+        compile_expression = cast(_ExpressionCompiler, index_expression.compile)
+        expression = str(
+            compile_expression(dialect=dialect, compile_kwargs={"literal_binds": True})
         )
-    )
     expression = expression.replace('"', "")
     expression = re.sub(
         r"\b(?:profile_items|events|observations|planning_resources)\s*\.\s*",
@@ -52,11 +60,15 @@ def _expression_tokens(index: Index) -> tuple[str, ...] | None:
 
 def _same_ai_payload_index(left: Index, right: Index, name: str) -> bool:
     table_name = _AI_PAYLOAD_INDEXES[name]
+    left_table = left.table
+    right_table = right.table
     if (
         left.name != name
         or right.name != name
-        or left.table.name != table_name
-        or right.table.name != table_name
+        or left_table is None
+        or right_table is None
+        or left_table.name != table_name
+        or right_table.name != table_name
         or left.unique != right.unique
         or left.dialect_options["postgresql"].get("using")
         != right.dialect_options["postgresql"].get("using")

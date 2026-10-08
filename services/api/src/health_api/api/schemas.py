@@ -6,15 +6,6 @@ from datetime import date, datetime, timedelta
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import (
-    AwareDatetime,
-    ConfigDict,
-    Field,
-    StrictBool,
-    StrictInt,
-    model_validator,
-)
-
 from health_api.domain.analytics import (
     AnalysisMetricId,
     AssociationPair,
@@ -51,7 +42,17 @@ from health_api.domain.schemas import (
     ProfileNotes,
     ProfilePayloadV1,
     ProfileValidity,
-    StrictModel,
+)
+from health_api.domain.schemas import (
+    StrictModel as StrictModel,  # noqa: PLC0414 - public façade re-export for mypy
+)
+from pydantic import (
+    AwareDatetime,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    model_validator,
 )
 
 

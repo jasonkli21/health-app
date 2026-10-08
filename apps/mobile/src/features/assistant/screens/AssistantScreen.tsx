@@ -104,13 +104,9 @@ export default function AssistantScreen() {
         evidenceDraft={assistant.proposalEvidenceDraft}
         filter={assistant.proposalStateFilter}
         hasMore={assistant.proposalHasMore}
-        onFilter={(filter: ProposalStateFilter) => {
-          assistant.setProposalStateFilter(filter);
-          assistant.setProposalCursor(null);
-          assistant.setProposalHasMore(false);
-          assistant.setProposals([]);
-          assistant.setProposalDetails({});
-        }}
+        onFilter={(filter: ProposalStateFilter) =>
+          assistant.setProposalStateFilter(filter)
+        }
         onReviewDetail={(proposalId) =>
           void assistant.loadProposalDetail(proposalId)
         }
@@ -123,10 +119,7 @@ export default function AssistantScreen() {
         onRationaleChange={assistant.changeProposalRationale}
         onCommandsChange={assistant.changeProposalCommands}
         onEvidenceChange={assistant.changeProposalEvidence}
-        onRefresh={() => {
-          assistant.setProposalCursor(null);
-          void assistant.loadProposals(false);
-        }}
+        onRefresh={assistant.refreshProposals}
         onLoadMore={() => void assistant.loadProposals(true)}
       />
 

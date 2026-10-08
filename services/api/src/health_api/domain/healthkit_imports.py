@@ -6,6 +6,12 @@ from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
+from health_api.domain.schemas import (
+    EventSchemaV1,
+    FiniteDailyNumber,
+    ObservationSchemaV1,
+    StrictModel,
+)
 from pydantic import (
     AwareDatetime,
     Field,
@@ -13,13 +19,6 @@ from pydantic import (
     StrictStr,
     StringConstraints,
     model_validator,
-)
-
-from health_api.domain.schemas import (
-    EventSchemaV1,
-    FiniteDailyNumber,
-    ObservationSchemaV1,
-    StrictModel,
 )
 
 
