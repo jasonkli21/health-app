@@ -9,16 +9,13 @@ from datetime import date, datetime, timedelta
 from typing import Any, TypeGuard
 from uuid import UUID
 
-from pydantic import ValidationError
-from sqlalchemy import and_, or_, select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
-
 from health_api.application.analytics_service import invalidate_analytics
 from health_api.application.envelope_service import manual_source, next_daily_sequence, unit_of_work
 from health_api.application.errors import DailyConflict, DailyNotFound, DailyValidationError
+from health_api.application.planning_trackers import (
+    validate_tracker_observation as _validate_tracker_observation,
+)
 from health_api.domain.daily import local_day_bounds
-from health_api.domain.planning import TrackerDefinitionV1, validate_tracker_values
 from health_api.domain.schemas import (
     CustomTrackerValueV1,
     DailyDomain,
@@ -38,11 +35,13 @@ from health_api.persistence.models import (
     HealthObject,
     HealthObjectRevision,
     ObservationItem,
-    PlanningResource,
     Source,
-    TrackerSchemaVersion,
     User,
 )
+from pydantic import ValidationError
+from sqlalchemy import and_, or_, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 type EventAggregate = tuple[HealthObject, EventItem, Source, tuple[UUID, ...]]
 type ObservationAggregate = tuple[HealthObject, ObservationItem, Source]
@@ -178,50 +177,6 @@ def _observation_fields(schema: ObservationSchemaV1) -> dict[str, Any]:
             }
         )
     return fields
-
-
-def _validate_tracker_observation(
-    session: Session, owner_id: UUID, schema: ObservationSchemaV1, *, allow_archived: bool = False
-) -> None:
-    value = schema.payload.value
-    if not isinstance(value, CustomTrackerValueV1):
-        return
-    row = session.execute(
-        select(HealthObject, PlanningResource)
-        .join(
-            PlanningResource,
-            and_(
-                PlanningResource.owner_id == HealthObject.owner_id,
-                PlanningResource.object_id == HealthObject.id,
-            ),
-        )
-        .where(
-            HealthObject.owner_id == owner_id,
-            HealthObject.id == value.tracker_id,
-            HealthObject.object_type == "tracker_definition",
-        )
-        .with_for_update()
-    ).one_or_none()
-    if row is None:
-        raise DailyNotFound
-    tracker, resource = row
-    if not allow_archived and (tracker.status != "active" or resource.lifecycle != "active"):
-        raise DailyValidationError("archived trackers do not accept new entries")
-    schema_version = session.get(
-        TrackerSchemaVersion, (owner_id, value.tracker_id, value.schema_version)
-    )
-    if schema_version is None:
-        raise DailyNotFound
-    try:
-        definition = TrackerDefinitionV1.model_validate(schema_version.definition)
-        values = validate_tracker_values(definition, value.values)
-    except (ValidationError, ValueError) as exc:
-        raise DailyValidationError(
-            "tracker values do not match the selected schema version"
-        ) from exc
-    if definition.domain != schema.domain:
-        raise DailyValidationError("tracker domain does not match the Observation")
-    value.values = values
 
 
 def _validate_compound(command: CreateDailyEntry) -> None:

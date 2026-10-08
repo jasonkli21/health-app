@@ -8,9 +8,6 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import Response
-from pydantic import AwareDatetime
-from sqlalchemy.orm import Session
-
 from health_api.api.dependencies import get_current_owner, get_session, get_settings
 from health_api.api.errors import APIError
 from health_api.api.schemas import ErrorResponse, StrictModel
@@ -26,6 +23,8 @@ from health_api.application.account_data_service import (
 )
 from health_api.config.settings import Settings
 from health_api.persistence.models import OwnerDeletionJob
+from pydantic import AwareDatetime
+from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["account-data"])
 

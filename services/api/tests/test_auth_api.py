@@ -3,6 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi.testclient import TestClient
+from health_api.api.ai import router as ai_router
 from health_api.api.daily import router as daily_router
 from health_api.api.dependencies import get_current_owner
 from health_api.api.profile import router as profile_router
@@ -33,7 +34,7 @@ def _app(verifier: FixedVerifier) -> TestClient:
     return TestClient(create_app(settings, identity_verifier=verifier))
 
 
-def test_every_profile_daily_and_history_route_rejects_invalid_bearers() -> None:
+def test_every_profile_daily_ai_and_history_route_rejects_invalid_bearers() -> None:
     client = _app(FixedVerifier(TokenVerificationError()))
     item_id = UUID("00000000-0000-0000-0000-000000000001")
     paths = [
@@ -47,6 +48,7 @@ def test_every_profile_daily_and_history_route_rejects_invalid_bearers() -> None
         f"/observations/{item_id}",
         f"/observations/{item_id}/history",
         "/today",
+        "/assistant/status",
     ]
 
     for path in paths:
@@ -55,9 +57,23 @@ def test_every_profile_daily_and_history_route_rejects_invalid_bearers() -> None
         assert response.json()["code"] == "invalid_token"
         assert "sensitive-token-value" not in response.text
 
+    message = client.post(
+        "/assistant/messages",
+        headers={"Authorization": "Bearer sensitive-token-value"},
+        json={
+            "message": "Review sleep",
+            "scope": {"task": "Review sleep", "resource_types": ["event"]},
+        },
+    )
+    assert message.status_code == 401
+    assert message.json()["code"] == "invalid_token"
+    assert "sensitive-token-value" not in message.text
 
-def test_every_registered_domain_operation_resolves_the_verified_owner() -> None:
-    domain_routes = [route for router in (profile_router, daily_router) for route in router.routes]
+
+def test_every_registered_owner_scoped_operation_resolves_the_verified_owner() -> None:
+    domain_routes = [
+        route for router in (profile_router, daily_router, ai_router) for route in router.routes
+    ]
     assert domain_routes
     for route in domain_routes:
         assert any(
@@ -73,6 +89,20 @@ def test_missing_bearer_is_rejected_without_auth_fallback() -> None:
     response = client.get("/profile")
     assert response.status_code == 401
     assert response.json()["code"] == "authentication_required"
+
+    status = client.get("/assistant/status")
+    assert status.status_code == 401
+    assert status.json()["code"] == "authentication_required"
+
+    message = client.post(
+        "/assistant/messages",
+        json={
+            "message": "Review sleep",
+            "scope": {"task": "Review sleep", "resource_types": ["event"]},
+        },
+    )
+    assert message.status_code == 401
+    assert message.json()["code"] == "authentication_required"
 
 
 def test_verifier_outage_returns_sanitized_503_and_liveness_stays_dependency_free() -> None:

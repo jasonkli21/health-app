@@ -33,7 +33,7 @@ separate Phase 9 release gates described later in this record.
 | 9. Proposal event/revision ordering              | Added explicit revision flush boundaries in create/edit paths; the full PostgreSQL suite now exercises the repaired proposal paths.                                                                                                                                                                                                       |
 | 10. Search projection crash                      | Split SQL-expression and decoded-payload projections while retaining the same relationship-field exclusions; matching search is exercised by the PostgreSQL suite.                                                                                                                                                                        |
 | 11. Regression assertions                        | Corrected analytics call arguments, flat HealthKit error assertions, deterministic daily history ordering, the safe `distance` field path, zero-valued observations-only symptom-summary semantics, and aggregate receipt counts. The full PostgreSQL suite passes without weakening privacy or unknown-versus-zero behavior.             |
-| 12. Migration drift                              | Added a narrow semantic comparator for four equivalent GIN expressions. Comparator tests keep missing or materially changed indexes visible; `alembic check` reports no upgrade operations on PostgreSQL 16.15. PostgreSQL 17 and query-plan checks remain open.                                                                          |
+| 12. Migration drift                              | Added a narrow semantic comparator for four equivalent GIN expressions. Comparator tests keep missing or materially changed indexes visible; clean upgrade/drift checks pass on PostgreSQL 16.15 and 17. Four index definitions and GIN planner paths were checked on PostgreSQL 17; performance measurement remains open.                |
 
 ## Findings in the delivered account-data slice
 
@@ -313,8 +313,33 @@ remaining phase during defect follow-up:
   typechecked. Focused Ruff checks and formatting passed.
 - GCS cleanup tests use a fake client and establish configured deadline and
   generation-precondition behavior only. No live GCS, Neon, Firebase, iOS,
-  HealthKit, external-AI retention, PostgreSQL 17, restore/replay, accessibility,
-  performance, or whole-system release acceptance is claimed.
+  HealthKit, external-AI retention, restore/replay, accessibility, performance,
+  or whole-system release acceptance is claimed.
+
+### Independent verification pass — October 7, 2026
+
+An additional pass against `75ff343` reproduced the full API result: **221
+passed** against a fresh disposable PostgreSQL **16.15** database. `alembic check`
+reported no new upgrade operations (with a SQLAlchemy `dialect_options`
+reflection warning). The mobile Vitest suite passed **125 tests across 25
+files**, and mobile TypeScript checking passed. Focused Ruff check/format,
+mobile ESLint, and the migration-comparator/object-storage tests also pass.
+
+The same **221 API tests** and `alembic check` passed on a fresh PostgreSQL
+**17.11** database. The four GIN index definitions matched the intended
+relationship-safe payload projection, and representative `EXPLAIN` queries
+selected each GIN index when sequential scans were disabled. This verifies
+index definitions and planner paths, not production selectivity or latency.
+The Phase 9 migration created both account-data tables and all 25 write-freeze
+triggers on that database.
+
+This pass found import-order diagnostics in seven changed Python files and an
+ESLint error on the account-data recovery effect, plus minor mobile warnings.
+Those narrow lint issues were corrected in the working tree. The
+repository requires pnpm 9.x while the available pnpm is 11.25.0, so mobile
+checks used the already-installed local binaries directly without changing
+dependencies or lockfiles. Neon, live GCS, backup/restore, device, measured
+performance, and other external gates remain unverified as recorded above.
 
 The code defects and regressions listed in findings 1–12 now have follow-up
 fixes or corrected assertions. Preserve the architecture and disabled-feature

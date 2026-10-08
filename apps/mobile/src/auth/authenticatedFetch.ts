@@ -1,6 +1,9 @@
-import { ApiError } from "@personal-health/api-client";
-import type { components } from "@personal-health/api-client";
-import type { FetchLike, FetchResponse } from "@personal-health/api-client";
+import {
+  ApiError,
+  type components,
+  type FetchLike,
+  type FetchResponse,
+} from "@personal-health/api-client";
 
 import type { SessionStore } from "./sessionStore";
 import { assertApiRequestUrl, apiBaseUrl } from "./apiConfig";

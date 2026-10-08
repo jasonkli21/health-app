@@ -20,6 +20,7 @@ In another terminal:
 
 ```bash
 curl --fail http://127.0.0.1:8000/healthz
+curl --fail http://127.0.0.1:8000/readyz
 EXPO_PUBLIC_API_URL=http://127.0.0.1:8000 pnpm mobile:start
 ```
 
@@ -29,7 +30,7 @@ The shell uses Expo Go; it does not require an already-built development client.
 
 After the Python environment and API dependencies are ready, export OpenAPI and build the generated TypeScript client with `pnpm --filter @personal-health/api-client generate`. This performs no database request. Check generated source with `pnpm --filter @personal-health/api-client typecheck`; CI also regenerates the tracked artifacts and fails on drift.
 
-`/healthz` is process liveness only: it requires no database, identity, objects, or AI service. Local settings use `APP_ENV=local`, `AUTH_MODE=dev`, `OBJECT_STORAGE_BACKEND=local`, and the one server-side `LOCAL_PRINCIPAL_ID`. Protected routes return 401 when that ID is absent. This identity is for private local development and is not internet authentication. The API uses a bounded SQLAlchemy pool and stores synthetic local objects under `.data/objects`; that directory is ignored by Git.
+`/healthz` is process liveness only: it requires no database, identity, objects, or AI service. `/readyz` checks the configured database connection with a read-only `SELECT 1` and returns only `{"status":"ok"}` or a generic 503 `{"status":"unavailable"}`. Run it after PostgreSQL is started and migrations are applied. Local settings use `APP_ENV=local`, `AUTH_MODE=dev`, `OBJECT_STORAGE_BACKEND=local`, and the one server-side `LOCAL_PRINCIPAL_ID`. Protected routes return 401 when that ID is absent. This identity is for private local development and is not internet authentication. The API uses a bounded SQLAlchemy pool and stores synthetic local objects under `.data/objects`; that directory is ignored by Git.
 
 Cloud mode requires `APP_ENV=cloud`, `AUTH_MODE=firebase`, a Firebase project ID, GCP project and private GCS bucket identifiers, an explicit Cloud Run instance count and database connection budget, and a pooled Neon `DATABASE_URL` with `sslmode=verify-full`. The Cloud Run service receives database credentials from Secret Manager through its runtime identity. A release job uses the separate direct Neon URL as `MIGRATION_DATABASE_URL`; schema changes never run at API startup. Do not copy any server variables into Expo public variables. `.env.example` contains only local values; cloud configuration and secret names are listed in the [Phase 3 cloud release runbook](../infra/gcp/README.md).
 
@@ -37,7 +38,7 @@ When `EXPO_PUBLIC_AUTH_MODE=firebase`, the mobile app uses Firebase Authenticati
 
 Firebase mode additionally requires `EXPO_PUBLIC_FIREBASE_API_KEY`, `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN`, `EXPO_PUBLIC_FIREBASE_PROJECT_ID` and `EXPO_PUBLIC_FIREBASE_APP_ID`. These values identify the client app and are not authentication credentials. Firebase refresh tokens are persisted by the SDK through Expo SecureStore. The API obtains ownership only from a verified bearer ID token and the additive provider-identity mapping; it never trusts a client-supplied owner ID or merges identities by email.
 
-Most request bodies are limited to 65,536 bytes. The normalized HealthKit batch route is limited to 1,048,576 bytes and 200 total changes per request. Errors do not include submitted health values. Responses include a server-generated `X-Request-ID`. Lists are owner/filter/as-of scoped with a 100-item maximum; preserve the returned `as_of` when following its cursor. Unknown values use explicit `null` in the required typed payload value; `false` and `0` remain known values.
+Most request bodies are limited to 65,536 bytes. The normalized HealthKit batch route is limited to 1,048,576 bytes and 200 total changes per request. Errors do not include submitted health values. Responses echo a safe ASCII `X-Request-ID` of at most 64 characters; otherwise the server supplies a UUID. Request events are emitted as JSON lines with severity, request ID, method, route template, status, and duration. Body-limit rejections also include the configured limit and a fixed reason. Logs exclude query strings, other headers, bodies, health values, and raw exception details. Lists are owner/filter/as-of scoped with a 100-item maximum; preserve the returned `as_of` when following its cursor. Unknown values use explicit `null` in the required typed payload value; `false` and `0` remain known values.
 
 ## Migrations and database tests
 
@@ -80,7 +81,9 @@ pnpm --filter @personal-health/mobile exec expo install --check
 pnpm --filter @personal-health/mobile exec expo export --platform ios --output-dir /tmp/personal-health-ios-bundle
 ```
 
-The API persistence tests require `TEST_DATABASE_URL`; without it, PostgreSQL integration cases are skipped. CI provisions its own disposable PostgreSQL service. Do not treat SQLite as a substitute for PostgreSQL transaction, migration, uniqueness or query behavior. The generated client and Profile value model have behavioral Vitest tests; a test-only React DOM render checks accessible labels and opt-in defaults in the native Profile form. It does not verify interactive behavior. Device execution, create/edit/archive/history walkthrough, keyboard behavior, and assistive-technology accessibility remain manual checks on an equipped host.
+The API persistence tests require `TEST_DATABASE_URL`; without it, PostgreSQL integration cases are skipped. CI provisions PostgreSQL 17 and the session fixture upgrades Alembic to head before running the API suite. This automates PostgreSQL migration and API regression coverage for tests in that suite; it does not establish Neon parity or production behavior. Do not treat SQLite as a substitute for PostgreSQL transaction, migration, uniqueness or query behavior. The generated client and Profile value model have behavioral Vitest tests; a test-only React DOM render checks accessible labels and opt-in defaults in the native Profile form. It does not verify interactive behavior. Device execution, create/edit/archive/history walkthrough, keyboard behavior, and assistive-technology accessibility remain manual checks on an equipped host.
+
+CI also checks Terraform formatting and schema validation with backend initialization disabled, and builds the exact production API Dockerfile without pushing the image. These checks need no GCP credentials and do not deploy or establish live IAM, database, storage, or Cloud Run behavior.
 
 Frontend resolutions are in `pnpm-lock.yaml`; use pinned pnpm **9.15.0** (for example `corepack pnpm@9.15.0`) and install with `--frozen-lockfile`. The checked-in `requirements-dev.lock` pins the Python 3.12 development/test environment as pip constraints; `requirements-runtime.lock` pins only the production dependency closure with hashes for the locked container install. Regenerate both deliberately when changing dependencies or Python/platform. Build tooling is separately pinned in `pyproject.toml`. Lock regeneration uses uv:
 

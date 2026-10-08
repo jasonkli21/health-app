@@ -8,12 +8,11 @@ from pathlib import Path
 from typing import Literal
 from uuid import UUID
 
+from health_api.domain.proposals import MAX_PROPOSAL_LIFETIME_HOURS
+from health_api.domain.schemas import validate_iana_timezone
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
-
-from health_api.domain.proposals import MAX_PROPOSAL_LIFETIME_HOURS
-from health_api.domain.schemas import validate_iana_timezone
 
 
 def _postgres_url(value: str | SecretStr) -> URL:
@@ -132,7 +131,8 @@ class Settings(BaseSettings):
             raise ValueError("FIREBASE_PROJECT_ID is required when AUTH_MODE=firebase")
         if self.personal_ai_enabled:
             raise ValueError(
-                "PERSONAL_AI_ENABLED cannot be true until the Personal AI service contract is configured"
+                "PERSONAL_AI_ENABLED cannot be true until the Personal AI Application Integration "
+                "Contract is implemented and reviewed"
             )
 
         if self.app_env == "cloud":

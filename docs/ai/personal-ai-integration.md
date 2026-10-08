@@ -1,44 +1,80 @@
 # Personal AI integration
 
-Personal AI is the shared intelligence layer; Health is the domain authority.
+Health owns canonical health state, authorization, validation, and health
+mutations. Personal AI is an optional reasoning service and has no Health
+database credentials. The current Health boundary is local preview/search plus
+an explicitly disabled live-message route.
 
-Personal AI owns LLM routing, general conversation/memory, web/research orchestration, cross-domain reasoning, and shared agent/tool orchestration. Health owns canonical state, schema/validation, domain retrieval/analytics, context construction, and action persistence.
+## Implemented in Health now
 
-The Health service builds task-specific `HealthContextPack`s instead of dumping the full profile. Candidate sections: request context, constraints, active contexts, goals, preferences, today, recent summaries, relevant events/observations/trends/records, provenance.
+- `POST /ai/context` returns a bounded, owner-scoped Health preview. Each
+  request rechecks item-level AI permission, active state, temporal validity,
+  and requested narrowing.
+- `GET /search` searches only current owner resources explicitly allowed for AI
+  use. These are Health-owned local features and do not require Personal AI.
+- Owners can review and apply typed action proposals through Health's explicit
+  proposal flow. Personal AI cannot submit proposals or write canonical state.
+- `GET /assistant/status` is authenticated and reports the live integration as
+  disabled with no capabilities. `POST /assistant/messages` remains available
+  for client compatibility and always returns a sanitized 503 until the
+  Personal AI Application Integration Contract is implemented and reviewed.
+- `PERSONAL_AI_ENABLED` defaults to false, and settings reject `true`. No
+  endpoint, service credential, delegated-owner token, or callback is
+  configured.
 
-Read capabilities conceptually include context, search, today, profile, goals, plans, trends, records. Mutations are proposals for events, profile changes, goals, plans, and trackers.
+## Shared architecture in Personal AI
 
-Health facts discovered in conversation should be proposed into Health rather than stored as competing generic durable memory. Cross-app sharing is explicit.
+Personal AI has a shared Application Integration Contract composed from typed
+request scope, registered application capabilities, and domain-owned
+adapters. Its current implementation includes registered typed context
+providers and bounded operations, permission dependencies, field-level
+sensitivity metadata, deterministic planning before retrieval, and a shared
+context builder. Provider registration does not grant permission. Personal
+AI's own current-state record still lists incomplete policy-version references
+and end-to-end revocation work; this is not evidence of a Health integration.
 
-Design for general wellness, education, personally consequential medical reasoning, and urgent-safety classifications with progressively stricter grounding/action policies.
+## Planned Health read integration
 
-## Authorization and data flow
+Personal AI Phase 29 plans for Health to expose Health-owned, read-only typed
+capabilities through the Application Integration Contract. Health must
+authorize an owner, application/workspace scope, purpose, category, and
+operation before fetching that category. Responses must be bounded and
+domain-typed, preserving source identity/version, provenance and authority,
+effective/source time, units, uncertainty, and field-level sensitivity. The
+most restrictive sensitivity must apply downstream. Cross-app Health use is
+denied by default unless explicitly authorized. An owner identifier inside a
+payload is not authorization, and verbose sensitive artifacts should be kept
+to a minimum or disabled.
 
-Health may build a versioned, minimized context preview from canonical
-owner-scoped resources. Every included object must be active and temporally
-eligible, and the owner must have explicitly enabled its AI-use permission.
-Task scope and per-request exclusions can narrow that set but cannot grant
-permission. Context size, included resources, and evidence are bounded and
-revision-linked. User text and notes remain untrusted data; relationship
-metadata must not make an unauthorized endpoint searchable or visible.
+No Phase 29 provider endpoint, registration, or live Health integration is
+implemented here. The local preview remains a separate Health capability.
 
-Cross-domain permission is separate and does not authorize this Assistant.
-Health rebuilds context immediately before any future provider send, checks
-permissions again on every read, binds delegation to a short-lived
-owner/request scope, and validates every cited revision. If any required
-provider identity, delegation, callback, retention, timeout, or safety contract
-is absent or unreviewed, provider messaging and AI-originated proposal
-submission must remain disabled. Health-side preview/search and owner-authored
-structured proposals are separate local capabilities.
+## Planned mutation integration
 
-See [current state](../current-state.md) for what is implemented and
-[Phase 5 evidence](../implementation/evidence/phase-5-release.md) for the
-verified preview/search boundary and open provider gates.
+Personal AI Phase 31 describes typed mutation proposals. Generic orchestration
+may own proposal metadata and workflow, while Health remains responsible for
+owner authorization, domain validation, the authoritative write, and the
+returned post-state. Health may reject sensitive operations even when a
+generic proposal has user confirmation. The current Health proposal flow is
+owner-authored; AI-originated proposal submission remains unavailable.
 
-Phase 7 adds an optional `trends` context section for one explicitly selected
-metric. The preview is computed by Health from current active Event/Observation
-inputs marked `ai_use_allowed`; it does not read persisted insights or
-recommendations as provider instructions. Numeric tracker summaries additionally
-require an active tracker definition with AI use explicitly enabled. The
-Personal AI adapter remains disabled, and deterministic Insights work without
-it.
+## Local preview is not the interchange contract
+
+`AIContextPack` is a response model for an authenticated local Health preview.
+It contains Health-specific fields, including a generic JSON `content` value,
+and does not carry the future provider contract's complete field sensitivity
+and permission-dependency envelope. Its `owner_scope` value is not an
+authorization credential. Do not send this model directly to Personal AI or
+treat it as the future cross-service transport format.
+
+A future provider projection must use server-derived scope and explicit
+purpose, authorize before fetch, return bounded typed fields, preserve
+provenance and temporal semantics, apply the most restrictive sensitivity,
+deny cross-app use by default, and keep canonical Health state in Health.
+
+See [current state](../current-state.md), the
+[Health API contract](../api/api-contract.md),
+[boundary alignment evidence](../implementation/evidence/personal-ai-boundary-alignment-2026-10-08.md),
+and [Phase 5 release evidence](../implementation/evidence/phase-5-release.md)
+for the delivered local preview/search behavior and the remaining external
+gates.

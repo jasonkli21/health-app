@@ -73,7 +73,7 @@ export function AccountDataScreen() {
         ? current.mode === "dev" && current.status === "ready"
         : current.status === "signed_in")
     );
-  }, [session.epoch, session.mode, session.status, session.userId]);
+  }, [session.epoch, session.mode, session.userId]);
 
   const finishDeletion = useCallback(async (): Promise<void> => {
     await clearOwnerDeletionState(
@@ -139,7 +139,7 @@ export function AccountDataScreen() {
         setLocalCleanupPending(true);
         try {
           await finishDeletion();
-        } catch (error) {
+        } catch {
           if (isOriginalSession()) {
             setMessage(localCleanupError());
           }
@@ -156,7 +156,7 @@ export function AccountDataScreen() {
   }, [finishDeletion, isOriginalSession, requestKey]);
 
   useEffect(() => {
-    void loadRecovery();
+    void Promise.resolve().then(loadRecovery);
   }, [loadRecovery]);
 
   async function exportData(): Promise<void> {

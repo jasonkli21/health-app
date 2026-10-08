@@ -2760,6 +2760,16 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  readinesscheck: {
+    responses: {
+      "200": {
+        [key: string]: string;
+      };
+      "503": {
+        [key: string]: string;
+      };
+    };
+  };
   refreshInsights: {
     requestBody: components["schemas"]["InsightGenerateRequest"];
     responses: {
@@ -3979,6 +3989,14 @@ export class HealthApiClient {
       undefined,
       requestBody,
     );
+  }
+
+  async readinesscheck(): Promise<{
+    [key: string]: string;
+  }> {
+    return this.request<{
+      [key: string]: string;
+    }>("GET", `/readyz`, undefined, undefined);
   }
 
   async refreshInsights(

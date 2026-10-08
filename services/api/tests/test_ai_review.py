@@ -1,28 +1,33 @@
 from __future__ import annotations
 
-import asyncio
 import base64
 import json
-from datetime import UTC, datetime
-from uuid import UUID
+from datetime import UTC, date, datetime
+from types import SimpleNamespace
+from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy.dialects import postgresql
-
 from health_api.api.ai import (
     _decode_cursor,
-    _invoke_adapter,
     _owner_binding,
     _query_binding,
-    _validate_adapter_response,
 )
 from health_api.api.errors import APIError
+from health_api.application.ai_context_admission import _eligibility_conditions
+from health_api.application.ai_context_pack import _append_budgeted_entries
+from health_api.application.ai_context_projection import (
+    _context_entry,
+    _filter_relationships_to_included_entries,
+)
 from health_api.application.ai_context_service import (
     _eligible_candidates,
     _payload_search_projection,
 )
-from health_api.domain.ai import AIContextRequest, AssistantMessageRequest
-from health_api.persistence.models import PlanningResource
+from health_api.domain.ai import AIContextEntry, AIContextPack, AIContextRequest
+from health_api.integrations.personal_ai import create_personal_ai_adapter
+from health_api.persistence.models import EventItem, ObservationItem, PlanningResource
+from sqlalchemy import and_, select
+from sqlalchemy.dialects import postgresql
 
 OWNER = UUID("00000000-0000-0000-0000-000000000101")
 
@@ -69,78 +74,13 @@ def test_context_request_supports_bounded_domain_and_item_narrowing() -> None:
     assert len(request.excluded_object_ids) == 1
 
 
-def test_adapter_response_is_bound_to_health_request_and_counts() -> None:
-    request_id = UUID("00000000-0000-0000-0000-000000000456")
-    object_id = UUID("00000000-0000-0000-0000-000000000123")
-    result = _validate_adapter_response(
-        {
-            "request_id": str(request_id),
-            "reply": "Review your sleep log.",
-            "risk_class": "general_wellness",
-            "context_summary": {"invented": 999},
-            "evidence_refs": [{"object_id": str(object_id), "revision": 2}],
-            "service_status": "complete",
-        },
-        request_id=request_id,
-        included_counts={"event": 1},
-        permitted_refs={(object_id, 2): ("event", "Sleep log")},
-        requested_risk="consequential_medical",
-    )
-    assert result.context_summary == {"event": 1}
-    assert result.risk_class == "consequential_medical"
+def test_personal_ai_factory_exposes_disabled_status_without_transport() -> None:
+    integration = create_personal_ai_adapter()
 
-
-def test_adapter_response_rejects_mismatched_ids_and_invented_evidence() -> None:
-    request_id = UUID("00000000-0000-0000-0000-000000000456")
-    response = {
-        "request_id": str(request_id),
-        "reply": "Unsupported.",
-        "risk_class": "general_wellness",
-        "context_summary": {},
-        "evidence_refs": [],
-        "service_status": "complete",
-    }
-    with pytest.raises(APIError) as mismatched:
-        _validate_adapter_response(
-            {**response, "request_id": str(OWNER)},
-            request_id=request_id,
-            included_counts={},
-            permitted_refs={},
-            requested_risk="general_wellness",
-        )
-    assert mismatched.value.code == "assistant_invalid_response"
-    with pytest.raises(APIError) as unsupported_evidence:
-        _validate_adapter_response(
-            {
-                **response,
-                "evidence_refs": [{"object_id": str(OWNER), "revision": 1}],
-            },
-            request_id=request_id,
-            included_counts={},
-            permitted_refs={},
-            requested_risk="general_wellness",
-        )
-    assert unsupported_evidence.value.code == "assistant_invalid_evidence"
-
-
-@pytest.mark.asyncio
-async def test_adapter_deadline_cancels_a_never_finishing_fake(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    import health_api.api.ai as ai_routes
-
-    class NeverFinishes:
-        async def send_message(self, _request: object, _context: object) -> object:
-            await asyncio.Event().wait()
-
-    monkeypatch.setattr(ai_routes, "ADAPTER_TIMEOUT_SECONDS", 0.001)
-    request = AssistantMessageRequest(
-        message="test", scope=AIContextRequest(task="test", resource_types=["event"])
-    )
-    with pytest.raises(APIError) as timeout:
-        await _invoke_adapter(NeverFinishes(), request, None)  # type: ignore[arg-type]
-    assert timeout.value.code == "assistant_unavailable"
-    assert timeout.value.message == "Assistant request timed out."
+    assert integration.configured is False
+    assert integration.status == "disabled"
+    assert integration.reason.endswith("implemented and reviewed.")
+    assert not hasattr(integration, "send_message")
 
 
 def test_search_projection_removes_relationship_fields_and_planning_dates_compile() -> None:
@@ -160,3 +100,200 @@ def test_search_projection_removes_relationship_fields_and_planning_dates_compil
     )
     compiled = candidates.select().compile(dialect=postgresql.dialect())
     assert {"start_at", "end_at", "start_date", "end_date"}.issubset(set(compiled.params.values()))
+
+
+def test_candidate_admission_requires_owner_consent_currentness_time_and_narrowing() -> None:
+    excluded_id = uuid4()
+    conditions = _eligibility_conditions(
+        OWNER,
+        object_type="event",
+        payload=EventItem.payload,
+        as_of=datetime(2026, 10, 8, 12, tzinfo=UTC),
+        start_date=date(2026, 10, 1),
+        start_at=datetime(2026, 10, 1, tzinfo=UTC),
+        end_date=date(2026, 10, 8),
+        excluded_object_ids=(excluded_id,),
+        domains=("sleep",),
+    )
+    compiled = select(1).where(and_(*conditions)).compile(dialect=postgresql.dialect())
+    sql = compiled.string
+
+    assert "health_objects.owner_id" in sql
+    assert "health_objects.status" in sql
+    assert "health_objects.ai_use_allowed IS true" in sql
+    assert "health_objects.valid_from" in sql and "health_objects.valid_to" in sql
+    assert "health_objects.domain IN" in sql
+    assert "health_objects.id NOT IN" in sql
+    assert excluded_id in compiled.params["id_1"]
+    assert compiled.params["domain_1"] == ["sleep"]
+
+
+def test_custom_tracker_values_do_not_pass_the_context_admission_gate() -> None:
+    conditions = _eligibility_conditions(
+        OWNER,
+        object_type="observation",
+        payload=ObservationItem.payload,
+        as_of=datetime(2026, 10, 8, 12, tzinfo=UTC),
+        start_date=date(2026, 10, 1),
+        start_at=datetime(2026, 10, 1, tzinfo=UTC),
+        end_date=date(2026, 10, 8),
+    )
+    compiled = select(1).where(and_(*conditions)).compile(dialect=postgresql.dialect())
+
+    assert "observations.payload" in compiled.string
+    assert "custom" in compiled.params.values()
+
+
+def _entry(
+    object_id: UUID,
+    object_type: str,
+    payload: dict[str, object],
+) -> AIContextEntry:
+    return AIContextEntry(
+        object_id=object_id,
+        revision=1,
+        object_type=object_type,  # type: ignore[arg-type]
+        domain="planning" if object_type in {"context", "plan"} else "nutrition",
+        title="Review-test entry",
+        valid_from=None,
+        valid_to=None,
+        source_kind="manual",
+        confirmation_status="user_confirmed",
+        content={"payload": payload, "notes": None},
+        content_is_user_data=True,
+        relevance_reason="Current entry",
+    )
+
+
+def test_projection_drops_relationships_to_ineligible_endpoints() -> None:
+    hidden_id, included_id = uuid4(), uuid4()
+    context = _entry(
+        uuid4(),
+        "context",
+        {
+            "related": [
+                {"object_id": str(hidden_id), "label": "private endpoint"},
+                {"object_id": str(included_id), "label": "included endpoint"},
+            ]
+        },
+    )
+    included = _entry(included_id, "event", {"kind": "meal"})
+
+    _filter_relationships_to_included_entries([context, included])
+
+    related = context.content["payload"]["related"]
+    assert related == [{"object_id": str(included_id), "label": "included endpoint"}]
+    assert str(hidden_id) not in context.model_dump_json()
+
+
+def test_projection_preserves_date_only_time_and_unknown_values() -> None:
+    local_date = date(2026, 10, 8)
+    row = SimpleNamespace(
+        object_type="event",
+        priority=4,
+        object_id=uuid4(),
+        revision=2,
+        domain="measurements",
+        title="Review-test measurement",
+        valid_from=None,
+        valid_to=None,
+        source_kind="manual",
+        confirmation_status="user_confirmed",
+        payload={"value": None, "known": False, "zero": 0},
+        notes=None,
+        health_metadata={},
+        time_precision="date_only",
+        timezone="Pacific/Auckland",
+        local_date=local_date,
+        occurred_at=None,
+        ended_at=None,
+    )
+
+    entry = _context_entry(row)
+
+    assert entry.content["time"] == {
+        "precision": "date_only",
+        "timezone": "Pacific/Auckland",
+        "local_date": "2026-10-08",
+    }
+    assert entry.content["payload"] == {"value": None, "known": False, "zero": 0}
+
+    instant = datetime(2026, 10, 8, 19, 30, tzinfo=UTC)
+    instant_row = SimpleNamespace(
+        **{
+            **row.__dict__,
+            "time_precision": "instant",
+            "timezone": "UTC",
+            "local_date": None,
+            "occurred_at": instant,
+            "ended_at": None,
+        }
+    )
+    instant_entry = _context_entry(instant_row)
+    assert instant_entry.content["time"] == {
+        "precision": "instant",
+        "timezone": "UTC",
+        "occurred_at": instant.isoformat(),
+        "ended_at": None,
+    }
+
+
+def _empty_pack(now: datetime) -> AIContextPack:
+    return AIContextPack(
+        schema_version=1,
+        request_id=UUID("00000000-0000-0000-0000-000000000123"),
+        owner_scope="a" * 32,
+        built_at=now,
+        as_of=now,
+        timezone="UTC",
+        task="Review-test budget",
+        task_kind="general_wellness",
+        resource_types=["event"],
+        domains=[],
+        sections=["entries"],
+        lookback_days=30,
+        entries=[],
+        today_summary_date=now.date(),
+        today_summary_scope="included_opted_in_entries_only",
+        today_summaries=[],
+        included_counts={},
+        omitted_by_user=0,
+        omitted_by_budget=0,
+        truncated=False,
+        budget_bytes=65_536,
+        serialized_bytes=0,
+    )
+
+
+def test_one_oversized_candidate_is_deterministically_omitted() -> None:
+    now = datetime(2026, 10, 8, 12, tzinfo=UTC)
+    row = SimpleNamespace(
+        object_type="event",
+        priority=4,
+        object_id=UUID("00000000-0000-0000-0000-000000000456"),
+        revision=1,
+        domain="nutrition",
+        title="Review-test oversized entry",
+        valid_from=None,
+        valid_to=None,
+        source_kind="manual",
+        confirmation_status="user_confirmed",
+        payload={"large": "x" * 70_000},
+        notes=None,
+        health_metadata={},
+        time_precision=None,
+        timezone=None,
+        local_date=None,
+        occurred_at=None,
+        ended_at=None,
+    )
+    first = _empty_pack(now)
+    second = _empty_pack(now)
+
+    assert _append_budgeted_entries(first, [row]) is False
+    assert _append_budgeted_entries(second, [row]) is False
+
+    assert first.entries == second.entries == []
+    assert first.omitted_by_budget == second.omitted_by_budget == 1
+    assert first.truncated is second.truncated is True
+    assert first.serialized_bytes == second.serialized_bytes <= 65_536

@@ -7,7 +7,6 @@ from uuid import UUID
 
 import pytest
 from google.api_core.exceptions import GoogleAPICallError
-
 from health_api.integrations.object_storage import (
     GCSObjectStorage,
     LocalObjectStorage,

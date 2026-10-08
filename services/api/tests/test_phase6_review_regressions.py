@@ -9,13 +9,11 @@ from uuid import uuid4
 import pytest
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
 from health_api.api.dependencies import get_current_owner, get_session, get_settings
 from health_api.api.errors import APIError
 from health_api.api.proposals import create_proposal, get_proposal, reject_proposal, router
 from health_api.application import action_proposal_service as proposals
+from health_api.application import proposal_apply, proposal_validation
 from health_api.application.errors import ActionProposalConflict, ActionProposalValidationError
 from health_api.domain.planning import PlanPayloadV1
 from health_api.domain.proposals import (
@@ -31,6 +29,8 @@ from health_api.domain.proposals import (
 from health_api.domain.schemas import ProfilePayloadV1
 from health_api.main import create_app
 from health_api.persistence.models import ActionCommandReceipt, ActionProposal, HealthObject, User
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 
 def _profile() -> ProfilePayloadV1:
@@ -272,7 +272,7 @@ def test_prior_receipt_replay_compares_revision(monkeypatch: pytest.MonkeyPatch)
     session.begin.return_value.__enter__ = MagicMock(return_value=None)
     session.begin.return_value.__exit__ = MagicMock(return_value=None)
     session.scalar.return_value = owner
-    monkeypatch.setattr(proposals, "_find_receipt", lambda *_: receipt)
+    monkeypatch.setattr(proposal_apply, "_find_receipt", lambda *_: receipt)
 
     with pytest.raises(ActionProposalConflict, match="idempotency key"):
         proposals.apply_action_proposal(
@@ -297,8 +297,8 @@ def test_applied_proposal_binds_a_successful_alternate_key_to_canonical_result(
     session.begin.return_value.__enter__ = MagicMock(return_value=None)
     session.begin.return_value.__exit__ = MagicMock(return_value=None)
     session.scalar.side_effect = [owner, proposal, original]
-    monkeypatch.setattr(proposals, "_find_receipt", lambda *_: None)
-    monkeypatch.setattr(proposals, "_state_from_row", lambda *_: "canonical-state")
+    monkeypatch.setattr(proposal_apply, "_find_receipt", lambda *_: None)
+    monkeypatch.setattr(proposal_apply, "_state_from_row", lambda *_: "canonical-state")
 
     outcome = proposals.apply_action_proposal(
         session, owner_id, proposal_id, 2, "c" * 64, "alternate-key"
@@ -326,7 +326,7 @@ def test_archived_profile_update_fails_draft_validation(monkeypatch: pytest.Monk
         "commands": [command.model_dump(mode="json", exclude_unset=True)],
     }
     monkeypatch.setattr(
-        proposals,
+        proposal_validation,
         "get_profile_item",
         lambda *_: (SimpleNamespace(status="archived", revision=1), None, None),
     )
@@ -480,7 +480,7 @@ def test_database_apply_failure_after_target_write_rolls_back_proposal_effects(
         target_results(*args, **kwargs)
         raise RuntimeError("injected failure after target write")
 
-    monkeypatch.setattr(proposals, "_target_results", fail_after_target_write)
+    monkeypatch.setattr(proposal_apply, "_target_results", fail_after_target_write)
     with pytest.raises(RuntimeError, match="injected failure"):
         proposals.apply_action_proposal(
             db_session, owner_id, proposal_id, state.revision, state.content_hash, "rollback-key"

@@ -1,4 +1,4 @@
-"""Versioned, minimized contracts for optional read-only Personal AI access."""
+"""Health-owned local AI context preview/search and disabled Assistant contracts."""
 
 from __future__ import annotations
 
@@ -6,11 +6,10 @@ from datetime import date, datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import AwareDatetime, Field, StrictBool, StrictInt, model_validator
-
 from health_api.domain.analytics import AnalysisMetricId, TrendResult
 from health_api.domain.daily_rollups import MetricSummaryV1
 from health_api.domain.schemas import ConfirmationStatus, StrictModel
+from pydantic import AwareDatetime, Field, StrictBool, StrictInt, model_validator
 
 AIResourceType = Literal[
     "profile_item",
@@ -91,6 +90,8 @@ class AIContextEntry(StrictModel):
 
 
 class AIContextPack(StrictModel):
+    """Owner-authenticated local preview; not a cross-service transport envelope."""
+
     schema_version: Literal[1]
     request_id: UUID
     owner_scope: Annotated[str, Field(min_length=32, max_length=64)]

@@ -79,7 +79,8 @@ resource "google_cloud_run_v2_service" "api" {
   # Mobile sends Firebase ID tokens, not Cloud Run IAM identity tokens. The
   # application verifies bearer identity on every owner-scoped route.
   invoker_iam_disabled = true
-  launch_stage         = "GA"
+  # Cloud Run readiness probes are currently a preview feature.
+  launch_stage         = "BETA"
 
   template {
     service_account                  = google_service_account.runtime.email
@@ -94,6 +95,37 @@ resource "google_cloud_run_v2_service" "api" {
       image = var.api_image_uri
       ports {
         container_port = 8080
+      }
+      startup_probe {
+        timeout_seconds   = 5
+        period_seconds    = 10
+        failure_threshold = 6
+
+        http_get {
+          path = "/readyz"
+          port = 8080
+        }
+      }
+      readiness_probe {
+        timeout_seconds   = 5
+        period_seconds    = 10
+        failure_threshold = 3
+        success_threshold = 1
+
+        http_get {
+          path = "/readyz"
+          port = 8080
+        }
+      }
+      liveness_probe {
+        timeout_seconds   = 5
+        period_seconds    = 30
+        failure_threshold = 3
+
+        http_get {
+          path = "/healthz"
+          port = 8080
+        }
       }
       resources {
         limits = {

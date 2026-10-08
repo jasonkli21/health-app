@@ -114,6 +114,7 @@
       },
       "AIContextPack": {
         "additionalProperties": false,
+        "description": "Owner-authenticated local preview; not a cross-service transport envelope.",
         "properties": {
           "as_of": {
             "format": "date-time",
@@ -8467,7 +8468,7 @@
     }
   },
   "info": {
-    "description": "Owner-scoped account data, Profile, daily Event/Observation, planning, and read-only Assistant APIs. Identity is resolved from server configuration or verified Firebase bearer tokens. Request bodies are limited to 65,536 bytes except normalized HealthKit batches, which are limited to 1,048,576 bytes.",
+    "description": "Owner-scoped account data, Profile, daily Event/Observation, planning, and local AI context preview/search. Live Personal AI messaging is unavailable until the Application Integration Contract is implemented and reviewed. Identity is resolved from server configuration or verified Firebase bearer tokens. Request bodies are limited to 65,536 bytes except normalized HealthKit batches, which are limited to 1,048,576 bytes.",
     "title": "Personal Health API",
     "version": "1.0.0"
   },
@@ -9670,6 +9671,7 @@
     },
     "/assistant/messages": {
       "post": {
+        "description": "Always return sanitized 503 until the shared contract is implemented and reviewed.",
         "operationId": "sendAssistantMessage",
         "requestBody": {
           "content": {
@@ -9744,6 +9746,7 @@
     },
     "/assistant/status": {
       "get": {
+        "description": "Return owner-authenticated status for the disabled external integration.",
         "operationId": "getAssistantStatus",
         "responses": {
           "200": {
@@ -16165,6 +16168,44 @@
         ],
         "summary": "Get Profile History",
         "tags": ["profile"]
+      }
+    },
+    "/readyz": {
+      "get": {
+        "description": "Check canonical database availability without returning connection details.",
+        "operationId": "readinesscheck",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Readinesscheck",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response 503 Readinesscheck",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The canonical Health database is unavailable."
+          }
+        },
+        "summary": "Readinesscheck",
+        "tags": ["system"]
       }
     },
     "/recommendations": {

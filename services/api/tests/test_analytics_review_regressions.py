@@ -6,12 +6,13 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-
-from health_api.application.analytics_service import (
-    _snapshot,
+from health_api.application.analytics_artifacts import _snapshot
+from health_api.application.analytics_computation import (
+    _series_from_snapshot,
     _standard_points,
     _tracker_metric_label,
 )
+from health_api.application.analytics_contracts import AnalyticsSourceSnapshot
 from health_api.domain.analytics import (
     ASSOCIATION_PAIRS,
     METRIC_CATALOG,
@@ -164,6 +165,32 @@ def test_analytics_symptom_severity_omits_cross_day_relationships() -> None:
     assert points[0].value is None
     assert points[0].known_count == 0
     assert all(reference.object_id != observation_id for reference in evidence)
+
+
+def test_pure_snapshot_calculation_preserves_missing_values_and_generation() -> None:
+    snapshot = AnalyticsSourceSnapshot(
+        generation=17,
+        events=[],
+        observations=[],
+        links={},
+        provenance={},
+        preferred_installations={},
+    )
+
+    definition, points, evidence, generation = _series_from_snapshot(
+        "weight",
+        METRIC_CATALOG[AnalyticsMetric.WEIGHT],
+        date(2026, 10, 7),
+        date(2026, 10, 7),
+        "UTC",
+        snapshot,
+    )
+
+    assert definition.metric == "weight"
+    assert points[0].value is None
+    assert points[0].known_count == points[0].total_count == 0
+    assert evidence == []
+    assert generation == 17
 
 
 def test_tracker_metric_labels_fit_contract_for_long_unicode_names() -> None:

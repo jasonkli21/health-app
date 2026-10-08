@@ -1,13 +1,18 @@
 # Integrations
 
-Adapters for Personal AI, object storage, authentication, and later HealthKit/import sources. External systems must not leak transport-specific concerns into the domain layer.
+Adapters for object storage, authentication, and later HealthKit/import
+sources. External systems must not leak transport-specific concerns into the
+domain layer.
 
-The Personal AI adapter is a typed, disabled boundary until its real service,
-service-to-service identity, user delegation, tool callback, timeout, and
-retention contracts are reviewed. Do not add a guessed endpoint, accept an
-arbitrary URL, or forward a user bearer token to a model provider. Health
-context must be rebuilt immediately before any future send; provider evidence
-must resolve to included owner revisions.
+The Personal AI integration currently exposes disabled status only. The
+factory does not create a message transport, and `POST /assistant/messages`
+returns a sanitized 503 until the Personal AI Application Integration
+Contract is implemented and reviewed. `AIContextPack` is for the local Health
+preview and must not be treated as an external request envelope. Do not add a
+guessed endpoint, accept an arbitrary URL, or forward a user bearer token to a
+model provider. A future Health provider must authorize the owner, application
+scope, purpose, category, and operation before fetching data, and return
+bounded domain-typed fields with provenance and sensitivity metadata.
 
 ## Object storage boundary
 

@@ -26,7 +26,10 @@ The Cloud Run service has public HTTPS ingress because a native Firebase client
 does not present a Google Cloud Run invoker identity token. This disables Cloud
 Run's invoker IAM check; every Profile/daily domain request still requires a
 Firebase ID bearer token validated by the API. `/healthz` is intentionally
-public, dependency-free process liveness. No other domain route is anonymous.
+public, dependency-free process liveness. `/readyz` is also public and checks
+only whether the canonical Health database can execute `SELECT 1`; it returns
+a generic ready/unavailable status. Neither endpoint returns health data,
+connection details, or credentials. No other domain route is anonymous.
 The runtime service account can read only the pooled DB secret, read Firebase
 Auth user records for revocation checks, and use private objects in the one
 bucket. The migration account can read only the direct DB secret and cannot
@@ -118,8 +121,9 @@ data before any destructive action. An incompatible schema change requires an
 expand/migrate/contract sequence across separately reviewed releases.
 
 On Firebase verifier, Neon, or GCS outage, domain APIs fail closed with
-sanitized 503 responses; `/healthz` remains process liveness and does not claim
-dependency readiness. Check operational metrics and Cloud Run logs without
+sanitized 503 responses. `/healthz` remains process liveness; `/readyz` reports
+only canonical database availability and does not represent Firebase, GCS, or
+general dependency health. Check operational metrics and Cloud Run logs without
 logging tokens, request bodies, health values, SQL parameters or secret values.
 If the job fails, do not deploy the candidate API revision. Preserve the prior
 serving image and investigate only with approved synthetic staging data.
@@ -152,8 +156,28 @@ finishes. Do not bypass the lock or downgrade live data. Lock-query implicit
 transactions end before Alembic starts; unlock/connection cleanup runs on
 success and error. Real PostgreSQL concurrency acceptance is still pending.
 
-The container disables Uvicorn access logs. Operational request logs contain
-only generated request ID, route template (or unmatched marker), status and
-duration; the exception boundary suppresses raw error/SQL details. Cloud Run's
-own platform request logs are outside this application boundary: review their
-retention/access and verify the live log-redaction policy before acceptance.
+The pinned Google provider 8.2.0 supports Cloud Run v2 startup, readiness, and
+liveness probe blocks. Cloud Run readiness probes are a preview feature, so
+the service configuration opts into the provider's `BETA` launch stage.
+Terraform gates startup and ongoing traffic on `/readyz` with five-second
+probe timeouts; `/healthz` is used for liveness. Startup has a 60-second
+failure window, while ongoing readiness removes an instance from traffic
+after three consecutive failures. This is database readiness only; Firebase,
+GCS, Neon parity, and optional Personal AI behavior are not probed. The preview
+probe behavior has not been deployed or verified against a live project.
+
+The container disables Uvicorn access logs. Application request events are
+one-line JSON with severity, validated or generated request ID, method, route
+template (or unmatched marker), status code, and duration. Body-limit
+rejections add a fixed reason and configured byte limit. The logs exclude
+query strings, other headers, bodies, health values, AI context, and raw
+exception or SQL details. Cloud Run's platform request logs are outside this application
+boundary; review their retention/access and the live redaction policy before
+acceptance.
+
+CI checks `terraform fmt -check -recursive infra/gcp`, initializes with
+`-backend=false -lockfile=readonly`, validates the pinned provider schema, and
+builds the production API image from the repository root without pushing. The
+checks need no GCP credentials and do not apply infrastructure. They do not
+establish provider behavior against a live project, image deployment, database
+connectivity, IAM, or log retention.

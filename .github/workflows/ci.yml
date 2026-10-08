@@ -5,6 +5,23 @@ on:
   pull_request:
 
 jobs:
+  infrastructure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.13.3
+          terraform_wrapper: false
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive infra/gcp
+      - name: Validate Terraform without cloud credentials
+        run: |
+          terraform -chdir=infra/gcp init -backend=false -lockfile=readonly
+          terraform -chdir=infra/gcp validate
+      - name: Build production API image
+        run: docker build --file infra/docker/api.Dockerfile --tag personal-health-api:ci .
+
   scaffold:
     runs-on: ubuntu-latest
     services:

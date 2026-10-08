@@ -13,6 +13,11 @@ def test_settings_allow_an_unconfigured_local_principal_for_fail_closed_routes()
     assert settings.local_principal_id is None
 
 
+def test_personal_ai_enabled_is_rejected_until_the_integration_contract_is_implemented() -> None:
+    with pytest.raises(ValidationError, match="Application Integration Contract"):
+        Settings(_env_file=None, personal_ai_enabled=True)
+
+
 def test_settings_accept_explicit_local_principal_and_iana_timezone() -> None:
     settings = Settings(
         _env_file=None,

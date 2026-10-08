@@ -226,10 +226,11 @@ uvicorn health_api.main:app \
   --host 127.0.0.1
 ```
 
-Liveness:
+Process liveness and database readiness:
 
 ```bash
 curl --fail http://127.0.0.1:8000/healthz
+curl --fail http://127.0.0.1:8000/readyz
 ```
 
 ### 7. Start the mobile app

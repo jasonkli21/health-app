@@ -10,10 +10,6 @@ from typing import Annotated, Any, Literal, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response
-from pydantic import BaseModel, ValidationError
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
 from health_api.api.dependencies import get_current_owner, get_session
 from health_api.api.errors import APIError
 from health_api.api.schemas import (
@@ -67,6 +63,7 @@ from health_api.application.planning_service import (
     transition_planning_resource,
     update_planning_resource,
 )
+from health_api.application.planning_trackers import list_tracker_schema_versions
 from health_api.domain.planning import (
     ContextLifecycle,
     GoalLifecycle,
@@ -74,7 +71,8 @@ from health_api.domain.planning import (
     RegimenLifecycle,
     TrackerDefinitionV1,
 )
-from health_api.persistence.models import TrackerSchemaVersion
+from pydantic import BaseModel, ValidationError
+from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["planning"])
 COMMON_ERRORS: dict[int | str, dict[str, Any]] = {
@@ -988,19 +986,7 @@ def tracker_versions(
     after_version: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> TrackerSchemaVersionListResponse:
-    get_planning_resource(session, owner, tracker_id, "tracker_definition")
-    rows = list(
-        session.scalars(
-            select(TrackerSchemaVersion)
-            .where(
-                TrackerSchemaVersion.owner_id == owner,
-                TrackerSchemaVersion.tracker_id == tracker_id,
-                TrackerSchemaVersion.version > after_version,
-            )
-            .order_by(TrackerSchemaVersion.version.asc())
-            .limit(limit + 1)
-        )
-    )
+    rows = list_tracker_schema_versions(session, owner, tracker_id, after_version, limit + 1)
     has_more = len(rows) > limit
     rows = rows[:limit]
     return TrackerSchemaVersionListResponse(

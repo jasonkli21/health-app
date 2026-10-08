@@ -4,9 +4,9 @@ FastAPI request and response schemas are authoritative. The tracked, determinist
 
 ## Shared behavior
 
-`GET /healthz` is process liveness only and does not query storage. In development mode, owner-scoped routes use the server-configured local principal. In Firebase mode, the API verifies the bearer token and maps the verified issuer and subject to an owner. A missing/disabled local principal, invalid token, or unavailable account returns a sanitized authentication error. Request bodies cannot set an owner, actor, source, lifecycle, or revision; `X-User-ID` and similar client identity headers are ignored.
+`GET /healthz` is process liveness only and does not query storage. `GET /readyz` executes a read-only `SELECT 1` through the configured database engine and returns only `{"status":"ok"}` or a generic 503 `{"status":"unavailable"}`. In development mode, owner-scoped routes use the server-configured local principal. In Firebase mode, the API verifies the bearer token and maps the verified issuer and subject to an owner. A missing/disabled local principal, invalid token, or unavailable account returns a sanitized authentication error. Request bodies cannot set an owner, actor, source, lifecycle, or revision; `X-User-ID` and similar client identity headers are ignored.
 
-Every HTTP response includes a server-generated `X-Request-ID`. Errors use `{ "code", "message", "field_errors", "request_id" }`; request validation field errors contain field paths and generic messages, never submitted values. Database failures return a sanitized 503. Request bodies are limited to 65,536 bytes. Profile labels are limited to 120 characters, text values to 2,000, notes to 4,000, metadata to 30 scalar entries and 4,096 encoded bytes, and list/history pages to 100 items.
+Every HTTP response includes an `X-Request-ID`. A single incoming value is preserved only when it is 1–64 ASCII letters, digits, periods, underscores, or hyphens and starts with a letter or digit; otherwise the server generates a UUID. Errors use `{ "code", "message", "field_errors", "request_id" }`; request validation field errors contain field paths and generic messages, never submitted values. Database failures return a sanitized 503. Request bodies are limited to 65,536 bytes. Profile labels are limited to 120 characters, text values to 2,000, notes to 4,000, metadata to 30 scalar entries and 4,096 encoded bytes, and list/history pages to 100 items.
 
 Times must include a UTC offset and are normalized to UTC. Validity is half-open: `valid_from <= as_of < valid_to`, with either endpoint nullable. Required `profile.value: null` means unknown; it differs from numeric zero and boolean false. A missing PATCH field preserves the stored value, while an explicit null clears optional notes, metadata, or validity endpoints. Profile payload and permission fields reject explicit null. Permission flags default to false.
 
@@ -140,14 +140,14 @@ their existing idempotency fingerprint behavior. Profile and planning items
 already expose the same opt-in; `cross_domain_use_allowed` remains separate
 and is not used by this Assistant.
 
-| Route                                      | Contract                                                                                                                                                                                                                                                                                                          |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /assistant/status`                    | Reports whether a reviewed adapter is ready and which read capabilities are active. Disabled adapters report an empty capability list.                                                                                                                                                                            |
-| `POST /ai/context`                         | Builds a current preview for the authenticated owner from `task`, `task_kind`, selected `resource_types`, `lookback_days` (0–90), optional `as_of`/timezone, and optional excluded object UUIDs.                                                                                                                  |
-| `GET /search?q=…&types=…&limit=…&cursor=…` | PostgreSQL full-text search over current active resources. `types` is an optional comma-separated list; results require `ai_use_allowed=true`. Limit is 1–50 (default 20); `q` is at most 500 characters.                                                                                                         |
-| `POST /assistant/messages`                 | Accepts an 8,000-character message and the same scope request. Health checks adapter availability before building or sending context; the current disabled adapter returns sanitized 503. A configured adapter must receive a newly built Pack and return evidence references that resolve to included revisions. |
+| Route                                      | Contract                                                                                                                                                                                                                                           |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /assistant/status`                    | Authenticated, owner-scoped status. The external integration currently reports `enabled=false`, `adapter_status=disabled`, and no capabilities because the Personal AI Application Integration Contract has not yet been implemented and reviewed. |
+| `POST /ai/context`                         | Builds a current local preview for the authenticated owner from `task`, `task_kind`, selected `resource_types`, `lookback_days` (0–90), optional `as_of`/timezone, and optional excluded object UUIDs. This route does not call Personal AI.       |
+| `GET /search?q=…&types=…&limit=…&cursor=…` | Health-owned PostgreSQL full-text search over current active resources. `types` is an optional comma-separated list; results require `ai_use_allowed=true`. Limit is 1–50 (default 20); `q` is at most 500 characters.                             |
+| `POST /assistant/messages`                 | Retains the 8,000-character message and context-scope request schema for client compatibility, but always returns a sanitized 503 while live messaging is unavailable. It does not build a Pack or invoke an adapter.                              |
 
-The Pack v1 includes the task and selected types, random per-request opaque
+The local Pack v1 preview includes the task and selected types, random per-request opaque
 owner scope, timezone and `as_of`, revision-linked minimized entries,
 source/confirmation metadata, inclusion counts, user exclusions, deterministic
 truncation and a 65,536-byte serialized budget. Current-day rollups are
@@ -166,8 +166,10 @@ validity, selected resource type, and per-object AI permission. Daily search
 uses a bounded 90-day local window; context uses the requested local-day
 window. Full-text search uses additive GIN indexes on envelope title/notes and
 typed JSON payloads (migration `f5c0a1e2d3b4`). Cursors bind to owner, query and
-resource filters. Provider callbacks and service delegation are not available
-until an actual Personal AI protocol is supplied and reviewed.
+resource filters. The local Pack is not the Application Integration Contract
+transport envelope. Provider callbacks, service delegation, and Health provider
+registration are not available until that shared contract is implemented and
+reviewed; `PERSONAL_AI_ENABLED=true` is rejected by configuration validation.
 
 ## Phase 6 typed action proposals
 

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sys
 from time import monotonic
+from typing import cast
 from uuid import uuid4
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -17,6 +19,21 @@ if not request_logger.handlers:
     request_logger.addHandler(handler)
 request_logger.setLevel(logging.INFO)
 request_logger.propagate = False
+
+_REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
+
+
+def _request_id(scope: Scope) -> str:
+    headers = cast(list[tuple[bytes, bytes]], scope.get("headers", []))
+    values = [value for name, value in headers if name.lower() == b"x-request-id"]
+    if len(values) == 1 and len(values[0]) <= 64:
+        try:
+            candidate = values[0].decode("ascii")
+        except UnicodeDecodeError:
+            candidate = ""
+        if _REQUEST_ID_PATTERN.fullmatch(candidate):
+            return candidate
+    return str(uuid4())
 
 
 class RequestBoundaryMiddleware:
@@ -35,23 +52,32 @@ class RequestBoundaryMiddleware:
             await self.app(scope, receive, send)
             return
 
-        request_id = str(uuid4())
+        request_id = _request_id(scope)
         body_limit = self.path_limits.get(scope.get("path", ""), self.max_body_bytes)
         started = monotonic()
         status = 500
         response_started = False
 
-        def log_completion() -> None:
+        def log_completion(*, body_rejected: bool = False) -> None:
             route = scope.get("route")
             template = getattr(route, "path", "<unmatched>")
+            method = str(scope.get("method", "")).upper()
+            if not (1 <= len(method) <= 16 and method.isascii() and method.isalpha()):
+                method = "OTHER"
             # Route templates are application source, never user-supplied paths.
-            request_logger.info(
-                "request_id=%s route=%s status=%d duration_ms=%d",
-                request_id,
-                template,
-                status,
-                round((monotonic() - started) * 1000),
-            )
+            fields: dict[str, str | int] = {
+                "event": "http_request_rejected" if body_rejected else "http_request_completed",
+                "severity": "ERROR" if status >= 500 else "WARNING" if status >= 400 else "INFO",
+                "request_id": request_id,
+                "method": method,
+                "route": template,
+                "status_code": status,
+                "duration_ms": round((monotonic() - started) * 1000),
+            }
+            if body_rejected:
+                fields["rejection_reason"] = "body_limit_exceeded"
+                fields["body_limit_bytes"] = body_limit
+            request_logger.info(json.dumps(fields, separators=(",", ":"), sort_keys=True))
 
         scope.setdefault("state", {})["request_id"] = request_id
         chunks: list[bytes] = []
@@ -86,7 +112,7 @@ class RequestBoundaryMiddleware:
                     }
                 )
                 await send({"type": "http.response.body", "body": body, "more_body": False})
-                log_completion()
+                log_completion(body_rejected=True)
                 return
             chunks.append(chunk)
             more_body = message.get("more_body", False)

@@ -1,10 +1,9 @@
 from __future__ import annotations
 
+from health_api.persistence.migration_compare import include_schema_object
 from sqlalchemy import Column, MetaData, Table, Text, cast, func, literal_column, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.schema import Index
-
-from health_api.persistence.migration_compare import include_schema_object
 
 
 def _metadata_index() -> Index:
