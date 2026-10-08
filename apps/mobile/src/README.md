@@ -15,3 +15,11 @@ storage until the server reports completion; then the app removes the
 account-scoped HealthKit consent and indexed checkpoint entries before
 signing out. The share sheet is user-directed and may retain its own export
 copy. This does not erase Apple Health originals or external service copies.
+
+Large feature screens keep route-level composition in `screens/`, move
+request/state transitions into a feature-local controller or pure state
+module, and place workflow presentation in feature-local `components/`.
+Controllers own generated API calls, request identity and staleness guards,
+and save/retry behavior; components receive typed values and callbacks. Keep
+native behavior inside the mobile feature and keep feature-specific UI out of
+cross-platform packages.

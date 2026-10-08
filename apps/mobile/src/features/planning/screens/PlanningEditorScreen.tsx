@@ -1,14 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import {
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { SafeAreaView, ScrollView, Text, View } from "react-native";
 import type { components } from "@personal-health/api-client";
 import { ApiError } from "@personal-health/api-client";
 
@@ -28,12 +20,26 @@ import {
   planningErrorMessage,
   sendPlanningCreate,
 } from "../api";
-import { nextTrackerFieldId } from "../trackerEntry";
 import { canAdvancePlanningRevision } from "../editState";
 import { RequestScope } from "../../profile/requestScope";
+import {
+  buildPlanningMutation,
+  GOAL_METRICS_BY_DOMAIN,
+  planningCreateAttempt,
+} from "../draft";
+import type { PlanningKind as Kind, TrackerField } from "../draft";
+import { ChoiceField, Input } from "../components/EditorControls";
+import { styles } from "../components/editorStyles";
+import {
+  ContextEditorFields,
+  GoalEditorFields,
+  PlanDateFields,
+  PlanItemsEditorFields,
+  RegimenEditorFields,
+  TrackerDefinitionFields,
+  nextTrackerField,
+} from "../components/PlanningKindSections";
 
-type Kind = "goal" | "regimen" | "plan" | "context" | "tracker_definition";
-type TrackerField = components["schemas"]["TrackerFieldV1"];
 type ContextRelation = components["schemas"]["ContextRelation"];
 type ContextTarget = { id: string; title: string; kind: string };
 const DOMAINS = [
@@ -78,33 +84,6 @@ const TRACKER_UNITS = [
   "year",
   "dose",
 ] as const;
-const GOAL_METRICS_BY_DOMAIN: Record<string, readonly string[]> = {
-  general: [],
-  nutrition: ["energy"],
-  exercise: ["duration", "distance"],
-  sleep: ["duration"],
-  symptoms: ["symptom_severity", "symptom_episode_count"],
-  measurements: [
-    "weight",
-    "temperature",
-    "systolic_pressure",
-    "diastolic_pressure",
-    "pulse",
-  ],
-};
-const GOAL_UNITS: Record<string, readonly string[]> = {
-  energy: ["kcal", "kJ"],
-  duration: ["min", "h"],
-  distance: ["m", "km", "mi"],
-  weight: ["kg", "lb"],
-  temperature: ["C", "F"],
-  systolic_pressure: ["mmHg"],
-  diastolic_pressure: ["mmHg"],
-  pulse: ["bpm"],
-  symptom_severity: ["score"],
-  symptom_episode_count: ["episodes"],
-};
-
 export default function PlanningEditorScreen() {
   const params = useLocalSearchParams<{ kind?: string; id?: string }>();
   const router = useRouter();
@@ -486,270 +465,77 @@ export default function PlanningEditorScreen() {
       setError("Load the planning item before saving changes.");
       return;
     }
-    if (!label.trim()) {
-      setError("Enter a name before saving.");
+
+    const built = buildPlanningMutation({
+      kind,
+      id: original?.id ?? newDailyId(),
+      original,
+      label,
+      domain,
+      category,
+      startDate,
+      endDate,
+      targetDate,
+      targetMetric,
+      targetComparator,
+      targetValue,
+      targetUnit,
+      targetPeriod,
+      regimenQuantity,
+      regimenUnit,
+      regimenInstructions,
+      contextNotes,
+      contextPriority,
+      contextRelated,
+      fields,
+      planItems,
+      aiUseAllowed,
+      crossDomainUseAllowed,
+    });
+    if (!built.ok) {
+      setError(built.error);
       return;
     }
-    const dates =
-      kind === "goal"
-        ? [startDate, targetDate]
-        : kind === "regimen" || kind === "plan" || kind === "context"
-          ? [startDate, endDate]
-          : [];
-    if (dates.some((value) => value && !isCalendarDate(value))) {
-      setError("Dates must be real calendar dates in YYYY-MM-DD format.");
-      return;
-    }
-    if (startDate && endDate && endDate < startDate) {
-      setError("The end date must be on or after the start date.");
-      return;
-    }
-    if (startDate && targetDate && targetDate < startDate) {
-      setError("The target date must be on or after the start date.");
-      return;
-    }
+
     setBusy(true);
     try {
-      const id = original?.id ?? newDailyId();
-      const revision = original?.revision ?? 0;
-      const session = sessionStore.getSnapshot();
-      if (kind === "goal") {
-        let target: components["schemas"]["MetricTarget"] | null = null;
-        if (targetMetric !== "none") {
-          const numericTarget = Number(targetValue);
-          if (
-            !targetValue.trim() ||
-            !Number.isFinite(numericTarget) ||
-            numericTarget < 0
-          ) {
-            setError("Enter a nonnegative finite value for the goal target.");
-            return;
-          }
-          if (!(GOAL_METRICS_BY_DOMAIN[domain] ?? []).includes(targetMetric)) {
-            setError(
-              "Choose a target metric that belongs to this goal domain.",
+      const { mutation } = built;
+      if (editing) {
+        switch (mutation.kind) {
+          case "goal":
+            await planningApi.updateGoal(
+              { goal_id: mutation.create.id },
+              mutation.update,
             );
-            return;
-          }
-          target = {
-            metric: targetMetric as components["schemas"]["MetricKey"],
-            comparator:
-              targetComparator as components["schemas"]["GoalComparator"],
-            value: numericTarget,
-            unit: targetUnit as components["schemas"]["MeasurementUnit"],
-          };
+            break;
+          case "regimen":
+            await planningApi.updateRegimen(
+              { regimen_id: mutation.create.id },
+              mutation.update,
+            );
+            break;
+          case "plan":
+            await planningApi.updatePlan(
+              { plan_id: mutation.create.id },
+              mutation.update,
+            );
+            break;
+          case "context":
+            await planningApi.updateContext(
+              { context_id: mutation.create.id },
+              mutation.update,
+            );
+            break;
+          case "tracker_definition":
+            await planningApi.updateTracker(
+              { tracker_id: mutation.create.id },
+              mutation.update,
+            );
+            break;
         }
-        const goal: components["schemas"]["GoalPayloadV1"] = {
-          ...(original?.object_type === "goal" ? original.goal : {}),
-          label: label.trim(),
-          domain: domain as components["schemas"]["GoalDomain"],
-          start_date: startDate || null,
-          target_date: targetDate || null,
-          target,
-          target_period: target
-            ? (targetPeriod as components["schemas"]["GoalPayloadV1"]["target_period"])
-            : null,
-        };
-        if (editing)
-          await planningApi.updateGoal(
-            { goal_id: id },
-            {
-              expected_revision: revision,
-              goal,
-              ai_use_allowed: aiUseAllowed,
-              cross_domain_use_allowed: crossDomainUseAllowed,
-            },
-          );
-        else if (
-          !(await sendCreate({
-            kind: "goal",
-            body: {
-              id,
-              goal,
-              ai_use_allowed: aiUseAllowed,
-              cross_domain_use_allowed: crossDomainUseAllowed,
-            },
-            sessionEpoch: session.epoch,
-            sessionUserId: session.userId,
-          }))
-        )
-          return;
-      } else if (kind === "regimen") {
-        const quantityValue = regimenQuantity.trim()
-          ? Number(regimenQuantity)
-          : null;
-        if (
-          quantityValue !== null &&
-          (!Number.isFinite(quantityValue) || quantityValue < 0)
-        ) {
-          setError("Enter a nonnegative finite regimen quantity.");
-          return;
-        }
-        if (regimenInstructions.length > 2000) {
-          setError("Instructions can be at most 2,000 characters.");
-          return;
-        }
-        const regimen: components["schemas"]["RegimenPayloadV1"] = {
-          ...(original?.object_type === "regimen" ? original.regimen : {}),
-          label: label.trim(),
-          kind: category as components["schemas"]["RegimenKind"],
-          domain: domain as components["schemas"]["GoalDomain"],
-          start_date: startDate || null,
-          end_date: endDate || null,
-          instructions: regimenInstructions.trim() || null,
-          quantity:
-            quantityValue === null
-              ? null
-              : {
-                  value: quantityValue,
-                  unit: regimenUnit as components["schemas"]["ProfileUnit"],
-                },
-        };
-        if (editing)
-          await planningApi.updateRegimen(
-            { regimen_id: id },
-            {
-              expected_revision: revision,
-              regimen,
-              ai_use_allowed: aiUseAllowed,
-              cross_domain_use_allowed: crossDomainUseAllowed,
-            },
-          );
-        else if (
-          !(await sendCreate({
-            kind: "regimen",
-            body: {
-              id,
-              regimen,
-              ai_use_allowed: aiUseAllowed,
-              cross_domain_use_allowed: crossDomainUseAllowed,
-            },
-            sessionEpoch: session.epoch,
-            sessionUserId: session.userId,
-          }))
-        )
-          return;
-      } else if (kind === "plan") {
-        const plan: components["schemas"]["PlanPayloadV1"] = {
-          ...(original?.object_type === "plan" ? original.plan : {}),
-          label: label.trim(),
-          items: planItems,
-          start_date: startDate || null,
-          end_date: endDate || null,
-        };
-        if (editing)
-          await planningApi.updatePlan(
-            { plan_id: id },
-            {
-              expected_revision: revision,
-              plan,
-              ai_use_allowed: aiUseAllowed,
-              cross_domain_use_allowed: crossDomainUseAllowed,
-            },
-          );
-        else if (
-          !(await sendCreate({
-            kind: "plan",
-            body: {
-              id,
-              plan,
-              ai_use_allowed: aiUseAllowed,
-              cross_domain_use_allowed: crossDomainUseAllowed,
-            },
-            sessionEpoch: session.epoch,
-            sessionUserId: session.userId,
-          }))
-        )
-          return;
-      } else if (kind === "context") {
-        const priority = Number(contextPriority);
-        if (!Number.isInteger(priority) || priority < 0 || priority > 100) {
-          setError(
-            "Context priority must be a whole number from 0 through 100.",
-          );
-          return;
-        }
-        if (contextNotes.length > 2000 || contextRelated.length > 20) {
-          setError("Context notes or linked items exceed the allowed limit.");
-          return;
-        }
-        const context: components["schemas"]["ContextPayloadV1"] = {
-          ...(original?.object_type === "context" ? original.context : {}),
-          label: label.trim(),
-          context_type: category as components["schemas"]["ContextType"],
-          priority,
-          notes: contextNotes.trim() || null,
-          start_at: startDate || null,
-          end_at: endDate || null,
-          related: contextRelated,
-        };
-        if (editing)
-          await planningApi.updateContext(
-            { context_id: id },
-            {
-              expected_revision: revision,
-              context,
-              ai_use_allowed: aiUseAllowed,
-              cross_domain_use_allowed: crossDomainUseAllowed,
-            },
-          );
-        else if (
-          !(await sendCreate({
-            kind: "context",
-            body: {
-              id,
-              context,
-              ai_use_allowed: aiUseAllowed,
-              cross_domain_use_allowed: crossDomainUseAllowed,
-            },
-            sessionEpoch: session.epoch,
-            sessionUserId: session.userId,
-          }))
-        )
-          return;
       } else {
-        if (
-          fields.length === 0 ||
-          fields.some((field) => !field.id.trim() || !field.label.trim())
-        ) {
-          setError("Each tracker field needs an ID and label.");
-          return;
-        }
-        const definition: components["schemas"]["TrackerDefinitionV1"] = {
-          name: label.trim(),
-          domain: domain as components["schemas"]["DailyDomain"],
-          fields: fields.map((field) => ({
-            ...field,
-            id: field.id.trim(),
-            label: field.label.trim(),
-            choices: field.kind === "enum" ? (field.choices ?? []) : [],
-            unit: field.kind === "quantity" ? (field.unit ?? "dose") : null,
-          })),
-        };
-        if (editing)
-          await planningApi.updateTracker(
-            { tracker_id: id },
-            {
-              expected_revision: revision,
-              definition,
-              ai_use_allowed: aiUseAllowed,
-              cross_domain_use_allowed: crossDomainUseAllowed,
-            },
-          );
-        else if (
-          !(await sendCreate({
-            kind: "tracker_definition",
-            body: {
-              id,
-              definition,
-              ai_use_allowed: aiUseAllowed,
-              cross_domain_use_allowed: crossDomainUseAllowed,
-            },
-            sessionEpoch: session.epoch,
-            sessionUserId: session.userId,
-          }))
-        )
-          return;
+        const attempt = planningCreateAttempt(mutation, sessionAtSubmit);
+        if (!(await sendCreate(attempt))) return;
       }
       if (!isCurrentSession()) return;
       router.replace("/planning");
@@ -944,325 +730,123 @@ export default function PlanningEditorScreen() {
           />
         ) : null}
         {kind === "goal" ? (
-          <View style={styles.fieldCard}>
-            <Text accessibilityRole="header" style={styles.sectionTitle}>
-              Optional target
-            </Text>
-            <ChoiceField
-              label="Metric"
-              options={["none", ...(GOAL_METRICS_BY_DOMAIN[domain] ?? [])]}
-              value={targetMetric}
-              onChange={(metric) => {
-                setTargetMetric(metric);
-                const units = GOAL_UNITS[metric];
-                if (units?.[0]) setTargetUnit(units[0]);
-              }}
-            />
-            {targetMetric !== "none" ? (
-              <>
-                <ChoiceField
-                  label="Comparison"
-                  options={["at_least", "at_most", "equal"] as const}
-                  value={targetComparator}
-                  onChange={setTargetComparator}
-                />
-                <Input
-                  label="Target value"
-                  value={targetValue}
-                  onChange={setTargetValue}
-                  keyboardType="decimal-pad"
-                />
-                <ChoiceField
-                  label="Target unit"
-                  options={GOAL_UNITS[targetMetric] ?? []}
-                  value={targetUnit}
-                  onChange={setTargetUnit}
-                />
-                <ChoiceField
-                  label="Target period"
-                  options={["once", "day", "week", "month", "year"] as const}
-                  value={targetPeriod}
-                  onChange={setTargetPeriod}
-                />
-              </>
-            ) : null}
-            <Input
-              label="Starts on (YYYY-MM-DD)"
-              value={startDate}
-              onChange={setStartDate}
-            />
-            <Input
-              label="Target date (YYYY-MM-DD)"
-              value={targetDate}
-              onChange={setTargetDate}
-            />
-          </View>
+          <GoalEditorFields
+            domain={domain}
+            startDate={startDate}
+            targetDate={targetDate}
+            targetMetric={targetMetric}
+            targetComparator={targetComparator}
+            targetValue={targetValue}
+            targetUnit={targetUnit}
+            targetPeriod={targetPeriod}
+            onStartDate={setStartDate}
+            onTargetDate={setTargetDate}
+            onTargetMetric={setTargetMetric}
+            onTargetComparator={setTargetComparator}
+            onTargetValue={setTargetValue}
+            onTargetUnit={setTargetUnit}
+            onTargetPeriod={setTargetPeriod}
+          />
         ) : null}
         {kind === "regimen" ? (
-          <View style={styles.fieldCard}>
-            <ChoiceField
-              label="Regimen type"
-              options={
-                ["habit", "medication", "supplement", "activity"] as const
-              }
-              value={category}
-              onChange={setCategory}
-            />
-            <Input
-              label="Optional quantity"
-              value={regimenQuantity}
-              onChange={setRegimenQuantity}
-              keyboardType="decimal-pad"
-            />
-            {regimenQuantity.trim() ? (
-              <ChoiceField
-                label="Quantity unit"
-                options={TRACKER_UNITS}
-                value={regimenUnit}
-                onChange={setRegimenUnit}
-              />
-            ) : null}
-            <Text style={styles.inputLabel}>Optional instructions</Text>
-            <TextInput
-              accessibilityLabel="Optional instructions"
-              value={regimenInstructions}
-              onChangeText={setRegimenInstructions}
-              multiline
-              maxLength={2000}
-              style={[styles.input, styles.multiline]}
-            />
-            <Input
-              label="Starts on (YYYY-MM-DD)"
-              value={startDate}
-              onChange={setStartDate}
-            />
-            <Input
-              label="Ends on (YYYY-MM-DD)"
-              value={endDate}
-              onChange={setEndDate}
-            />
-          </View>
+          <RegimenEditorFields
+            category={category}
+            quantity={regimenQuantity}
+            unit={regimenUnit}
+            instructions={regimenInstructions}
+            startDate={startDate}
+            endDate={endDate}
+            units={TRACKER_UNITS}
+            onCategory={setCategory}
+            onQuantity={setRegimenQuantity}
+            onUnit={setRegimenUnit}
+            onInstructions={setRegimenInstructions}
+            onStartDate={setStartDate}
+            onEndDate={setEndDate}
+          />
         ) : null}
         {kind === "plan" ? (
-          <View style={styles.fieldCard}>
-            <Input
-              label="Starts on (YYYY-MM-DD)"
-              value={startDate}
-              onChange={setStartDate}
-            />
-            <Input
-              label="Ends on (YYYY-MM-DD)"
-              value={endDate}
-              onChange={setEndDate}
-            />
-          </View>
+          <PlanDateFields
+            startDate={startDate}
+            endDate={endDate}
+            onStartDate={setStartDate}
+            onEndDate={setEndDate}
+          />
+        ) : null}
+        {kind === "plan" ? (
+          <PlanItemsEditorFields
+            editing={editing}
+            original={original}
+            items={planItems}
+            references={availableReferences}
+            itemKind={planItemKind}
+            itemLabel={planItemLabel}
+            itemReference={planItemReference}
+            pickerCursors={pickerCursors}
+            loadingPicker={loadingPicker}
+            onItemKind={setPlanItemKind}
+            onItemLabel={setPlanItemLabel}
+            onItemReference={setPlanItemReference}
+            onRemove={(index) =>
+              setPlanItems((current) =>
+                current.filter((_, itemIndex) => itemIndex !== index),
+              )
+            }
+            onMove={movePlanItem}
+            onLoadMore={(targetKind) => void loadMorePicker(targetKind)}
+            onAdd={addPlanItem}
+            onEditSchedule={(item) =>
+              original?.object_type === "plan" &&
+              router.push({
+                pathname: "/planning/schedule",
+                params: {
+                  parentKind: "plan",
+                  parentId: original.id,
+                  itemId: item.id,
+                  label: item.label,
+                },
+              })
+            }
+          />
         ) : null}
         {kind === "context" ? (
-          <View style={styles.fieldCard}>
-            <ChoiceField
-              label="Context type"
-              options={
-                [
-                  "travel",
-                  "illness",
-                  "recovery",
-                  "schedule_change",
-                  "other",
-                ] as const
-              }
-              value={category}
-              onChange={setCategory}
-            />
-            <Input
-              label="Starts on (YYYY-MM-DD)"
-              value={startDate}
-              onChange={setStartDate}
-            />
-            <Input
-              label="Ends on (YYYY-MM-DD)"
-              value={endDate}
-              onChange={setEndDate}
-            />
-            <Input
-              label="Priority (0–100)"
-              value={contextPriority}
-              onChange={setContextPriority}
-              keyboardType="number-pad"
-            />
-            <Text style={styles.inputLabel}>Notes</Text>
-            <TextInput
-              accessibilityLabel="Context notes"
-              value={contextNotes}
-              onChangeText={setContextNotes}
-              multiline
-              maxLength={2000}
-              style={[styles.input, styles.multiline]}
-            />
-            <Text accessibilityRole="header" style={styles.inputLabel}>
-              Related Profile items, goals, and regimens
-            </Text>
-            {contextTargets.map((target) => {
-              const selected = contextRelated.some(
-                (relation) => relation.object_id === target.id,
-              );
-              return (
-                <Pressable
-                  key={target.id}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  onPress={() =>
-                    setContextRelated((current) =>
-                      selected
-                        ? current.filter(
-                            (relation) => relation.object_id !== target.id,
-                          )
-                        : current.length >= 20
-                          ? current
-                          : [
-                              ...current,
-                              {
-                                object_id: target.id,
-                                priority: 0,
-                                relevance: "related",
-                              },
-                            ],
-                    )
-                  }
-                  style={[
-                    styles.targetChoice,
-                    selected && styles.targetChoiceSelected,
-                  ]}
-                >
-                  <Text style={styles.choiceText}>
-                    {target.kind} · {target.title}
-                  </Text>
-                  <Text style={styles.noteText}>
-                    {selected ? "Linked" : "Tap to link"}
-                  </Text>
-                </Pressable>
-              );
-            })}
-            {(["goal", "regimen", "profile"] as const).map((targetKind) =>
-              pickerCursors[targetKind] ? (
-                <ActionButton
-                  key={targetKind}
-                  label={`Load more ${targetKind === "profile" ? "Profile items" : `${targetKind}s`}`}
-                  secondary
-                  busy={loadingPicker === targetKind}
-                  disabled={
-                    loadingPicker !== null && loadingPicker !== targetKind
-                  }
-                  onPress={() => void loadMorePicker(targetKind)}
-                />
-              ) : null,
-            )}
-            {contextTargets.length === 0 ? (
-              <Text style={styles.noteText}>
-                No Profile items, goals, or regimens are available to link.
-              </Text>
-            ) : null}
-          </View>
+          <ContextEditorFields
+            category={category}
+            startDate={startDate}
+            endDate={endDate}
+            priority={contextPriority}
+            notes={contextNotes}
+            related={contextRelated}
+            targets={contextTargets}
+            pickerCursors={pickerCursors}
+            loadingPicker={loadingPicker}
+            onCategory={setCategory}
+            onStartDate={setStartDate}
+            onEndDate={setEndDate}
+            onPriority={setContextPriority}
+            onNotes={setContextNotes}
+            onRelated={setContextRelated}
+            onLoadMore={(targetKind) => void loadMorePicker(targetKind)}
+          />
         ) : null}
         {kind === "tracker_definition" ? (
-          <>
-            <ChoiceField
-              label="Tracker domain"
-              options={TRACKER_DOMAINS}
-              value={domain}
-              onChange={setDomain}
-            />
-            <Text accessibilityRole="header" style={styles.sectionTitle}>
-              Fields
-            </Text>
-            {fields.map((field, index) => (
-              <View key={`${index}:${field.id}`} style={styles.fieldCard}>
-                <Input
-                  label="Stable field ID"
-                  value={field.id}
-                  onChange={(value) => updateField(index, { id: value })}
-                />
-                <Input
-                  label="Field label"
-                  value={field.label}
-                  onChange={(value) => updateField(index, { label: value })}
-                />
-                <ChoiceField
-                  label="Field type"
-                  options={FIELD_KINDS}
-                  value={field.kind}
-                  onChange={(value) =>
-                    updateField(index, {
-                      kind: value as TrackerField["kind"],
-                      choices: value === "enum" ? field.choices : [],
-                      unit:
-                        value === "quantity" ? (field.unit ?? "dose") : null,
-                    })
-                  }
-                />
-                {field.kind === "enum" ? (
-                  <Input
-                    label="Choices, separated by commas"
-                    value={(field.choices ?? []).join(", ")}
-                    onChange={(value) =>
-                      updateField(index, {
-                        choices: value
-                          .split(",")
-                          .map((choice) => choice.trim())
-                          .filter(Boolean),
-                      })
-                    }
-                  />
-                ) : null}
-                {field.kind === "quantity" ? (
-                  <ChoiceField
-                    label="Supported unit"
-                    options={TRACKER_UNITS}
-                    value={field.unit ?? "dose"}
-                    onChange={(value) =>
-                      updateField(index, {
-                        unit: value as TrackerField["unit"],
-                      })
-                    }
-                  />
-                ) : null}
-                <ActionButton
-                  label={field.required ? "Required: yes" : "Required: no"}
-                  secondary
-                  onPress={() =>
-                    updateField(index, { required: !field.required })
-                  }
-                />
-                {fields.length > 1 ? (
-                  <ActionButton
-                    label="Remove field"
-                    secondary
-                    onPress={() =>
-                      setFields((current) =>
-                        current.filter((_, fieldIndex) => fieldIndex !== index),
-                      )
-                    }
-                  />
-                ) : null}
-              </View>
-            ))}
-            <ActionButton
-              label="Add field"
-              secondary
-              disabled={fields.length >= 20}
-              onPress={() =>
-                setFields((current) => [
-                  ...current,
-                  {
-                    id: nextTrackerFieldId(current),
-                    label: "New field",
-                    kind: "text",
-                    required: false,
-                    choices: [],
-                  },
-                ])
-              }
-            />
-          </>
+          <TrackerDefinitionFields
+            domain={domain}
+            fields={fields}
+            domains={TRACKER_DOMAINS}
+            fieldKinds={FIELD_KINDS}
+            units={TRACKER_UNITS}
+            onDomain={setDomain}
+            onUpdate={updateField}
+            onRemove={(index) =>
+              setFields((current) =>
+                current.filter((_, fieldIndex) => fieldIndex !== index),
+              )
+            }
+            onAdd={() =>
+              setFields((current) => [...current, nextTrackerField(current)])
+            }
+          />
         ) : null}
 
         {kind === "plan" && original?.object_type === "plan" ? (
@@ -1271,147 +855,6 @@ export default function PlanningEditorScreen() {
               This edit preserves all {original.plan.items?.length ?? 0}{" "}
               existing plan items.
             </Text>
-          </View>
-        ) : null}
-        {kind === "plan" ? (
-          <View style={styles.fieldCard}>
-            <Text accessibilityRole="header" style={styles.sectionTitle}>
-              Plan items
-            </Text>
-            {planItems.length === 0 ? (
-              <Text style={styles.noteText}>No intended items yet.</Text>
-            ) : null}
-            {planItems.map((item, index) => (
-              <View key={item.id} style={styles.itemRow}>
-                <View style={styles.cardMain}>
-                  <Text style={styles.inputLabel}>{item.label}</Text>
-                  <Text style={styles.noteText}>
-                    {item.kind === "task"
-                      ? "Manual task"
-                      : `${item.kind} reference`}
-                  </Text>
-                </View>
-                <View style={styles.actions}>
-                  <ActionButton
-                    label="Move up"
-                    secondary
-                    disabled={index === 0}
-                    onPress={() => movePlanItem(index, -1)}
-                  />
-                  <ActionButton
-                    label="Remove"
-                    secondary
-                    onPress={() =>
-                      setPlanItems((current) =>
-                        current.filter((_, itemIndex) => itemIndex !== index),
-                      )
-                    }
-                  />
-                  {editing &&
-                  original?.object_type === "plan" &&
-                  original.lifecycle === "active" &&
-                  (original.plan.items ?? []).some(
-                    (saved) => saved.id === item.id,
-                  ) ? (
-                    <ActionButton
-                      label="Edit schedule"
-                      secondary
-                      onPress={() =>
-                        router.push({
-                          pathname: "/planning/schedule",
-                          params: {
-                            parentKind: "plan",
-                            parentId: original.id,
-                            itemId: item.id,
-                            label: item.label,
-                          },
-                        })
-                      }
-                    />
-                  ) : null}
-                </View>
-              </View>
-            ))}
-            <ChoiceField
-              label="Item type"
-              options={["task", "goal", "regimen"] as const}
-              value={planItemKind}
-              onChange={setPlanItemKind}
-            />
-            {planItemKind === "task" ? (
-              <Input
-                label="Task label"
-                value={planItemLabel}
-                onChange={setPlanItemLabel}
-              />
-            ) : (
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Choose a goal or regimen</Text>
-                {availableReferences
-                  .filter(
-                    (item) =>
-                      item.object_type === planItemKind &&
-                      item.status === "active",
-                  )
-                  .map((item) => (
-                    <Pressable
-                      key={item.id}
-                      accessibilityRole="button"
-                      accessibilityState={{
-                        selected: planItemReference === item.id,
-                      }}
-                      onPress={() => {
-                        setPlanItemReference(item.id);
-                        setPlanItemLabel(item.title);
-                      }}
-                      style={[
-                        styles.choice,
-                        planItemReference === item.id && styles.choiceSelected,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.choiceText,
-                          planItemReference === item.id &&
-                            styles.choiceTextSelected,
-                        ]}
-                      >
-                        {item.title}
-                      </Text>
-                    </Pressable>
-                  ))}
-                {availableReferences.filter(
-                  (item) =>
-                    item.object_type === planItemKind &&
-                    item.status === "active",
-                ).length === 0 ? (
-                  <Text style={styles.noteText}>
-                    Create an active {planItemKind} first.
-                  </Text>
-                ) : null}
-                {pickerCursors[planItemKind] ? (
-                  <ActionButton
-                    label={`Load more ${planItemKind}s`}
-                    secondary
-                    busy={loadingPicker === planItemKind}
-                    disabled={
-                      loadingPicker !== null && loadingPicker !== planItemKind
-                    }
-                    onPress={() => void loadMorePicker(planItemKind)}
-                  />
-                ) : null}
-              </View>
-            )}
-            <ActionButton
-              label="Add plan item"
-              secondary
-              disabled={
-                !planItemLabel.trim() ||
-                (planItemKind !== "task" && !planItemReference) ||
-                planItems.length >= 50
-              }
-              onPress={addPlanItem}
-            />
           </View>
         ) : null}
         {kind === "context" ? (
@@ -1552,128 +995,3 @@ function archivedDetails(item: PlanningItem): string {
   }
   return `${item.definition.domain} · schema version ${item.current_schema_version} · ${item.definition.fields.length} fields`;
 }
-
-function isCalendarDate(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const date = new Date(`${value}T00:00:00Z`);
-  return (
-    !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
-  );
-}
-
-function Input({
-  label,
-  value,
-  onChange,
-  keyboardType = "default",
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  keyboardType?: "default" | "number-pad" | "decimal-pad";
-}) {
-  return (
-    <View style={styles.inputGroup}>
-      <Text style={styles.inputLabel}>{label}</Text>
-      <TextInput
-        accessibilityLabel={label}
-        value={value}
-        onChangeText={onChange}
-        keyboardType={keyboardType}
-        autoCapitalize="sentences"
-        style={styles.input}
-      />
-    </View>
-  );
-}
-
-function ChoiceField<T extends string>({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: readonly T[];
-  value: string;
-  onChange: (value: T) => void;
-}) {
-  return (
-    <View style={styles.inputGroup}>
-      <Text style={styles.inputLabel}>{label}</Text>
-      <View style={styles.choices}>
-        {options.map((option) => (
-          <Pressable
-            key={option}
-            accessibilityRole="button"
-            accessibilityState={{ selected: value === option }}
-            onPress={() => onChange(option)}
-            style={[styles.choice, value === option && styles.choiceSelected]}
-          >
-            <Text
-              style={[
-                styles.choiceText,
-                value === option && styles.choiceTextSelected,
-              ]}
-            >
-              {option.replaceAll("_", " ")}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#f7f9f7" },
-  content: { gap: 16, padding: 20, paddingBottom: 36 },
-  title: { color: "#17201c", fontSize: 28, fontWeight: "700" },
-  subtitle: { color: "#46534d", fontSize: 15, lineHeight: 22 },
-  sectionTitle: { color: "#203a2e", fontSize: 20, fontWeight: "700" },
-  cardTitle: { color: "#17201c", fontSize: 18, fontWeight: "700" },
-  body: { color: "#46534d", fontSize: 14, lineHeight: 20 },
-  inputGroup: { gap: 6 },
-  inputLabel: { color: "#203a2e", fontSize: 15, fontWeight: "700" },
-  input: {
-    backgroundColor: "#fff",
-    borderColor: "#68786f",
-    borderRadius: 10,
-    borderWidth: 1,
-    color: "#17201c",
-    fontSize: 16,
-    minHeight: 50,
-    paddingHorizontal: 14,
-  },
-  choices: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  choice: {
-    backgroundColor: "#fff",
-    borderColor: "#68786f",
-    borderRadius: 18,
-    borderWidth: 1,
-    paddingHorizontal: 13,
-    paddingVertical: 9,
-  },
-  choiceSelected: { backgroundColor: "#245d3a", borderColor: "#245d3a" },
-  choiceText: { color: "#24342b", fontSize: 14, textTransform: "capitalize" },
-  choiceTextSelected: { color: "#fff", fontWeight: "700" },
-  fieldCard: {
-    backgroundColor: "#eaf0ec",
-    borderRadius: 14,
-    gap: 12,
-    padding: 14,
-  },
-  multiline: { minHeight: 90, paddingTop: 12, textAlignVertical: "top" },
-  targetChoice: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    gap: 4,
-    padding: 12,
-  },
-  targetChoiceSelected: { borderColor: "#245d3a", borderWidth: 2 },
-  itemRow: { backgroundColor: "#fff", borderRadius: 10, gap: 10, padding: 12 },
-  cardMain: { gap: 4 },
-  actions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  note: { backgroundColor: "#eaf0ec", borderRadius: 12, padding: 14 },
-  noteText: { color: "#46534d", fontSize: 14, lineHeight: 21 },
-});
