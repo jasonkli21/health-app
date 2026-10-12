@@ -110,6 +110,57 @@ class FirebaseTokenVerifier:
         finally:
             self._in_flight.release()
 
+    def resolve_google_provider_uid(self, google_subject: str) -> str:
+        """Resolve only a Google identity already linked to a Firebase account."""
+        if not google_subject or len(google_subject) > 128:
+            raise TokenVerificationError
+        if not self._in_flight.acquire(timeout=0.2):
+            raise VerifierUnavailable from None
+        try:
+            firebase_admin, firebase_auth = self._sdk()
+            try:
+                app = firebase_admin.get_app(self._app_name)
+            except ValueError:
+                try:
+                    app = firebase_admin.initialize_app(
+                        options={
+                            "projectId": self.project_id,
+                            "httpTimeout": self.timeout_seconds,
+                        },
+                        name=self._app_name,
+                    )
+                except ValueError:
+                    app = firebase_admin.get_app(self._app_name)
+            try:
+                user = firebase_auth.get_user_by_provider_uid(
+                    "google.com", google_subject, app=app
+                )
+            except (
+                firebase_auth.UserNotFoundError,
+                firebase_auth.UserDisabledError,
+                ValueError,
+            ) as exc:
+                raise TokenVerificationError from exc
+            except firebase_admin.exceptions.FirebaseError as exc:
+                raise VerifierUnavailable from exc
+            if (
+                getattr(user, "disabled", True)
+                or not isinstance(getattr(user, "uid", None), str)
+                or not any(
+                    getattr(provider, "provider_id", None) == "google.com"
+                    and getattr(provider, "uid", None) == google_subject
+                    for provider in getattr(user, "provider_data", ())
+                )
+            ):
+                raise TokenVerificationError
+            return user.uid
+        except (TokenVerificationError, VerifierUnavailable):
+            raise
+        except Exception as exc:
+            raise VerifierUnavailable from exc
+        finally:
+            self._in_flight.release()
+
     @staticmethod
     def _sdk() -> tuple[Any, Any]:
         try:

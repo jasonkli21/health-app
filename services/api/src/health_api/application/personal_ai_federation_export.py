@@ -93,7 +93,7 @@ def read_health_federation_export(
 
     obj, profile, source = row
     version = _version(obj)
-    permission_id = f"health_federation_export:{request.purpose}:{obj.id}"
+    permission_id = f"health_federation:{request.purpose}:{obj.id}"
     dependency = HealthFederationPermissionDependency(
         permission_id=permission_id,
         version=version,

@@ -1,6 +1,6 @@
 # Current implementation state
 
-Updated October 11, 2026. This page is the single living summary of delivered
+Updated October 12, 2026. This page is the single living summary of delivered
 scope, current work boundaries, and open acceptance gates. It is reconciled
 from the latest code and release/review evidence through the Phase 9 local
 export and domain-erasure foundation.
@@ -20,7 +20,7 @@ export and domain-erasure foundation.
 | Selective HealthKit import foundation              | Owner-scoped batch contract, source identities/preferences/revisions, normalized mobile mappings, secure per-account consent/checkpoints, and review fixes are implemented locally. PostgreSQL-backed API tests run in CI; Neon parity, production concurrency, and device acceptance remain open. The native adapter stays unavailable pending a compatible iOS build and real-device verification.                                           | [Phase 8 release](implementation/evidence/phase-8-release.md), [independent review](implementation/evidence/phase-8-independent-review.md), [Phase 8 plan](implementation/phases/phase-8-implementation-plan.md)                          |
 | Owner export and domain erasure foundation         | Repeatable-read owner JSON export, explicit/recent-auth domain deletion, owner write freeze, bounded private-object cleanup, dependency-ordered erasure, and a health-free erasure marker are implemented locally. Historical Phase 9 PostgreSQL 16.15 and 17.11 tests cover every inventory table and export/erasure recovery. The marker has no restore-replay runner; live cloud, object, device, and restore-drill acceptance remain open. | [Phase 9 release evidence](implementation/evidence/phase-9-release.md), [independent review and remediation](implementation/evidence/phase-9-independent-review.md), [Phase 9 plan](implementation/phases/phase-9-implementation-plan.md) |
 | Personal AI typed context read contract           | A separate, read-only `health-context-read-v1` endpoint and Health-owned projection are implemented locally behind `PERSONAL_AI_CONTEXT_READ_ENABLED=false`. It requires an exact Google service identity plus a recent, revoked-checked Firebase owner token, then applies both local AI-use and cross-domain consent through the shared admission gate. It does not enable Assistant messaging or change canonical state. Personal AI currently supplies a Google OIDC user token rather than the Firebase token required here, so live reads remain unavailable. | [Phase 29 evidence](implementation/evidence/phase-29-personal-ai-context.md), [integration contract](ai/personal-ai-integration.md) |
-| Personal AI narrow federation export             | A separate default-off `health-federation-export-v1` endpoint exports only the selected dietary restriction to Travel or ergonomic constraint to Shopping. Health checks the Firebase owner, current object, local AI consent, cross-domain consent, exact purpose/field/destination, current revision, and sensitivity. Results are complete or authoritative-empty and include source/permission dependency metadata. | [Phase 30 evidence](implementation/evidence/phase-30-federation-exports.md) |
+| Personal AI narrow federation export             | A separate default-off `health-federation-export-v1` endpoint exports only the selected dietary restriction to Travel or ergonomic constraint to Shopping. A short-lived, signed, request-bound Google-user assertion is verified alongside Personal AI's Google service identity, then mapped through an already linked Google provider to an existing Firebase Health owner. Health still checks the current object, local AI consent, cross-domain consent, exact purpose/field/destination, current revision, and sensitivity. Results are complete or authoritative-empty and include source/permission dependency metadata. PostgreSQL-backed and live identity acceptance remain open. | [Phase 30 evidence](implementation/evidence/phase-30-federation-exports.md), [delegated-identity follow-up](implementation/evidence/phase-30-delegated-identity-follow-up-2026-10-12.md) |
 
 Phase 9 document records, reviewed extraction and Records review surfaces,
 durable large exports, backup/restore, and whole-system maturity are not
@@ -50,14 +50,17 @@ accessibility.
   exposes the choice when creating or editing an entry. Each write advances
   the object revision and records both consent flags in revision history,
   which gives Health context dependencies a monotonic currentness epoch.
-- Live delegated-owner authorization is not wired: Health requires a recent
-  Firebase ID token, while the current Personal AI adapter supplies its
-  verified Google OIDC identity token. No email-based mapping, owner creation,
-  or token substitution is used. Sidecar category selection, deployed
-  identity/privacy review, and live domain verification remain open. The
-  integration creates no Health mutations or proposals; canonical state
-  remains owned by Health. See [boundary alignment evidence](implementation/evidence/personal-ai-boundary-alignment-2026-10-08.md)
-  and [Phase 29 evidence](implementation/evidence/phase-29-personal-ai-context.md).
+- The broad Phase 29 context-read route still requires a recent Firebase ID
+  token and remains unavailable to Personal AI's Google OIDC adapter. Phase
+  30's separate narrow export route now verifies a short-lived signed Google
+  identity assertion and resolves only an already-linked Firebase owner; the
+  export gate remains off and linked-account, database, deployed identity,
+  privacy, and end-to-end revocation acceptance remain open. No email-based
+  mapping, owner creation, or token substitution is used. The integration
+  creates no Health mutations or proposals; canonical state remains owned by
+  Health. See [boundary alignment evidence](implementation/evidence/personal-ai-boundary-alignment-2026-10-08.md),
+  [Phase 29 evidence](implementation/evidence/phase-29-personal-ai-context.md),
+  and [Phase 30 delegated-identity evidence](implementation/evidence/phase-30-delegated-identity-follow-up-2026-10-12.md).
 - Proposal apply requires the exact reviewed revision/hash and explicit
   confirmation. General AI-originated writes remain unavailable.
 - Cloud auth and private-storage boundaries are implemented in code, but live

@@ -21,6 +21,16 @@ an explicitly disabled live-message route.
   versioned `health-context-read-v1` read contract. Its default-off
   `PERSONAL_AI_CONTEXT_READ_ENABLED` gate does not enable Assistant messaging.
   `PERSONAL_AI_ENABLED` still defaults to false and settings reject `true`.
+- A separate default-off
+  `POST /v1/integrations/personal-ai/federation-export` supports only dietary
+  restrictions → Travel and ergonomic constraints → Shopping. It requires the
+  Personal AI service identity plus a short-lived Ed25519-signed delegated
+  Google identity assertion bound to Health's audience, recent-auth time, exact
+  request body, purpose, and destination. Health resolves the Google subject to
+  an already-linked Firebase provider and then resolves its existing Firebase
+  owner; it still rechecks Health-owned consent, object status, revision, and
+  sensitivity before returning data. The assertion is request-only and is not
+  stored with the grant, context snapshot, logs, or proposal metadata.
 
 ## Shared architecture in Personal AI
 
@@ -66,11 +76,13 @@ Health's local `ai_use_allowed` and
 federation grant is an additional authorization; effective access is their
 intersection, with separate dependency versions.
 
-The current Personal AI adapter can provide a Google OIDC user token, while
-Health requires a recent Firebase token; there is no delegated Firebase-token
-bridge or live read path between the repositories yet. The category sidecar,
-identity/privacy review, cloud IAM and provider verification remain open. These
-are explicit activation gaps, not passed external checks.
+The broader Phase 29 context-read endpoint still requires a recent Firebase
+token and remains unavailable to Personal AI's Google OIDC adapter. Phase 30's
+narrow export uses the separate signed assertion bridge described above. Its
+default-off gate, linked-account dependency, PostgreSQL-backed export tests,
+cloud IAM, deployed identity/privacy review, and the Shopping destination
+chooser/host remain open. Travel's local host now exposes the generic chooser;
+these remaining items are activation gaps, not passed external checks.
 
 ## Planned mutation integration
 

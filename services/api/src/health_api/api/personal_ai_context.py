@@ -22,6 +22,7 @@ from health_api.integrations.federation_export import (
     HealthFederationExportRequest,
     HealthFederationExportResponse,
 )
+from health_api.integrations.firebase_auth import TokenVerificationError, VerifierUnavailable
 from health_api.integrations.personal_ai_context import (
     HEALTH_CONTEXT_PATH,
     HealthContextReadRequest,
@@ -30,6 +31,9 @@ from health_api.integrations.personal_ai_context import (
 from health_api.integrations.personal_ai_context_auth import (
     PersonalAIContextAuthorizationError,
     PersonalAIContextIdentityVerifier,
+)
+from health_api.integrations.personal_ai_federation_auth import (
+    PersonalAIFederationIdentityVerifier,
 )
 
 router = APIRouter(tags=["Personal AI Health context"])
@@ -159,8 +163,8 @@ async def read_health_federation_export_route(request: Request) -> Response:
         raise HTTPException(status_code=404, detail="Not found")
 
     service_headers = request.headers.getlist("authorization")
-    user_headers = request.headers.getlist("x-user-id-token")
-    if len(service_headers) != 1 or len(user_headers) != 1:
+    delegation_headers = request.headers.getlist("x-personal-ai-user-delegation")
+    if len(service_headers) != 1 or len(delegation_headers) != 1:
         raise HTTPException(status_code=401, detail="Authentication required")
     scheme, separator, service_token = service_headers[0].partition(" ")
     if scheme.casefold() != "bearer" or not separator or not service_token.strip():
@@ -179,19 +183,35 @@ async def read_health_federation_export_route(request: Request) -> Response:
         raise HTTPException(status_code=503, detail="Identity service unavailable")
     verifier = getattr(
         request.app.state,
-        "personal_ai_context_identity_verifier",
-        PersonalAIContextIdentityVerifier(),
+        "personal_ai_federation_identity_verifier",
+        PersonalAIFederationIdentityVerifier(),
     )
     try:
         identity = await run_in_threadpool(
             verifier.verify,
             service_token=service_token.strip(),
-            user_token=user_headers[0],
+            delegation=delegation_headers[0],
+            request_body=body.model_dump(mode="json"),
             settings=settings,
-            user_verifier=user_verifier,
         )
     except PersonalAIContextAuthorizationError as error:
         raise HTTPException(status_code=401, detail="Authentication required") from error
+
+    firebase_uid_resolver = getattr(
+        request.app.state,
+        "firebase_google_identity_resolver",
+        getattr(user_verifier, "resolve_google_provider_uid", None),
+    )
+    if not callable(firebase_uid_resolver):
+        raise HTTPException(status_code=503, detail="Identity service unavailable")
+    try:
+        firebase_uid = await run_in_threadpool(firebase_uid_resolver, identity.subject)
+    except TokenVerificationError as error:
+        raise HTTPException(status_code=401, detail="Authentication required") from error
+    except VerifierUnavailable as error:
+        raise HTTPException(status_code=503, detail="Identity service unavailable") from error
+    if not isinstance(firebase_uid, str) or not firebase_uid:
+        raise HTTPException(status_code=401, detail="Authentication required")
 
     session_factory = request.app.state.session_factory
     try:
@@ -201,8 +221,8 @@ async def read_health_federation_export_route(request: Request) -> Response:
                 session.execute(text("SET LOCAL statement_timeout = '1800ms'"))
             owner_id = resolve_existing_owner(
                 session,
-                issuer=identity.issuer,
-                subject=identity.subject,
+                issuer=f"https://securetoken.google.com/{settings.firebase_project_id}",
+                subject=firebase_uid,
             )
             if owner_id is None:
                 raise HTTPException(status_code=401, detail="Authentication required")

@@ -98,6 +98,13 @@ class Settings(BaseSettings):
     personal_ai_context_service_audience: str = Field(default="", max_length=500)
     personal_ai_context_service_account: str = Field(default="", max_length=254)
     personal_ai_context_user_token_max_age_seconds: int = Field(default=300, ge=60, le=600)
+    personal_ai_federation_delegation_issuer: str = Field(
+        default="personal-ai-system", min_length=2, max_length=100
+    )
+    personal_ai_federation_delegation_key_id: str = Field(
+        default="health-federation-v1", min_length=1, max_length=80
+    )
+    personal_ai_federation_delegation_public_key: str = Field(default="", max_length=256)
     personal_ai_enabled: bool = False
     action_proposal_generation_enabled: bool = True
     action_proposal_ttl_hours: int = Field(default=24, ge=1, le=MAX_PROPOSAL_LIFETIME_HOURS)
@@ -154,8 +161,28 @@ class Settings(BaseSettings):
             )
         ):
             raise ValueError("personal_ai_context_identity_configuration_required")
-        if self.personal_ai_federation_export_enabled and not self.personal_ai_context_read_enabled:
-            raise ValueError("personal_ai_federation_requires_context_identity")
+        if self.personal_ai_federation_export_enabled:
+            if not self.personal_ai_context_read_enabled:
+                raise ValueError("personal_ai_federation_requires_context_identity")
+            import base64
+
+            from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
+            encoded_key = self.personal_ai_federation_delegation_public_key.strip()
+            try:
+                public_key = base64.b64decode(
+                    encoded_key + "=" * (-len(encoded_key) % 4),
+                    altchars=b"-_",
+                    validate=True,
+                )
+                Ed25519PublicKey.from_public_bytes(public_key)
+            except (ValueError, TypeError):
+                raise ValueError("personal_ai_federation_delegation_key_invalid") from None
+            if (
+                not self.personal_ai_federation_delegation_issuer.strip()
+                or not self.personal_ai_federation_delegation_key_id.strip()
+            ):
+                raise ValueError("personal_ai_federation_delegation_configuration_required")
 
         if self.app_env == "cloud":
             if self.auth_mode != "firebase":
