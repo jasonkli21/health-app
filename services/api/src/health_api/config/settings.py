@@ -94,6 +94,7 @@ class Settings(BaseSettings):
     auth_max_in_flight: int = Field(default=32, ge=1, le=128)
     # This read-only capability is independent of the disabled assistant message route.
     personal_ai_context_read_enabled: bool = False
+    personal_ai_federation_export_enabled: bool = False
     personal_ai_context_service_audience: str = Field(default="", max_length=500)
     personal_ai_context_service_account: str = Field(default="", max_length=254)
     personal_ai_context_user_token_max_age_seconds: int = Field(default=300, ge=60, le=600)
@@ -153,6 +154,8 @@ class Settings(BaseSettings):
             )
         ):
             raise ValueError("personal_ai_context_identity_configuration_required")
+        if self.personal_ai_federation_export_enabled and not self.personal_ai_context_read_enabled:
+            raise ValueError("personal_ai_federation_requires_context_identity")
 
         if self.app_env == "cloud":
             if self.auth_mode != "firebase":

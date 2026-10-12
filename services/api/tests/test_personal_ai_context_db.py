@@ -4,6 +4,9 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 from health_api.application.ai_context_admission import _eligibility_conditions
 from health_api.application.daily_service import (
     CreateDailyEntry,
@@ -12,19 +15,22 @@ from health_api.application.daily_service import (
     update_daily_item,
 )
 from health_api.application.personal_ai_context import read_personal_ai_health_context
+from health_api.application.personal_ai_federation_export import (
+    HealthFederationExportDenied,
+    read_health_federation_export,
+)
 from health_api.application.profile_service import (
     CreateProfile,
     create_profile_item,
     update_profile_item,
 )
 from health_api.domain.schemas import EventSchemaV1, ProfilePayloadV1, ProfileValidity
+from health_api.integrations.federation_export import HealthFederationExportRequest
 from health_api.integrations.personal_ai_context import (
     HealthContextEntityReference,
     HealthContextReadRequest,
 )
 from health_api.persistence.models import HealthObject, ProfileItem, ProviderIdentity, User
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 OWNER_ID = UUID("00000000-0000-0000-0000-000000000929")
 FIREBASE_ISSUER = "https://securetoken.google.com/health-test1"
@@ -60,6 +66,40 @@ def _profile(
         ai_use_allowed=True,
         cross_domain_use_allowed=cross_domain_use_allowed,
         notes="synthetic record note",
+    )
+
+
+def _federation_profile(*, key: str, value: object, share: bool = True) -> CreateProfile:
+    return CreateProfile(
+        id=uuid4(),
+        profile=ProfilePayloadV1.model_validate(
+            {
+                "kind": "constraint",
+                "category": "constraints",
+                "key": key,
+                "label": f"Synthetic {key.replace('_', ' ')}",
+                "value": value,
+            }
+        ),
+        validity=ProfileValidity(),
+        ai_use_allowed=True,
+        cross_domain_use_allowed=share,
+    )
+
+
+def _federation_request(entity_id: UUID, *, field: str = "dietary_restrictions"):
+    purpose, destination = (
+        ("health_dietary_restrictions_to_travel", "travel")
+        if field == "dietary_restrictions"
+        else ("health_ergonomic_constraints_to_shopping", "shopping")
+    )
+    return HealthFederationExportRequest(
+        operation="read",
+        category=field,
+        entity_id=entity_id,
+        purpose=purpose,
+        destination_application_id=destination,
+        fields=(field,),
     )
 
 
@@ -179,6 +219,93 @@ def test_catalog_and_profile_read_require_both_health_permissions(db_session: Se
         )
     )
     assert local_candidate == local_only.id
+
+
+def test_health_federation_export_is_narrow_owner_scoped_revisioned_and_revocable(
+    db_session: Session,
+) -> None:
+    _seed_owner(db_session)
+    shared = create_profile_item(
+        db_session,
+        OWNER_ID,
+        _federation_profile(
+            key="dietary_restrictions",
+            value={"type": "text_list", "value": ["synthetic allergy"]},
+        ),
+    ).aggregate[0]
+    empty = create_profile_item(
+        db_session,
+        OWNER_ID,
+        _federation_profile(key="ergonomic_constraints", value=None),
+    ).aggregate[0]
+    db_session.commit()
+
+    response = read_health_federation_export(
+        db_session,
+        OWNER_ID,
+        _federation_request(shared.id),
+        now=datetime.now(UTC),
+    )
+    assert response.complete is True
+    assert response.authoritative_empty is False
+    assert response.continuation is None
+    assert response.item.category == "dietary_restrictions"
+    assert response.item.payload.model_dump() == {
+        "dietary_restrictions": ("synthetic allergy",)
+    }
+    assert response.item.sensitivity == "restricted"
+    assert response.item.source_revision == shared.revision
+    assert response.item.permission_dependencies[0].version.endswith(
+        f"r{shared.revision}:ai1:cross1"
+    )
+    assert response.item.permission_dependencies[0].destination_application_id == "travel"
+    assert {reference.kind for reference in response.item.source_refs} == {"record", "source"}
+
+    authoritative_empty = read_health_federation_export(
+        db_session,
+        OWNER_ID,
+        _federation_request(empty.id, field="ergonomic_constraints"),
+        now=datetime.now(UTC),
+    )
+    assert authoritative_empty.complete is True
+    assert authoritative_empty.authoritative_empty is True
+    assert authoritative_empty.item.payload.model_dump() == {"ergonomic_constraints": None}
+
+    with pytest.raises(HealthFederationExportDenied):
+        read_health_federation_export(
+            db_session,
+            uuid4(),
+            _federation_request(shared.id),
+            now=datetime.now(UTC),
+        )
+    with pytest.raises(HealthFederationExportDenied):
+        read_health_federation_export(
+            db_session,
+            OWNER_ID,
+            _federation_request(uuid4()),
+            now=datetime.now(UTC),
+        )
+
+    update_profile_item(
+        db_session,
+        OWNER_ID,
+        shared.id,
+        expected_revision=shared.revision,
+        changes={"cross_domain_use_allowed": False},
+    )
+    db_session.flush()
+    verify = HealthFederationExportRequest(
+        operation="verify",
+        category="dietary_restrictions",
+        entity_id=shared.id,
+        purpose="health_dietary_restrictions_to_travel",
+        destination_application_id="travel",
+        fields=("permission_version",),
+    )
+    with pytest.raises(HealthFederationExportDenied):
+        read_health_federation_export(
+            db_session, OWNER_ID, verify, now=datetime.now(UTC)
+        )
 
 
 def test_bounded_daily_read_preserves_time_units_quality_and_unknown_uncertainty(

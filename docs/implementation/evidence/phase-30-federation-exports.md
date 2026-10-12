@@ -1,0 +1,11 @@
+# Phase 30 Health federation export evidence
+
+Date: 2026-10-11. Tested baseline: `7d70544` plus the local Health export changes.
+
+Health owns two narrow source contracts at `POST /v1/integrations/personal-ai/federation-export`: `health_dietary_restrictions_to_travel` and `health_ergonomic_constraints_to_shopping`. A request must name one existing `profile_item`, its exact constraint key, the matching destination, and its single field. Health verifies the Personal AI service token and recent Firebase user token, resolves only an existing active Health owner, and rechecks current object validity, local AI-use consent, cross-domain consent, revision, sensitivity, and supported value type. A read returns only the selected field; a verify returns only the current permission version. Complete and authoritative-empty are explicit; there is no paginated or partial response. The endpoint and feature flag default off.
+
+The new database tests cover positive narrow export, wrong owner/entity, explicit empty value, revision metadata, and consent revocation. Authentication-contract tests verify exact scope and reject an invalid delegated owner before opening a Health database session. The existing Health schema uses PostgreSQL-specific JSONB and transaction behavior; the four database-backed tests were skipped because no disposable `TEST_DATABASE_URL` was configured. Thus the source query is not yet verified against PostgreSQL in this session.
+
+Checks on the working tree: `tests/test_personal_ai_context_contract.py tests/test_personal_ai_context_db.py tests/test_personal_ai_federation_export.py` — **14 passed, 4 skipped**; Ruff on changed files — **passed**. The new offline test compiles and inspects the owner/consent query, then checks complete, empty, verify, narrow-field, dependency, missing-row, and unsupported-value behavior. No cloud or live identity checks were run.
+
+This endpoint does not close either live flow. Health requires a Firebase user token, while the Personal AI Health adapter currently has only Google OIDC identity. The shared adapter remains unregistered and both cross-domain exports remain default-off pending an accepted delegated identity bridge and PostgreSQL-backed test run.

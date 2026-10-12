@@ -10,6 +10,7 @@ from pydantic import ValidationError
 
 from health_api.api.personal_ai_context import router
 from health_api.config.settings import Settings
+from health_api.integrations.federation_export import HealthFederationExportRequest
 from health_api.integrations.firebase_auth import VerifiedIdentity
 from health_api.integrations.personal_ai_context import (
     HealthContextPayload,
@@ -106,6 +107,49 @@ def test_health_request_is_versioned_bounded_and_separate_from_local_preview() -
         )
 
 
+@pytest.mark.parametrize(
+    ("category", "purpose", "destination", "field"),
+    (
+        (
+            "dietary_restrictions",
+            "health_dietary_restrictions_to_travel",
+            "travel",
+            "dietary_restrictions",
+        ),
+        (
+            "ergonomic_constraints",
+            "health_ergonomic_constraints_to_shopping",
+            "shopping",
+            "ergonomic_constraints",
+        ),
+    ),
+)
+def test_health_federation_contract_accepts_only_narrow_declared_scopes(
+    category: str, purpose: str, destination: str, field: str
+) -> None:
+    request = HealthFederationExportRequest(
+        operation="read",
+        category=category,
+        entity_id=uuid4(),
+        purpose=purpose,
+        destination_application_id=destination,
+        fields=(field,),
+    )
+    assert request.entity_type == "profile_item"
+    verify = request.model_copy(update={"operation": "verify", "fields": ("permission_version",)})
+    assert verify.fields == ("permission_version",)
+
+    for changed in (
+        {"destination_application_id": "shopping" if destination == "travel" else "travel"},
+        {"fields": ("record",)},
+        {"entity_type": "event"},
+    ):
+        candidate = request.model_dump()
+        candidate.update(changed)
+        with pytest.raises(ValidationError):
+            HealthFederationExportRequest.model_validate(candidate)
+
+
 def test_health_read_gate_is_independent_and_cannot_enable_assistant_messages() -> None:
     assert Settings(_env_file=None, app_env="test").personal_ai_context_read_enabled is False
     assert _settings().personal_ai_enabled is False
@@ -117,6 +161,16 @@ def test_health_read_gate_is_independent_and_cannot_enable_assistant_messages() 
         )
     with pytest.raises(ValidationError, match="PERSONAL_AI_ENABLED cannot be true"):
         _settings(personal_ai_enabled=True)
+
+
+def test_federation_export_gate_requires_identity_gate_and_defaults_off() -> None:
+    assert Settings(_env_file=None, app_env="test").personal_ai_federation_export_enabled is False
+    with pytest.raises(ValidationError, match="personal_ai_federation_requires_context_identity"):
+        Settings(
+            _env_file=None,
+            app_env="test",
+            personal_ai_federation_export_enabled=True,
+        )
 
 
 def test_dual_auth_requires_exact_google_service_and_recent_firebase_identity() -> None:
@@ -175,6 +229,45 @@ async def test_invalid_owner_identity_is_rejected_before_opening_a_database_sess
                 "X-User-ID-Token": "invalid-or-unmapped-user-token",
             },
             json={"operation": "catalog"},
+        )
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_invalid_federation_owner_is_rejected_before_opening_a_database_session() -> None:
+    app = FastAPI()
+    app.state.settings = _settings(personal_ai_federation_export_enabled=True)
+    app.state.identity_verifier = FixedFirebaseVerifier(
+        VerifiedIdentity(FIREBASE_ISSUER, "unused", issued_at=int(time.time()))
+    )
+
+    class RejectingVerifier:
+        def verify(self, **kwargs: object) -> None:
+            del kwargs
+            raise PersonalAIContextAuthorizationError("owner identity not mapped")
+
+    app.state.personal_ai_context_identity_verifier = RejectingVerifier()
+
+    def session_factory() -> None:
+        raise AssertionError("unauthorized requests must not open a Health data session")
+
+    app.state.session_factory = session_factory
+    app.include_router(router)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+        response = await client.post(
+            "/v1/integrations/personal-ai/federation-export",
+            headers={
+                "Authorization": "Bearer service-token",
+                "X-User-ID-Token": "invalid-or-unmapped-user-token",
+            },
+            json={
+                "operation": "read",
+                "category": "dietary_restrictions",
+                "entity_id": str(uuid4()),
+                "purpose": "health_dietary_restrictions_to_travel",
+                "destination_application_id": "travel",
+                "fields": ["dietary_restrictions"],
+            },
         )
     assert response.status_code == 401
 
