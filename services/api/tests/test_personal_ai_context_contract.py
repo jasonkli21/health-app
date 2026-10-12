@@ -181,13 +181,26 @@ def test_health_read_gate_is_independent_and_cannot_enable_assistant_messages() 
         _settings(personal_ai_enabled=True)
 
 
-def test_federation_export_gate_requires_identity_gate_and_defaults_off() -> None:
+def test_federation_export_gate_is_independent_and_defaults_off() -> None:
     assert Settings(_env_file=None, app_env="test").personal_ai_federation_export_enabled is False
-    with pytest.raises(ValidationError, match="personal_ai_federation_requires_context_identity"):
+    federation_only = _settings(
+        personal_ai_context_read_enabled=False,
+        personal_ai_federation_export_enabled=True,
+    )
+    assert federation_only.personal_ai_federation_export_enabled is True
+    assert federation_only.personal_ai_context_read_enabled is False
+
+    with pytest.raises(ValidationError, match="personal_ai_context_identity_configuration_required"):
         Settings(
             _env_file=None,
             app_env="test",
             personal_ai_federation_export_enabled=True,
+        )
+    with pytest.raises(ValidationError, match="personal_ai_federation_delegation_key_invalid"):
+        _settings(
+            personal_ai_context_read_enabled=False,
+            personal_ai_federation_export_enabled=True,
+            personal_ai_federation_delegation_public_key="invalid",
         )
 
 
@@ -254,7 +267,10 @@ async def test_invalid_owner_identity_is_rejected_before_opening_a_database_sess
 @pytest.mark.asyncio
 async def test_invalid_federation_owner_is_rejected_before_opening_a_database_session() -> None:
     app = FastAPI()
-    app.state.settings = _settings(personal_ai_federation_export_enabled=True)
+    app.state.settings = _settings(
+        personal_ai_context_read_enabled=False,
+        personal_ai_federation_export_enabled=True,
+    )
     app.state.identity_verifier = FixedFirebaseVerifier(
         VerifiedIdentity(FIREBASE_ISSUER, "unused", issued_at=int(time.time()))
     )
@@ -288,6 +304,22 @@ async def test_invalid_federation_owner_is_rejected_before_opening_a_database_se
             },
         )
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_federation_only_gate_keeps_the_broad_context_route_closed() -> None:
+    app = FastAPI()
+    app.state.settings = _settings(
+        personal_ai_context_read_enabled=False,
+        personal_ai_federation_export_enabled=True,
+    )
+    app.include_router(router)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+        response = await client.post(
+            "/v1/integrations/personal-ai/context",
+            json={"operation": "catalog"},
+        )
+    assert response.status_code == 404
 
 
 def test_request_cannot_use_a_profile_item_reference_for_another_object_type() -> None:
@@ -396,6 +428,7 @@ def test_signed_delegation_binds_google_user_service_audience_and_exact_request(
         ({"aud": "wrong-service"}, False),
         ({"exp": int(time.time()) - 1}, False),
         ({"auth_time": int(time.time()) - 601}, False),
+        ({"auth_time": int(time.time()) + 61}, False),
         ({}, True),
     ],
 )

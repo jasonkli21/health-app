@@ -149,7 +149,7 @@ class Settings(BaseSettings):
                 "Contract's live identity, delegation, and messaging acceptance are implemented "
                 "and reviewed"
             )
-        if self.personal_ai_context_read_enabled and (
+        if (self.personal_ai_context_read_enabled or self.personal_ai_federation_export_enabled) and (
             self.auth_mode != "firebase"
             or not self.firebase_project_id
             or not self.personal_ai_context_service_audience.startswith("https://")
@@ -162,8 +162,6 @@ class Settings(BaseSettings):
         ):
             raise ValueError("personal_ai_context_identity_configuration_required")
         if self.personal_ai_federation_export_enabled:
-            if not self.personal_ai_context_read_enabled:
-                raise ValueError("personal_ai_federation_requires_context_identity")
             import base64
 
             from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
