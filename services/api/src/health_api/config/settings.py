@@ -8,11 +8,12 @@ from pathlib import Path
 from typing import Literal
 from uuid import UUID
 
-from health_api.domain.proposals import MAX_PROPOSAL_LIFETIME_HOURS
-from health_api.domain.schemas import validate_iana_timezone
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
+
+from health_api.domain.proposals import MAX_PROPOSAL_LIFETIME_HOURS
+from health_api.domain.schemas import validate_iana_timezone
 
 
 def _postgres_url(value: str | SecretStr) -> URL:
@@ -91,6 +92,11 @@ class Settings(BaseSettings):
     database_connection_budget: int | None = Field(default=None, ge=1, le=5000)
     auth_http_timeout_seconds: int = Field(default=4, ge=1, le=15)
     auth_max_in_flight: int = Field(default=32, ge=1, le=128)
+    # This read-only capability is independent of the disabled assistant message route.
+    personal_ai_context_read_enabled: bool = False
+    personal_ai_context_service_audience: str = Field(default="", max_length=500)
+    personal_ai_context_service_account: str = Field(default="", max_length=254)
+    personal_ai_context_user_token_max_age_seconds: int = Field(default=300, ge=60, le=600)
     personal_ai_enabled: bool = False
     action_proposal_generation_enabled: bool = True
     action_proposal_ttl_hours: int = Field(default=24, ge=1, le=MAX_PROPOSAL_LIFETIME_HOURS)
@@ -132,8 +138,21 @@ class Settings(BaseSettings):
         if self.personal_ai_enabled:
             raise ValueError(
                 "PERSONAL_AI_ENABLED cannot be true until the Personal AI Application Integration "
-                "Contract is implemented and reviewed"
+                "Contract's live identity, delegation, and messaging acceptance are implemented "
+                "and reviewed"
             )
+        if self.personal_ai_context_read_enabled and (
+            self.auth_mode != "firebase"
+            or not self.firebase_project_id
+            or not self.personal_ai_context_service_audience.startswith("https://")
+            or len(self.personal_ai_context_service_audience) > 500
+            or not self.personal_ai_context_service_account.strip()
+            or not re.fullmatch(
+                r"[A-Za-z0-9][A-Za-z0-9._%+-]{0,253}@[A-Za-z0-9.-]{1,253}",
+                self.personal_ai_context_service_account,
+            )
+        ):
+            raise ValueError("personal_ai_context_identity_configuration_required")
 
         if self.app_env == "cloud":
             if self.auth_mode != "firebase":

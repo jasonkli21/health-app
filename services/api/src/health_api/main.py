@@ -18,6 +18,7 @@ from health_api.api.daily import router as daily_router
 from health_api.api.errors import install_error_handlers
 from health_api.api.healthkit_imports import router as healthkit_import_router
 from health_api.api.middleware import RequestBoundaryMiddleware
+from health_api.api.personal_ai_context import router as personal_ai_context_router
 from health_api.api.planning import router as planning_router
 from health_api.api.profile import router as profile_router
 from health_api.api.proposals import router as proposals_router
@@ -93,6 +94,8 @@ def create_app(
     app.include_router(analytics_router)
     app.include_router(healthkit_import_router)
     app.include_router(account_data_router)
+    if configured_settings.personal_ai_context_read_enabled:
+        app.include_router(personal_ai_context_router)
 
     @app.get("/healthz", tags=["system"], operation_id="healthcheck")
     def healthcheck() -> dict[str, str]:

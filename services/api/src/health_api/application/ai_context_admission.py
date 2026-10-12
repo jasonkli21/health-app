@@ -7,6 +7,22 @@ from typing import Any
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
+from sqlalchemy import (
+    Date,
+    DateTime,
+    Integer,
+    String,
+    and_,
+    case,
+    cast,
+    func,
+    literal,
+    literal_column,
+    or_,
+    select,
+    union_all,
+)
+
 from health_api.application.ai_context_ranking import (
     _common_vector,
     _payload_vector,
@@ -25,21 +41,6 @@ from health_api.persistence.models import (
     ProfileItem,
     Source,
 )
-from sqlalchemy import (
-    Date,
-    DateTime,
-    Integer,
-    String,
-    and_,
-    case,
-    cast,
-    func,
-    literal,
-    literal_column,
-    or_,
-    select,
-    union_all,
-)
 
 
 def _eligibility_conditions(
@@ -53,6 +54,7 @@ def _eligibility_conditions(
     end_date: date,
     excluded_object_ids: tuple[UUID, ...] = (),
     domains: tuple[str, ...] = (),
+    require_cross_domain: bool = False,
 ) -> list[Any]:
     """The single SQL admission gate shared by preview and search candidates."""
     conditions: list[Any] = [
@@ -67,6 +69,9 @@ def _eligibility_conditions(
     ]
     if domains:
         conditions.append(HealthObject.domain.in_(domains))
+    if require_cross_domain:
+        # Cross-domain consent is independent from local AI-use consent.
+        conditions.append(HealthObject.cross_domain_use_allowed.is_(True))
     if excluded_object_ids:
         conditions.append(HealthObject.id.not_in(excluded_object_ids))
     if object_type in {"event", "observation"}:

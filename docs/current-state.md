@@ -1,6 +1,6 @@
 # Current implementation state
 
-Updated October 8, 2026. This page is the single living summary of delivered
+Updated October 11, 2026. This page is the single living summary of delivered
 scope, current work boundaries, and open acceptance gates. It is reconciled
 from the latest code and release/review evidence through the Phase 9 local
 export and domain-erasure foundation.
@@ -19,6 +19,7 @@ export and domain-erasure foundation.
 | Trends, insights, recommendations, and experiments | Deterministic bounded analysis, exact revision evidence, expiring insight/recommendation history, manual experiments, and mobile Insights/Today surfaces are implemented locally. The PostgreSQL 17 API suite runs in CI; complete numerical goldens, full AI permission/`as_of` integration coverage, unrepresented race cases, query-plan measurements, and device walkthrough remain open.                                                  | [Phase 7 release](implementation/evidence/phase-7-release.md), [Phase 7 plan](implementation/phases/phase-7-implementation-plan.md)                                                                                                       |
 | Selective HealthKit import foundation              | Owner-scoped batch contract, source identities/preferences/revisions, normalized mobile mappings, secure per-account consent/checkpoints, and review fixes are implemented locally. PostgreSQL-backed API tests run in CI; Neon parity, production concurrency, and device acceptance remain open. The native adapter stays unavailable pending a compatible iOS build and real-device verification.                                           | [Phase 8 release](implementation/evidence/phase-8-release.md), [independent review](implementation/evidence/phase-8-independent-review.md), [Phase 8 plan](implementation/phases/phase-8-implementation-plan.md)                          |
 | Owner export and domain erasure foundation         | Repeatable-read owner JSON export, explicit/recent-auth domain deletion, owner write freeze, bounded private-object cleanup, dependency-ordered erasure, and a health-free erasure marker are implemented locally. Historical Phase 9 PostgreSQL 16.15 and 17.11 tests cover every inventory table and export/erasure recovery. The marker has no restore-replay runner; live cloud, object, device, and restore-drill acceptance remain open. | [Phase 9 release evidence](implementation/evidence/phase-9-release.md), [independent review and remediation](implementation/evidence/phase-9-independent-review.md), [Phase 9 plan](implementation/phases/phase-9-implementation-plan.md) |
+| Personal AI typed context read contract           | A separate, read-only `health-context-read-v1` endpoint and Health-owned projection are implemented locally behind `PERSONAL_AI_CONTEXT_READ_ENABLED=false`. It requires an exact Google service identity plus a recent, revoked-checked Firebase owner token, then applies both local AI-use and cross-domain consent through the shared admission gate. It does not enable Assistant messaging or change canonical state. Personal AI currently supplies a Google OIDC user token rather than the Firebase token required here, so live reads remain unavailable. | [Phase 29 evidence](implementation/evidence/phase-29-personal-ai-context.md), [integration contract](ai/personal-ai-integration.md) |
 
 Phase 9 document records, reviewed extraction and Records review surfaces,
 durable large exports, backup/restore, and whole-system maturity are not
@@ -34,15 +35,25 @@ accessibility.
   item-level AI permission. Permission defaults to off; request scope may
   narrow sharing but cannot grant permission.
 - Local Health context preview and search work without Personal AI. The
-  `AIContextPack` is a local preview response, not a cross-service transport
-  contract. `/assistant/status` reports disabled with no capabilities, and
-  `/assistant/messages` always returns a sanitized 503 without building
-  context or invoking an adapter. `PERSONAL_AI_ENABLED=true` remains rejected.
-- Personal AI's typed provider/planner/builder architecture is documented as
-  the intended shared integration boundary. Health Phase 29 provider
-  registration, delegated owner authorization, retention/privacy review, and
-  live safety acceptance are not implemented; canonical health state remains
-  owned by Health. See the [boundary alignment evidence](implementation/evidence/personal-ai-boundary-alignment-2026-10-08.md).
+  `AIContextPack` remains a local preview response, separate from the
+  `health-context-read-v1` transport. The new read endpoint has an independent
+  default-off gate; `/assistant/status` remains disabled with no capabilities,
+  `/assistant/messages` remains a sanitized 503, and
+  `PERSONAL_AI_ENABLED=true` remains rejected.
+- The read projection accepts only typed Health categories and returns
+  selected provenance, time, units, quality/unknown uncertainty, sensitivity,
+  and permission dependencies. It never reads a category that fails the shared
+  owner/current/item-permission gate plus the independent
+  `cross_domain_use_allowed` gate. Daily records default to cross-domain off
+  and currently have no owner-facing control to enable that flag.
+- Live delegated-owner authorization is not wired: Health requires a recent
+  Firebase ID token, while the current Personal AI adapter supplies its
+  verified Google OIDC identity token. No email-based mapping, owner creation,
+  or token substitution is used. Sidecar category selection, deployed
+  identity/privacy review, and live domain verification remain open. The
+  integration creates no Health mutations or proposals; canonical state
+  remains owned by Health. See [boundary alignment evidence](implementation/evidence/personal-ai-boundary-alignment-2026-10-08.md)
+  and [Phase 29 evidence](implementation/evidence/phase-29-personal-ai-context.md).
 - Proposal apply requires the exact reviewed revision/hash and explicit
   confirmation. General AI-originated writes remain unavailable.
 - Cloud auth and private-storage boundaries are implemented in code, but live
@@ -99,9 +110,12 @@ architecture documents are routed only for web/shared-client work.
   backup/restore, and cost checks have not been established.
 - Device review remains open for accessibility, keyboard interaction,
   timezone behavior, session/account changes, and proposal confirmation.
-- The Health Application Integration Contract, retention/privacy review,
-  delegated-owner authorization, live read-only safety evaluation, and
-  provider behavior are unverified; live messaging remains disabled.
+- Live Personal AI owner delegation is unverified and currently incompatible
+  across the two local identity contracts (Google OIDC at Personal AI versus
+  Firebase ID tokens at Health). The Health read gate remains false; deployed
+  identity, retention/privacy review, live read-only safety, sidecar behavior,
+  and provider behavior remain unverified. Live Assistant messaging remains
+  disabled.
 - Earlier dependency advisory/source-use review gates are still listed in
   Phase 1 evidence.
 

@@ -63,6 +63,17 @@ contract is reviewed. Focused API coverage lives in
 `services/api/tests/test_ai_context_api.py`; PostgreSQL-specific cases still
 require the documented disposable test database.
 
+`personal_ai_context.py` is a separate, read-only service-to-service
+projection. It resolves only an existing Firebase identity mapping, selects
+versioned profile/Event/Observation schemas, and calls the same admission
+predicate with the additional `cross_domain_use_allowed` requirement. It
+returns a bounded `health-context-read-v1` DTO rather than `AIContextPack` and
+does not create Health state or AI proposals. Daily rows continue to default
+cross-domain permission off; no owner-facing toggle is added by this
+integration. The route owns a read-only transaction and short Postgres
+statement timeout, while this application service owns category selection and
+projection.
+
 `analytics_service.py` keeps the route-facing operations stable.
 `analytics_sources.py` loads owner-scoped current Event/Observation inputs and
 revision/provenance evidence once per request, with a 366-day window, 10,000

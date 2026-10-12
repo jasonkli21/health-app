@@ -21,6 +21,7 @@ class VerifiedIdentity:
     issuer: str
     subject: str
     auth_time: int | None = None
+    issued_at: int | None = None
 
 
 class IdentityVerifier(Protocol):
@@ -82,6 +83,7 @@ class FirebaseTokenVerifier:
             audience = claims.get("aud")
             subject = claims.get("sub")
             auth_time = claims.get("auth_time")
+            issued_at = claims.get("iat")
             if (
                 issuer != expected_issuer
                 or audience != self.project_id
@@ -92,7 +94,14 @@ class FirebaseTokenVerifier:
                 raise TokenVerificationError
             if isinstance(auth_time, bool) or not isinstance(auth_time, int):
                 auth_time = None
-            return VerifiedIdentity(issuer=issuer, subject=subject, auth_time=auth_time)
+            if isinstance(issued_at, bool) or not isinstance(issued_at, int):
+                issued_at = None
+            return VerifiedIdentity(
+                issuer=issuer,
+                subject=subject,
+                auth_time=auth_time,
+                issued_at=issued_at,
+            )
         except (TokenVerificationError, VerifierUnavailable):
             raise
         except Exception as exc:

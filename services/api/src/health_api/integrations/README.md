@@ -4,15 +4,19 @@ Adapters for object storage, authentication, and later HealthKit/import
 sources. External systems must not leak transport-specific concerns into the
 domain layer.
 
-The Personal AI integration currently exposes disabled status only. The
-factory does not create a message transport, and `POST /assistant/messages`
-returns a sanitized 503 until the Personal AI Application Integration
-Contract is implemented and reviewed. `AIContextPack` is for the local Health
-preview and must not be treated as an external request envelope. Do not add a
-guessed endpoint, accept an arbitrary URL, or forward a user bearer token to a
-model provider. A future Health provider must authorize the owner, application
-scope, purpose, category, and operation before fetching data, and return
-bounded domain-typed fields with provenance and sensitivity metadata.
+The Personal AI integration has a separate, default-off
+`health-context-read-v1` route at `/v1/integrations/personal-ai/context`.
+`personal_ai_context.py` owns the strict versioned DTO, and
+`personal_ai_context_auth.py` verifies a Google service identity and a recent,
+revoked-checked Firebase owner identity before Health lookup. The projection
+uses Health's canonical read permissions and remains separate from
+`AIContextPack`. The route does not enable `/assistant/status` or
+`POST /assistant/messages`; the latter remains a sanitized 503 and
+`PERSONAL_AI_ENABLED` remains rejected. The Personal AI repository currently
+provides Google OIDC user tokens rather than delegated Firebase tokens, so
+live reads between the repositories remain unavailable. Do not add a guessed
+identity mapping, accept an arbitrary URL, or forward a user bearer token to a
+model provider.
 
 ## Object storage boundary
 

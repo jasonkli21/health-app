@@ -142,10 +142,23 @@ and is not used by this Assistant.
 
 | Route                                      | Contract                                                                                                                                                                                                                                           |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /assistant/status`                    | Authenticated, owner-scoped status. The external integration currently reports `enabled=false`, `adapter_status=disabled`, and no capabilities because the Personal AI Application Integration Contract has not yet been implemented and reviewed. |
+| `GET /assistant/status`                    | Authenticated, owner-scoped status. The live Assistant integration reports `enabled=false`, `adapter_status=disabled`, and no capabilities; the separate read contract does not enable messaging.                                                           |
 | `POST /ai/context`                         | Builds a current local preview for the authenticated owner from `task`, `task_kind`, selected `resource_types`, `lookback_days` (0–90), optional `as_of`/timezone, and optional excluded object UUIDs. This route does not call Personal AI.       |
 | `GET /search?q=…&types=…&limit=…&cursor=…` | Health-owned PostgreSQL full-text search over current active resources. `types` is an optional comma-separated list; results require `ai_use_allowed=true`. Limit is 1–50 (default 20); `q` is at most 500 characters.                             |
 | `POST /assistant/messages`                 | Retains the 8,000-character message and context-scope request schema for client compatibility, but always returns a sanitized 503 while live messaging is unavailable. It does not build a Pack or invoke an adapter.                              |
+
+The separate server-to-server `POST /v1/integrations/personal-ai/context`
+route is mounted only when `PERSONAL_AI_CONTEXT_READ_ENABLED=true`. It accepts
+the strict `health-context-read-v1` request for authorized category catalog,
+profile, history, measurement time-series, or permission verification and
+returns a bounded typed projection. It requires a Google service ID token
+with the configured audience/exact service account and a recent, revoked-
+checked Firebase user ID token; owner identity is derived only from an
+existing exact identity mapping. Selected rows must pass both local AI-use
+and cross-domain consent through the shared Health admission predicate. The
+route never writes data and does not enable Assistant messaging. See the
+[Personal AI integration contract](../ai/personal-ai-integration.md) for the
+payload and currently unavailable delegated-token path.
 
 The local Pack v1 preview includes the task and selected types, random per-request opaque
 owner scope, timezone and `as_of`, revision-linked minimized entries,
