@@ -37,6 +37,7 @@ type Props = {
   onUpdate?: (
     record: EventRecord | ObservationRecord,
     aiUseAllowed: boolean,
+    crossDomainUseAllowed: boolean,
   ) => Promise<void>;
   onRetryUncertain?: () => Promise<void>;
   onConflictReload?: () => void;
@@ -178,7 +179,9 @@ export function DailyEntryForm({
         showBuildError(result.error);
         return;
       }
-      await send(() => onUpdate(result.value, draft.aiUseAllowed));
+      await send(() =>
+        onUpdate(result.value, draft.aiUseAllowed, draft.crossDomainUseAllowed),
+      );
       return;
     }
     if (!onCreate) return;
@@ -788,6 +791,19 @@ export function DailyEntryForm({
           accessibilityHint="Off by default. This entry can be included only when you allow AI use and select its type in the context preview."
           value={draft.aiUseAllowed}
           onValueChange={(aiUseAllowed) => update({ aiUseAllowed })}
+        />
+      </View>
+      <View style={styles.permissionRow}>
+        <Text style={styles.permissionLabel}>
+          Allow other apps to use this entry through Personal AI
+        </Text>
+        <Switch
+          accessibilityLabel="Allow other apps to use this daily entry through Personal AI"
+          accessibilityHint="Off by default. This records your Health permission; cross-app use remains unavailable until the shared identity and service gates are enabled."
+          value={draft.crossDomainUseAllowed}
+          onValueChange={(crossDomainUseAllowed) =>
+            update({ crossDomainUseAllowed })
+          }
         />
       </View>
 

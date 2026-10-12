@@ -80,6 +80,7 @@ export default function DailyEditScreen() {
   async function update(
     record: EventRecord | ObservationRecord,
     aiUseAllowed: boolean,
+    crossDomainUseAllowed: boolean,
   ) {
     if (!item) return;
     if (item.status !== "active")
@@ -91,6 +92,7 @@ export default function DailyEditScreen() {
           expected_revision: item.revision,
           event: record as EventRecord,
           ai_use_allowed: aiUseAllowed,
+          cross_domain_use_allowed: crossDomainUseAllowed,
         },
       );
       setEditState((state) => acceptDailyRefresh(state, updated, true));
@@ -101,6 +103,7 @@ export default function DailyEditScreen() {
           expected_revision: item.revision,
           observation: record as ObservationRecord,
           ai_use_allowed: aiUseAllowed,
+          cross_domain_use_allowed: crossDomainUseAllowed,
         },
       );
       setEditState((state) => acceptDailyRefresh(state, updated, true));

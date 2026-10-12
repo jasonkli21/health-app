@@ -53,14 +53,24 @@ offering categories. The response is bounded to 90 days, 32 rows, and 32 KiB.
 The projection is not `AIContextPack`, stores no duplicate state, and has no
 write or proposal operation. Custom tracker observations remain excluded.
 
-The Health read gate defaults off and does not alter `/assistant/status`,
-`/assistant/messages`, or Health mutation behavior. The current Personal AI
-adapter can provide a Google OIDC user token, while Health requires a recent
-Firebase token; there is no delegated Firebase-token bridge or live read path
-between the repositories yet. Daily Health entries also default their
-cross-domain permission off without an owner-facing control. The category
-sidecar, identity/privacy review, cloud IAM and provider verification remain
-open. These are explicit activation gaps, not passed external checks.
+The Health read gate defaults off and does not alter `/assistant/status` or
+`/assistant/messages`. Owners can set daily `cross_domain_use_allowed` during
+create and update; the mobile daily-entry form exposes this default-off choice
+for both new and existing entries. Those writes advance the canonical object
+revision and append a history snapshot containing the permission state. Health
+context dependency versions include that revision and both Health consent
+values, so a regrant creates a new version. The consent records a Health-owned
+prerequisite and does not activate the still-disabled Personal AI integration.
+Health's local `ai_use_allowed` and
+`cross_domain_use_allowed` are source-domain prerequisites. A future Phase 30
+federation grant is an additional authorization; effective access is their
+intersection, with separate dependency versions.
+
+The current Personal AI adapter can provide a Google OIDC user token, while
+Health requires a recent Firebase token; there is no delegated Firebase-token
+bridge or live read path between the repositories yet. The category sidecar,
+identity/privacy review, cloud IAM and provider verification remain open. These
+are explicit activation gaps, not passed external checks.
 
 ## Planned mutation integration
 

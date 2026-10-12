@@ -44,8 +44,11 @@ accessibility.
   selected provenance, time, units, quality/unknown uncertainty, sensitivity,
   and permission dependencies. It never reads a category that fails the shared
   owner/current/item-permission gate plus the independent
-  `cross_domain_use_allowed` gate. Daily records default to cross-domain off
-  and currently have no owner-facing control to enable that flag.
+  `cross_domain_use_allowed` gate. Daily records default to cross-domain off;
+  owners can set the flag on create or update, and the mobile daily-entry form
+  exposes the choice when creating or editing an entry. Each write advances
+  the object revision and records both consent flags in revision history,
+  which gives Health context dependencies a monotonic currentness epoch.
 - Live delegated-owner authorization is not wired: Health requires a recent
   Firebase ID token, while the current Personal AI adapter supplies its
   verified Google OIDC identity token. No email-based mapping, owner creation,

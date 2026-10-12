@@ -39,6 +39,22 @@ function built(
 }
 
 describe("daily entry builders", () => {
+  it("keeps cross-domain consent off by default and carries explicit consent", () => {
+    const defaultRequest = built("nutrition", draft({ label: "Lunch" }));
+    expect(defaultRequest.events?.[0]?.cross_domain_use_allowed).toBe(false);
+
+    const optedIn = built(
+      "symptoms",
+      draft({
+        label: "Headache",
+        severity: "4",
+        crossDomainUseAllowed: true,
+      }),
+    );
+    expect(optedIn.events?.[0]?.cross_domain_use_allowed).toBe(true);
+    expect(optedIn.observations?.[0]?.cross_domain_use_allowed).toBe(true);
+  });
+
   it("presents not logged, explicit zero, and partial coverage as distinct states", () => {
     const empty = summaryPresentation({
       domain: "nutrition",

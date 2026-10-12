@@ -321,6 +321,7 @@ export interface components {
     };
     DailyEventCreateRequest: {
       ai_use_allowed?: boolean;
+      cross_domain_use_allowed?: boolean;
       event: components["schemas"]["EventSchemaV1"];
       id: string;
     };
@@ -351,6 +352,7 @@ export interface components {
     };
     DailyEventUpdateRequest: {
       ai_use_allowed?: boolean;
+      cross_domain_use_allowed?: boolean;
       event: components["schemas"]["EventSchemaV1"];
       expected_revision: number;
     };
@@ -383,6 +385,7 @@ export interface components {
     };
     DailyObservationCreateRequest: {
       ai_use_allowed?: boolean;
+      cross_domain_use_allowed?: boolean;
       id: string;
       observation: components["schemas"]["ObservationSchemaV1"];
     };
@@ -412,6 +415,7 @@ export interface components {
     };
     DailyObservationUpdateRequest: {
       ai_use_allowed?: boolean;
+      cross_domain_use_allowed?: boolean;
       expected_revision: number;
       observation: components["schemas"]["ObservationSchemaV1"];
     };

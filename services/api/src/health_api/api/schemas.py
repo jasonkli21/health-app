@@ -422,12 +422,14 @@ class DailyEventCreateRequest(StrictModel):
     id: UUID
     event: EventSchemaV1
     ai_use_allowed: StrictBool = False
+    cross_domain_use_allowed: StrictBool = False
 
 
 class DailyObservationCreateRequest(StrictModel):
     id: UUID
     observation: ObservationSchemaV1
     ai_use_allowed: StrictBool = False
+    cross_domain_use_allowed: StrictBool = False
 
 
 class DailyLinkRequest(StrictModel):
@@ -464,11 +466,19 @@ class DailyEventUpdateRequest(StrictModel):
     ai_use_allowed: StrictBool | None = Field(
         default=None, json_schema_extra=_non_null_openapi_schema
     )
+    cross_domain_use_allowed: StrictBool | None = Field(
+        default=None, json_schema_extra=_non_null_openapi_schema
+    )
 
     @model_validator(mode="after")
     def permission_cannot_be_null(self) -> DailyEventUpdateRequest:
         if "ai_use_allowed" in self.model_fields_set and self.ai_use_allowed is None:
             raise ValueError("ai_use_allowed cannot be null")
+        if (
+            "cross_domain_use_allowed" in self.model_fields_set
+            and self.cross_domain_use_allowed is None
+        ):
+            raise ValueError("cross_domain_use_allowed cannot be null")
         return self
 
 
@@ -478,11 +488,19 @@ class DailyObservationUpdateRequest(StrictModel):
     ai_use_allowed: StrictBool | None = Field(
         default=None, json_schema_extra=_non_null_openapi_schema
     )
+    cross_domain_use_allowed: StrictBool | None = Field(
+        default=None, json_schema_extra=_non_null_openapi_schema
+    )
 
     @model_validator(mode="after")
     def permission_cannot_be_null(self) -> DailyObservationUpdateRequest:
         if "ai_use_allowed" in self.model_fields_set and self.ai_use_allowed is None:
             raise ValueError("ai_use_allowed cannot be null")
+        if (
+            "cross_domain_use_allowed" in self.model_fields_set
+            and self.cross_domain_use_allowed is None
+        ):
+            raise ValueError("cross_domain_use_allowed cannot be null")
         return self
 
 

@@ -147,6 +147,9 @@ describe("DailyEntryForm first render", () => {
     );
     expect(markup).toContain('aria-label="Allow AI use of this daily entry"');
     expect(markup).toContain(
+      'aria-label="Allow other apps to use this daily entry through Personal AI"',
+    );
+    expect(markup).toContain(
       'aria-description="Off by default. This entry can be included only when you allow AI use and select its type in the context preview."',
     );
     expect(markup).toContain('type="checkbox"');

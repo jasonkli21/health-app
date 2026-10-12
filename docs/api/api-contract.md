@@ -131,14 +131,16 @@ state.
 
 ## Phase 5 read-only Assistant contracts
 
-Daily Event and Observation create requests accept `ai_use_allowed` (default
-`false`); update requests may change it with the current expected revision.
-Permission changes are saved in the ordinary revision history. The compound
-daily create applies the explicit flag to each submitted object, including
-linked severity Observations. Old create retries with permission off retain
-their existing idempotency fingerprint behavior. Profile and planning items
-already expose the same opt-in; `cross_domain_use_allowed` remains separate
-and is not used by this Assistant.
+Daily Event and Observation create requests accept `ai_use_allowed` and
+`cross_domain_use_allowed` (both default `false`); update requests may change
+either flag with the current expected revision. Permission changes advance the
+object revision and are saved in its history snapshot. Daily cross-domain
+consent is a separate source-domain prerequisite for the Personal AI read
+contract and does not grant local Assistant access. The compound daily create
+applies each explicit flag to its submitted objects, including linked severity
+Observations. Old create retries with both permissions off retain their prior
+idempotency fingerprint behavior. Profile and planning items already expose
+both consent fields.
 
 | Route                                      | Contract                                                                                                                                                                                                                                           |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

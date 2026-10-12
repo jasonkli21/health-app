@@ -340,10 +340,21 @@ def _entry_history(revision: HealthObjectRevision) -> DailyHistoryEntry:
 def _create_command(body: DailyEntryCreateRequest) -> CreateDailyEntry:
     return CreateDailyEntry(
         events=tuple(
-            CreateDailyEvent(item.id, item.event, item.ai_use_allowed) for item in body.events
+            CreateDailyEvent(
+                item.id,
+                item.event,
+                item.ai_use_allowed,
+                cross_domain_use_allowed=item.cross_domain_use_allowed,
+            )
+            for item in body.events
         ),
         observations=tuple(
-            CreateDailyObservation(item.id, item.observation, item.ai_use_allowed)
+            CreateDailyObservation(
+                item.id,
+                item.observation,
+                item.ai_use_allowed,
+                cross_domain_use_allowed=item.cross_domain_use_allowed,
+            )
             for item in body.observations
         ),
         links=tuple(
@@ -476,7 +487,16 @@ def create_event(
     result = create_daily_entry(
         session,
         owner_id,
-        CreateDailyEntry(events=(CreateDailyEvent(body.id, body.event, body.ai_use_allowed),)),
+        CreateDailyEntry(
+            events=(
+                CreateDailyEvent(
+                    body.id,
+                    body.event,
+                    body.ai_use_allowed,
+                    cross_domain_use_allowed=body.cross_domain_use_allowed,
+                ),
+            )
+        ),
     )
     response.status_code = 201 if result.created else 200
     return _event_response(result.events[0])
@@ -540,6 +560,7 @@ def patch_event(
         body.expected_revision,
         body.event,
         body.ai_use_allowed,
+        cross_domain_use_allowed=body.cross_domain_use_allowed,
     )
     if not isinstance(aggregate[1], EventItem):
         raise DailyNotFound
@@ -620,7 +641,14 @@ def create_observation(
         session,
         owner_id,
         CreateDailyEntry(
-            observations=(CreateDailyObservation(body.id, body.observation, body.ai_use_allowed),)
+            observations=(
+                CreateDailyObservation(
+                    body.id,
+                    body.observation,
+                    body.ai_use_allowed,
+                    cross_domain_use_allowed=body.cross_domain_use_allowed,
+                ),
+            )
         ),
     )
     response.status_code = 201 if result.created else 200
@@ -685,6 +713,7 @@ def patch_observation(
         body.expected_revision,
         body.observation,
         body.ai_use_allowed,
+        cross_domain_use_allowed=body.cross_domain_use_allowed,
     )
     if not isinstance(aggregate[1], ObservationItem):
         raise DailyNotFound

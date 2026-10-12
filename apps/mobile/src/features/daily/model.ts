@@ -52,6 +52,7 @@ export type DailyDraft = {
   measurementUnit: "kg" | "lb" | "C" | "F" | "mmHg" | "bpm";
   notes: string;
   aiUseAllowed: boolean;
+  crossDomainUseAllowed: boolean;
 };
 
 export type BuildResult<T> =
@@ -102,6 +103,7 @@ export function emptyDailyDraft(now = new Date()): DailyDraft {
     measurementUnit: "kg",
     notes: "",
     aiUseAllowed: false,
+    crossDomainUseAllowed: false,
   };
 }
 
@@ -404,11 +406,13 @@ export function buildDailyCreateRequest(
             id: ids.observation,
             observation: systolic,
             ai_use_allowed: draft.aiUseAllowed,
+            cross_domain_use_allowed: draft.crossDomainUseAllowed,
           },
           {
             id: ids.secondObservation,
             observation: diastolic,
             ai_use_allowed: draft.aiUseAllowed,
+            cross_domain_use_allowed: draft.crossDomainUseAllowed,
           },
         );
       } else {
@@ -423,11 +427,17 @@ export function buildDailyCreateRequest(
           id: ids.observation,
           observation,
           ai_use_allowed: draft.aiUseAllowed,
+          cross_domain_use_allowed: draft.crossDomainUseAllowed,
         });
       }
     } else {
       const event = buildEvent(domain, draft);
-      events.push({ id: ids.event, event, ai_use_allowed: draft.aiUseAllowed });
+      events.push({
+        id: ids.event,
+        event,
+        ai_use_allowed: draft.aiUseAllowed,
+        cross_domain_use_allowed: draft.crossDomainUseAllowed,
+      });
       if (domain === "symptoms" && draft.severity.trim()) {
         const severity = buildObservation(
           "symptoms",
@@ -441,6 +451,7 @@ export function buildDailyCreateRequest(
           id: ids.observation,
           observation: severity,
           ai_use_allowed: draft.aiUseAllowed,
+          cross_domain_use_allowed: draft.crossDomainUseAllowed,
         });
         links.push({
           event_id: ids.event,
@@ -558,6 +569,7 @@ export function draftFromDailyItem(item: DailyItem): DailyDraft {
   const draft = emptyDailyDraft(new Date(item.recorded_at));
   draft.notes = item.notes ?? "";
   draft.aiUseAllowed = item.permissions.ai_use_allowed;
+  draft.crossDomainUseAllowed = item.permissions.cross_domain_use_allowed;
   if (item.object_type === "event") {
     draftTime(draft, item.event.time);
     draft.endedAt = item.event.ended_at ?? "";

@@ -9,9 +9,6 @@ from typing import Any, cast
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import and_, select
-from sqlalchemy.orm import Session
-
 from health_api.application.ai_context_admission import _eligibility_conditions
 from health_api.domain.ai import AIResourceType
 from health_api.domain.daily import local_day_bounds
@@ -48,6 +45,8 @@ from health_api.persistence.models import (
     Source,
     User,
 )
+from sqlalchemy import and_, select
+from sqlalchemy.orm import Session
 
 MAX_CONTEXT_CANDIDATES = 1_000
 _PROFILE_CATEGORY_TO_DB = {
@@ -242,7 +241,10 @@ def _query_rows(
         select(HealthObject, subtype, Source.source_kind)
         .select_from(HealthObject)
         .join(subtype, join_condition)
-        .join(Source, and_(Source.owner_id == HealthObject.owner_id, Source.id == HealthObject.source_id))
+        .join(
+            Source,
+            and_(Source.owner_id == HealthObject.owner_id, Source.id == HealthObject.source_id),
+        )
         .where(*conditions)
         .order_by(HealthObject.recorded_at.desc(), HealthObject.id)
         .limit(min(request.max_results + 1, MAX_CONTEXT_CANDIDATES))
@@ -250,8 +252,18 @@ def _query_rows(
     return list(session.execute(statement).all())
 
 
+def _permission_version_values(
+    revision: int, ai_use_allowed: bool, cross_domain_use_allowed: bool
+) -> str:
+    return (
+        f"health-object-v1:r{revision}:ai{int(ai_use_allowed)}:cross{int(cross_domain_use_allowed)}"
+    )
+
+
 def _permission_version(obj: HealthObject) -> str:
-    return f"health-object-v1:r{obj.revision}:ai1:cross1"
+    return _permission_version_values(
+        obj.revision, obj.ai_use_allowed, obj.cross_domain_use_allowed
+    )
 
 
 def _record_data(object_type: str, subtype: Any) -> dict[str, Any]:
@@ -403,7 +415,8 @@ def _to_record(
         effective_at=obj.valid_from,
         expires_at=obj.valid_to,
         sensitivity="restricted",
-        field_sensitivity=labels or (HealthContextFieldSensitivity(field="record", sensitivity="restricted"),),
+        field_sensitivity=labels
+        or (HealthContextFieldSensitivity(field="record", sensitivity="restricted"),),
         source_refs=(
             HealthContextSourceReference(
                 kind="record", reference_id=reference_id, fingerprint=fingerprint
@@ -509,7 +522,9 @@ def _verify_permission(
             object_type
         ],
     )
-    join_condition = and_(subtype.owner_id == HealthObject.owner_id, subtype.object_id == HealthObject.id)
+    join_condition = and_(
+        subtype.owner_id == HealthObject.owner_id, subtype.object_id == HealthObject.id
+    )
     conditions = _eligibility(
         owner_id,
         object_type=object_type,
@@ -523,7 +538,12 @@ def _verify_permission(
     if object_type == "profile_item":
         conditions.append(ProfileItem.category == _profile_category(category))
     row = session.execute(
-        select(HealthObject.id, HealthObject.revision)
+        select(
+            HealthObject.id,
+            HealthObject.revision,
+            HealthObject.ai_use_allowed,
+            HealthObject.cross_domain_use_allowed,
+        )
         .select_from(HealthObject)
         .join(subtype, join_condition)
         .where(*conditions)
@@ -534,7 +554,9 @@ def _verify_permission(
     return (
         HealthContextPermissionVersion(
             object_id=row.id,
-            version=f"health-object-v1:r{row.revision}:ai1:cross1",
+            version=_permission_version_values(
+                row.revision, row.ai_use_allowed, row.cross_domain_use_allowed
+            ),
         ),
     )
 
@@ -626,7 +648,5 @@ def read_personal_ai_health_context(
     while len(response.model_dump_json().encode("utf-8")) > request.max_bytes:
         if not response.items:
             raise HealthContextSelectionError("health_context_response_limit_exceeded")
-        response = response.model_copy(
-            update={"items": response.items[:-1], "truncated": True}
-        )
+        response = response.model_copy(update={"items": response.items[:-1], "truncated": True})
     return response

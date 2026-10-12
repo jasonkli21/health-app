@@ -1420,6 +1420,11 @@
             "title": "Ai Use Allowed",
             "type": "boolean"
           },
+          "cross_domain_use_allowed": {
+            "default": false,
+            "title": "Cross Domain Use Allowed",
+            "type": "boolean"
+          },
           "event": {
             "$ref": "#/components/schemas/EventSchemaV1"
           },
@@ -1600,6 +1605,10 @@
         "properties": {
           "ai_use_allowed": {
             "title": "Ai Use Allowed",
+            "type": "boolean"
+          },
+          "cross_domain_use_allowed": {
+            "title": "Cross Domain Use Allowed",
             "type": "boolean"
           },
           "event": {
@@ -1787,6 +1796,11 @@
             "title": "Ai Use Allowed",
             "type": "boolean"
           },
+          "cross_domain_use_allowed": {
+            "default": false,
+            "title": "Cross Domain Use Allowed",
+            "type": "boolean"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -1958,6 +1972,10 @@
         "properties": {
           "ai_use_allowed": {
             "title": "Ai Use Allowed",
+            "type": "boolean"
+          },
+          "cross_domain_use_allowed": {
+            "title": "Cross Domain Use Allowed",
             "type": "boolean"
           },
           "expected_revision": {

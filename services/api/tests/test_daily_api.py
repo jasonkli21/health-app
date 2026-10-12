@@ -138,6 +138,49 @@ async def test_event_create_idempotency_history_archive_and_date_range(
 
 
 @pytest.mark.asyncio
+async def test_daily_cross_domain_consent_is_owner_editable_and_audited(
+    api_client: AsyncClient,
+) -> None:
+    body = event_request(meal_event("2026-05-01T17:00:00Z"))
+    body.update({"ai_use_allowed": True, "cross_domain_use_allowed": True})
+
+    created = await api_client.post("/events", json=body)
+    assert created.status_code == 201
+    assert created.json()["permissions"] == {
+        "ai_use_allowed": True,
+        "cross_domain_use_allowed": True,
+    }
+
+    revoked = await api_client.patch(
+        f"/events/{body['id']}",
+        json={
+            "expected_revision": 1,
+            "event": body["event"],
+            "cross_domain_use_allowed": False,
+        },
+    )
+    assert revoked.status_code == 200
+    assert revoked.json()["revision"] == 2
+    assert revoked.json()["permissions"]["cross_domain_use_allowed"] is False
+
+    regranted = await api_client.patch(
+        f"/events/{body['id']}",
+        json={
+            "expected_revision": 2,
+            "event": body["event"],
+            "cross_domain_use_allowed": True,
+        },
+    )
+    assert regranted.status_code == 200
+    assert regranted.json()["revision"] == 3
+    assert regranted.json()["permissions"]["cross_domain_use_allowed"] is True
+
+    history = await api_client.get(f"/events/{body['id']}/history")
+    snapshots = [entry["snapshot"]["permissions"] for entry in history.json()["items"]]
+    assert [item["cross_domain_use_allowed"] for item in snapshots] == [True, False, True]
+
+
+@pytest.mark.asyncio
 async def test_compound_symptom_entry_and_blood_pressure_are_atomic_and_roll_up_once(
     api_client: AsyncClient,
 ) -> None:

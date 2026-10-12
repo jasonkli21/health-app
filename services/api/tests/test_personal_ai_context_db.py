@@ -4,23 +4,27 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import select, update
-from sqlalchemy.orm import Session
-
 from health_api.application.ai_context_admission import _eligibility_conditions
 from health_api.application.daily_service import (
     CreateDailyEntry,
     CreateDailyEvent,
     create_daily_entry,
+    update_daily_item,
 )
 from health_api.application.personal_ai_context import read_personal_ai_health_context
-from health_api.application.profile_service import CreateProfile, create_profile_item
+from health_api.application.profile_service import (
+    CreateProfile,
+    create_profile_item,
+    update_profile_item,
+)
 from health_api.domain.schemas import EventSchemaV1, ProfilePayloadV1, ProfileValidity
 from health_api.integrations.personal_ai_context import (
     HealthContextEntityReference,
     HealthContextReadRequest,
 )
 from health_api.persistence.models import HealthObject, ProfileItem, ProviderIdentity, User
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 OWNER_ID = UUID("00000000-0000-0000-0000-000000000929")
 FIREBASE_ISSUER = "https://securetoken.google.com/health-test1"
@@ -96,9 +100,7 @@ def test_catalog_and_profile_read_require_both_health_permissions(db_session: Se
             category="profile_preferences",
             fields=("record",),
             entity_refs=(
-                HealthContextEntityReference(
-                    object_type="profile_item", object_id=local_only.id
-                ),
+                HealthContextEntityReference(object_type="profile_item", object_id=local_only.id),
             ),
         ),
         now=now,
@@ -131,12 +133,13 @@ def test_catalog_and_profile_read_require_both_health_permissions(db_session: Se
         f"health_context_read:profile_background:profile_item:{shared.id}"
     )
 
-    db_session.execute(
-        update(HealthObject)
-        .where(HealthObject.owner_id == OWNER_ID, HealthObject.id == shared.id)
-        .values(cross_domain_use_allowed=False)
+    update_profile_item(
+        db_session,
+        OWNER_ID,
+        shared.id,
+        shared.revision,
+        {"cross_domain_use_allowed": False},
     )
-    db_session.commit()
     catalog_after_revoke = read_personal_ai_health_context(
         db_session, OWNER_ID, HealthContextReadRequest(operation="catalog"), now=now
     )
@@ -235,12 +238,14 @@ def test_bounded_daily_read_preserves_time_units_quality_and_unknown_uncertainty
     denied = read_personal_ai_health_context(db_session, OWNER_ID, request, now=now)
     assert denied.items == ()
 
-    db_session.execute(
-        update(HealthObject)
-        .where(HealthObject.owner_id == OWNER_ID, HealthObject.id == object_id)
-        .values(cross_domain_use_allowed=True)
+    update_daily_item(
+        db_session,
+        OWNER_ID,
+        object_id,
+        expected_revision=1,
+        record=event,
+        cross_domain_use_allowed=True,
     )
-    db_session.commit()
 
     response = read_personal_ai_health_context(db_session, OWNER_ID, request, now=now)
     assert len(response.items) == 1
@@ -251,6 +256,98 @@ def test_bounded_daily_read_preserves_time_units_quality_and_unknown_uncertainty
     assert item.payload.units == {"energy": "kcal"}
     assert item.payload.quality == {}
     assert item.payload.uncertainty is None
+
+
+def test_daily_consent_regrant_advances_health_permission_dependency_epoch(
+    db_session: Session,
+) -> None:
+    _seed_owner(db_session)
+    now = datetime.now(UTC)
+    occurred_at = now - timedelta(minutes=5)
+    event = EventSchemaV1.model_validate(
+        {
+            "domain": "nutrition",
+            "time": {
+                "precision": "instant",
+                "occurred_at": occurred_at.isoformat(),
+                "timezone": "America/Los_Angeles",
+            },
+            "ended_at": None,
+            "payload": {
+                "kind": "meal",
+                "label": "Synthetic consent epoch meal",
+                "foods": ["synthetic consent epoch food"],
+                "energy": {"value": 120, "unit": "kcal"},
+            },
+            "notes": None,
+        }
+    )
+    object_id = uuid4()
+    created = create_daily_entry(
+        db_session,
+        OWNER_ID,
+        CreateDailyEntry(
+            events=(
+                CreateDailyEvent(
+                    id=object_id,
+                    event=event,
+                    ai_use_allowed=True,
+                    cross_domain_use_allowed=True,
+                ),
+            )
+        ),
+    )
+    assert created.events[0][0].revision == 1
+    request = HealthContextReadRequest(
+        operation="history",
+        category="nutrition",
+        fields=("record",),
+        window_start=now - timedelta(days=1),
+        window_end=now,
+        max_results=8,
+        max_bytes=8192,
+    )
+    initial = read_personal_ai_health_context(db_session, OWNER_ID, request, now=now)
+    old_version = initial.items[0].permission_dependencies[0].version
+
+    revoked = update_daily_item(
+        db_session,
+        OWNER_ID,
+        object_id,
+        expected_revision=1,
+        record=event,
+        cross_domain_use_allowed=False,
+    )
+    assert revoked[0].revision == 2
+    verify_request = HealthContextReadRequest(
+        operation="verify",
+        category="nutrition",
+        entity_refs=(HealthContextEntityReference(object_type="event", object_id=object_id),),
+        fields=("permission_version",),
+        max_results=1,
+        max_bytes=4096,
+    )
+    assert (
+        read_personal_ai_health_context(
+            db_session, OWNER_ID, verify_request, now=now
+        ).permission_versions
+        == ()
+    )
+
+    regranted = update_daily_item(
+        db_session,
+        OWNER_ID,
+        object_id,
+        expected_revision=2,
+        record=event,
+        cross_domain_use_allowed=True,
+    )
+    assert regranted[0].revision == 3
+    current = read_personal_ai_health_context(db_session, OWNER_ID, request, now=now)
+    current_version = current.items[0].permission_dependencies[0].version
+    verification = read_personal_ai_health_context(db_session, OWNER_ID, verify_request, now=now)
+    assert verification.permission_versions[0].version == current_version
+    assert current_version != old_version
 
 
 def test_daily_history_future_and_overlong_windows_are_rejected() -> None:
