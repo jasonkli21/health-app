@@ -112,6 +112,7 @@ describe("daily entry builders", () => {
         label: "Lunch",
         precision: "date_only",
         localDate: "2026-05-01",
+        timezone: "America/Los_Angeles",
       }),
     );
     expect(request.events?.[0]?.event.time).toEqual({

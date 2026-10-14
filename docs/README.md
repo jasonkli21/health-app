@@ -2,7 +2,7 @@
 
 Stabilization and delegated tasks: [current state](current-state.md),
 [dated evidence](stabilization-2026-10-14.md), then the
-[suite review handoff](../../personal-ai-system/stabilization/REVIEW-HANDOFF.md).
+[suite review handoff](https://github.com/jasonkli21/personal-ai-agent/blob/main/stabilization/REVIEW-HANDOFF.md).
 
 This is the first documentation stop for agents. For an ordinary task, read
 [current state](current-state.md), then follow only the route that applies.

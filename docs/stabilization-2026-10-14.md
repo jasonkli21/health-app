@@ -31,11 +31,16 @@ distinct-epoch regression and the final all-five HTTPS matrix cover the uvloop
 case. Explicit Ruff first-party ownership and generated-format globs make the
 actual root CI invocation consistent with API-local checks.
 
+Fresh UTC CI exposed one date-only meal fixture relying on the machine
+timezone. The fixture now explicitly chooses America/Los_Angeles; the production
+default remains the device timezone. The full mobile suite is rerun under UTC
+and America/Los_Angeles.
+
 ## Evidence authority
 
-[Exact commands/counts/source identity](../../personal-ai-system/stabilization/VERIFICATION.md),
-[transition verification](../../personal-ai-system/stabilization/LUNA-TRANSITION-VERIFICATION.md)
-and [review priorities](../../personal-ai-system/stabilization/REVIEW-HANDOFF.md)
+[Exact commands/counts/source identity](https://github.com/jasonkli21/personal-ai-agent/blob/main/stabilization/VERIFICATION.md),
+[transition verification](https://github.com/jasonkli21/personal-ai-agent/blob/main/stabilization/LUNA-TRANSITION-VERIFICATION.md)
+and [review priorities](https://github.com/jasonkli21/personal-ai-agent/blob/main/stabilization/REVIEW-HANDOFF.md)
 are the suite evidence index. Earlier records retain their original date/results;
 newer local evidence supersedes their unrun-local-check statements only.
 
