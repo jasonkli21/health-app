@@ -7,7 +7,7 @@ name="personal-health-api"
 version="0.0.0"
 description="Personal Health domain API"
 requires-python=">=3.12"
-dependencies=["fastapi>=0.118,<1","pydantic>=2.11,<3","pydantic-settings>=2.10,<3","sqlalchemy>=2.0,<3","alembic>=1.16,<2","psycopg[binary]>=3.2,<4","uvicorn[standard]>=0.37,<1","httpx>=0.28,<1","firebase-admin>=6.9,<8","google-cloud-storage>=3.4,<4"]
+dependencies=["fastapi>=0.118,<1","pydantic>=2.11,<3","pydantic-settings>=2.10,<3","sqlalchemy>=2.0,<3","alembic>=1.16,<2","psycopg[binary]>=3.2,<4","uvicorn[standard]>=0.37,<1","httpx>=0.28,<1","cryptography>=46,<51","google-auth[requests]>=2.59,<3","firebase-admin>=6.9,<8","google-cloud-storage>=3.4,<4"]
 
 [project.optional-dependencies]
 dev=["pytest>=8.4,<9","pytest-asyncio>=1.2,<2","ruff>=0.13,<1","mypy>=1.18,<2"]
@@ -24,3 +24,12 @@ line-length=100
 [tool.mypy]
 python_version="3.12"
 strict=true
+
+[tool.ruff.lint.isort]
+known-first-party = ["health_api"]
+
+# Shared modules use canonical 88-column formatting; glob paths work from both
+# the repository CI root and services/api. Lint/type checks still include them.
+[tool.ruff.format]
+exclude = [
+    "**/health_api/integrations/task_control.py", "**/health_api/integrations/task_wire.py"]

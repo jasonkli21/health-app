@@ -14,6 +14,7 @@ from sqlalchemy.engine import URL, make_url
 
 from health_api.domain.proposals import MAX_PROPOSAL_LIFETIME_HOURS
 from health_api.domain.schemas import validate_iana_timezone
+from health_api.integrations.task_control import SourceTaskSettings
 
 
 def _postgres_url(value: str | SecretStr) -> URL:
@@ -65,6 +66,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        hide_input_in_errors=True,
         case_sensitive=False,
     )
 
@@ -93,6 +95,8 @@ class Settings(BaseSettings):
     auth_http_timeout_seconds: int = Field(default=4, ge=1, le=15)
     auth_max_in_flight: int = Field(default=32, ge=1, le=128)
     # This read-only capability is independent of the disabled assistant message route.
+    task_control: SourceTaskSettings | None = None
+    task_google_subject: str = Field(default="", max_length=128)
     personal_ai_context_read_enabled: bool = False
     personal_ai_federation_export_enabled: bool = False
     personal_ai_context_service_audience: str = Field(default="", max_length=500)
@@ -143,13 +147,21 @@ class Settings(BaseSettings):
             raise ValueError("development authentication is allowed only in local or test mode")
         if self.auth_mode == "firebase" and not self.firebase_project_id:
             raise ValueError("FIREBASE_PROJECT_ID is required when AUTH_MODE=firebase")
+        if self.task_control is not None and (
+            self.auth_mode != "firebase"
+            or not self.personal_ai_federation_export_enabled
+            or not self.task_google_subject.strip()
+        ):
+            raise ValueError("task_control_requires_linked_firebase_federation_identity")
         if self.personal_ai_enabled:
             raise ValueError(
                 "PERSONAL_AI_ENABLED cannot be true until the Personal AI Application Integration "
                 "Contract's live identity, delegation, and messaging acceptance are implemented "
                 "and reviewed"
             )
-        if (self.personal_ai_context_read_enabled or self.personal_ai_federation_export_enabled) and (
+        if (
+            self.personal_ai_context_read_enabled or self.personal_ai_federation_export_enabled
+        ) and (
             self.auth_mode != "firebase"
             or not self.firebase_project_id
             or not self.personal_ai_context_service_audience.startswith("https://")

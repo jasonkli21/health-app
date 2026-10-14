@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from io import StringIO
 from pathlib import Path
@@ -9,10 +10,12 @@ from uuid import UUID
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
-from health_api.api.middleware import request_logger
-from health_api.main import create_app
 from sqlalchemy import Engine
 from sqlalchemy.exc import SQLAlchemyError
+from starlette.types import Message, Receive, Scope, Send
+
+from health_api.api.middleware import RequestBoundaryMiddleware, request_logger
+from health_api.main import create_app
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -143,3 +146,37 @@ def test_migration_setup_preserves_request_logging(postgres_engine: Engine) -> N
     assert records[2]["body_limit_bytes"] == 65_536
     assert all("SECRET" not in line for line in lines)
     assert all("SECRET" not in response.text for response in responses)
+
+
+def test_body_deadline_uses_loop_clock_not_logging_clock() -> None:
+    async def exercise() -> None:
+        received: list[Message] = []
+
+        async def receive() -> Message:
+            # Yield to allow an expired asyncio deadline to cancel the read.
+            await asyncio.sleep(0.001)
+            return {"type": "http.request", "body": b"{}", "more_body": False}
+
+        async def send(message: Message) -> None:
+            received.append(message)
+
+        async def app(scope: Scope, receive: Receive, send: Send) -> None:
+            assert (await receive())["body"] == b"{}"
+            await send({"type": "http.response.start", "status": 200, "headers": []})
+            await send({"type": "http.response.body", "body": b"ok"})
+
+        logging_clock = asyncio.get_running_loop().time() - 100_000
+        with patch("health_api.api.middleware.monotonic", return_value=logging_clock):
+            await RequestBoundaryMiddleware(app)(
+                {
+                    "type": "http",
+                    "method": "POST",
+                    "path": "/internal/personal-ai/commands/read",
+                    "headers": [],
+                },
+                receive,
+                send,
+            )
+        assert received[0]["status"] == 200
+
+    asyncio.run(exercise())

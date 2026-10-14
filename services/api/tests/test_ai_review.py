@@ -7,6 +7,9 @@ from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy import and_, select
+from sqlalchemy.dialects import postgresql
+
 from health_api.api.ai import (
     _decode_cursor,
     _owner_binding,
@@ -26,8 +29,6 @@ from health_api.application.ai_context_service import (
 from health_api.domain.ai import AIContextEntry, AIContextPack, AIContextRequest
 from health_api.integrations.personal_ai import create_personal_ai_adapter
 from health_api.persistence.models import EventItem, ObservationItem, PlanningResource
-from sqlalchemy import and_, select
-from sqlalchemy.dialects import postgresql
 
 OWNER = UUID("00000000-0000-0000-0000-000000000101")
 

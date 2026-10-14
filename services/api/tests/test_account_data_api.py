@@ -13,6 +13,10 @@ import pytest_asyncio
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import Engine, func, select, update
+from sqlalchemy.orm import Session, sessionmaker
+
 from health_api.application import account_data_service
 from health_api.application.account_data_service import (
     AccountDataConflict,
@@ -28,9 +32,6 @@ from health_api.integrations.firebase_auth import VerifiedIdentity
 from health_api.integrations.object_storage import ObjectCleanupPending
 from health_api.main import create_app
 from health_api.persistence.models import HealthObject, ProfileItem, User
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy import Engine, func, select, update
-from sqlalchemy.orm import Session, sessionmaker
 
 OWNER_ID = UUID("00000000-0000-0000-0000-000000000901")
 OTHER_OWNER_ID = UUID("00000000-0000-0000-0000-000000000902")
@@ -51,6 +52,17 @@ def _seed_remaining_owner_inventory(db_session: Session) -> None:
     )
     assert source_id is not None
     now = datetime.now(UTC)
+    db_session.execute(
+        tables["delegated_source_commands"]
+        .insert()
+        .values(
+            command_id=uuid4(),
+            owner_id=OWNER_ID,
+            command={"synthetic_inventory_probe": True},
+            proposal_id=None,
+            created_at=now,
+        )
+    )
 
     def add_health_object(object_id: UUID, object_type: str, domain: str, title: str) -> None:
         db_session.execute(

@@ -119,7 +119,9 @@ def read_health_federation_export(
     authoritative_empty = False
     if request.operation == "read":
         try:
-            value = ProfileSchemaRegistry.get("profile_item", profile.payload.get("schema_version", 1))
+            value = ProfileSchemaRegistry.get(
+                "profile_item", profile.payload.get("schema_version", 1)
+            )
             validated = value.model_validate(profile.payload)
         except Exception as error:
             raise HealthFederationExportDenied("health_federation_source_invalid") from error

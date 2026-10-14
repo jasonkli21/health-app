@@ -4,16 +4,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from health_api.application.ai_context_projection import _payload_search_expression
-from health_api.persistence.models import (
-    HealthObject,
-)
 from sqlalchemy import (
     Text,
     cast,
     func,
     literal_column,
     or_,
+)
+
+from health_api.application.ai_context_projection import _payload_search_expression
+from health_api.persistence.models import (
+    HealthObject,
 )
 
 

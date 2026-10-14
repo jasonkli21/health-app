@@ -6,6 +6,8 @@ from pathlib import Path
 from uuid import UUID
 
 import pytest
+from pydantic import ValidationError
+
 from health_api.domain.daily import (
     UNIT_CONVERSION_VERSION,
     convert_value,
@@ -24,7 +26,6 @@ from health_api.domain.schemas import (
     ProfileSchemaRegistry,
     validate_iana_timezone,
 )
-from pydantic import ValidationError
 
 ROOT = Path(__file__).resolve().parent
 

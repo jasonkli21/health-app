@@ -1479,3 +1479,7 @@ class OwnerErasureLedger(Base):
             name="ck_owner_erasure_ledger_retention_policy",
         ),
     )
+
+
+# Register the separate source-command owner table for migrations and erasure.
+from health_api.persistence.source_commands import DelegatedSourceCommand  # noqa: F401

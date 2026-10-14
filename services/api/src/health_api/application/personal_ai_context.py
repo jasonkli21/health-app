@@ -9,6 +9,9 @@ from typing import Any, cast
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
+from sqlalchemy import and_, select
+from sqlalchemy.orm import Session
+
 from health_api.application.ai_context_admission import _eligibility_conditions
 from health_api.domain.ai import AIResourceType
 from health_api.domain.daily import local_day_bounds
@@ -45,8 +48,6 @@ from health_api.persistence.models import (
     Source,
     User,
 )
-from sqlalchemy import and_, select
-from sqlalchemy.orm import Session
 
 MAX_CONTEXT_CANDIDATES = 1_000
 _PROFILE_CATEGORY_TO_DB = {

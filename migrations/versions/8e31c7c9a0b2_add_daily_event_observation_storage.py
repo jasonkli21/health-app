@@ -24,14 +24,10 @@ def upgrade() -> None:
         "users",
         sa.Column("daily_sequence", sa.Integer(), server_default="0", nullable=False),
     )
-    op.create_check_constraint(
-        "ck_users_daily_sequence", "users", "daily_sequence >= 0"
-    )
+    op.create_check_constraint("ck_users_daily_sequence", "users", "daily_sequence >= 0")
 
     op.drop_constraint("ck_health_objects_type_phase1", "health_objects", type_="check")
-    op.drop_constraint(
-        "ck_health_objects_domain_phase1", "health_objects", type_="check"
-    )
+    op.drop_constraint("ck_health_objects_domain_phase1", "health_objects", type_="check")
     op.create_check_constraint(
         "ck_health_objects_type",
         "health_objects",
@@ -46,15 +42,9 @@ def upgrade() -> None:
     )
 
     op.add_column("health_object_revisions", sa.Column("daily_sequence", sa.Integer()))
-    op.add_column(
-        "health_object_revisions", sa.Column("daily_object_type", sa.String(length=16))
-    )
-    op.add_column(
-        "health_object_revisions", sa.Column("daily_domain", sa.String(length=24))
-    )
-    op.add_column(
-        "health_object_revisions", sa.Column("daily_status", sa.String(length=16))
-    )
+    op.add_column("health_object_revisions", sa.Column("daily_object_type", sa.String(length=16)))
+    op.add_column("health_object_revisions", sa.Column("daily_domain", sa.String(length=24)))
+    op.add_column("health_object_revisions", sa.Column("daily_status", sa.String(length=16)))
     op.add_column(
         "health_object_revisions",
         sa.Column("daily_time_precision", sa.String(length=16)),
@@ -148,12 +138,8 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("owner_id", "object_id"),
     )
-    op.create_index(
-        "ix_events_owner_instant", "events", ["owner_id", "occurred_at", "object_id"]
-    )
-    op.create_index(
-        "ix_events_owner_date", "events", ["owner_id", "local_date", "object_id"]
-    )
+    op.create_index("ix_events_owner_instant", "events", ["owner_id", "occurred_at", "object_id"])
+    op.create_index("ix_events_owner_date", "events", ["owner_id", "local_date", "object_id"])
 
     op.create_table(
         "observations",
@@ -237,9 +223,7 @@ def upgrade() -> None:
         sa.Column("event_object_id", sa.Uuid(), nullable=False),
         sa.Column("observation_object_id", sa.Uuid(), nullable=False),
         sa.Column("role", sa.String(length=32), nullable=False),
-        sa.CheckConstraint(
-            "role = 'symptom_severity'", name="ck_event_observation_links_role"
-        ),
+        sa.CheckConstraint("role = 'symptom_severity'", name="ck_event_observation_links_role"),
         sa.ForeignKeyConstraint(
             ["owner_id", "event_object_id"],
             ["events.owner_id", "events.object_id"],
@@ -273,9 +257,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     connection = op.get_bind()
     daily_count = connection.scalar(
-        sa.text(
-            "SELECT count(*) FROM health_objects WHERE object_type IN ('event', 'observation')"
-        )
+        sa.text("SELECT count(*) FROM health_objects WHERE object_type IN ('event', 'observation')")
     )
     if daily_count:
         raise RuntimeError("refusing to downgrade while daily health objects exist")
@@ -296,12 +278,8 @@ def downgrade() -> None:
         "ix_health_revisions_owner_object_daily_sequence",
         table_name="health_object_revisions",
     )
-    op.drop_index(
-        "ix_health_revisions_owner_daily_date", table_name="health_object_revisions"
-    )
-    op.drop_index(
-        "ix_health_revisions_owner_daily_instant", table_name="health_object_revisions"
-    )
+    op.drop_index("ix_health_revisions_owner_daily_date", table_name="health_object_revisions")
+    op.drop_index("ix_health_revisions_owner_daily_instant", table_name="health_object_revisions")
     op.drop_constraint(
         "uq_health_object_revision_daily_sequence",
         "health_object_revisions",

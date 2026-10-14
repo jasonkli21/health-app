@@ -5,11 +5,12 @@ from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import Engine, event
+from sqlalchemy.exc import SQLAlchemyError
+
 from health_api.config.settings import Settings
 from health_api.main import create_app
 from health_api.persistence.database import create_database_engine
-from sqlalchemy import Engine, event
-from sqlalchemy.exc import SQLAlchemyError
 
 
 def _settings(
@@ -79,7 +80,7 @@ def test_readyz_returns_sanitized_503_on_pool_exhaustion_and_recovers(
     postgres_engine: Engine,
 ) -> None:
     engine = create_database_engine(
-        str(postgres_engine.url),
+        postgres_engine.url,
         pool_size=1,
         max_overflow=0,
         pool_timeout_seconds=0.2,
@@ -105,7 +106,7 @@ def test_readyz_bounds_slow_postgres_query_and_releases_connection(
     postgres_engine: Engine,
 ) -> None:
     engine = create_database_engine(
-        str(postgres_engine.url),
+        postgres_engine.url,
         pool_size=1,
         max_overflow=0,
         pool_timeout_seconds=0.5,

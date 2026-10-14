@@ -7,6 +7,10 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from pydantic import ValidationError
+from sqlalchemy.dialects.postgresql import dialect
+from sqlalchemy.orm import configure_mappers
+
 from health_api.api.schemas import (
     GoalCreateRequest,
     OccurrenceActionRequest,
@@ -30,9 +34,6 @@ from health_api.domain.planning import (
     validate_tracker_values,
 )
 from health_api.persistence.models import ObservationItem
-from pydantic import ValidationError
-from sqlalchemy.dialects.postgresql import dialect
-from sqlalchemy.orm import configure_mappers
 
 
 def test_all_mappers_configure_with_the_observation_tracker_fk() -> None:

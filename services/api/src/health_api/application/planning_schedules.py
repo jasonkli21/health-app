@@ -8,6 +8,10 @@ from typing import Any, Literal, cast
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
+from pydantic import ValidationError
+from sqlalchemy import and_, exists, func, or_, select
+from sqlalchemy.orm import Session
+
 from health_api.application.errors import (
     PlanningConflict,
     PlanningNotFound,
@@ -38,9 +42,6 @@ from health_api.persistence.models import (
     PlanningSchedule,
     PlanningScheduleIdentity,
 )
-from pydantic import ValidationError
-from sqlalchemy import and_, exists, func, or_, select
-from sqlalchemy.orm import Session
 
 
 def _schedule_row_for_date(

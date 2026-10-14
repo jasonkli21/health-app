@@ -18,12 +18,8 @@ def upgrade() -> None:
         "action_proposals",
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("owner_id", sa.Uuid(), nullable=False),
-        sa.Column(
-            "schema_version", sa.SmallInteger(), server_default="1", nullable=False
-        ),
-        sa.Column(
-            "state", sa.String(length=16), server_default="pending", nullable=False
-        ),
+        sa.Column("schema_version", sa.SmallInteger(), server_default="1", nullable=False),
+        sa.Column("state", sa.String(length=16), server_default="pending", nullable=False),
         sa.Column("origin_kind", sa.String(length=16), nullable=False),
         sa.Column(
             "origin_metadata",
@@ -60,20 +56,14 @@ def upgrade() -> None:
             server_default=sa.text("'{}'::jsonb"),
             nullable=False,
         ),
-        sa.CheckConstraint(
-            "schema_version = 1", name="ck_action_proposals_schema_version"
-        ),
+        sa.CheckConstraint("schema_version = 1", name="ck_action_proposals_schema_version"),
         sa.CheckConstraint(
             "state IN ('pending', 'applied', 'rejected', 'expired', 'superseded')",
             name="ck_action_proposals_state",
         ),
-        sa.CheckConstraint(
-            "origin_kind IN ('user', 'ai')", name="ck_action_proposals_origin"
-        ),
+        sa.CheckConstraint("origin_kind IN ('user', 'ai')", name="ck_action_proposals_origin"),
         sa.CheckConstraint("current_revision > 0", name="ck_action_proposals_revision"),
-        sa.CheckConstraint(
-            "length(content_hash) = 64", name="ck_action_proposals_hash"
-        ),
+        sa.CheckConstraint("length(content_hash) = 64", name="ck_action_proposals_hash"),
         sa.CheckConstraint(
             "expires_at > created_at AND expires_at <= created_at + interval '7 days'",
             name="ck_action_proposals_expiry",
@@ -120,18 +110,12 @@ def upgrade() -> None:
             server_default=sa.func.now(),
             nullable=False,
         ),
-        sa.CheckConstraint(
-            "revision > 0", name="ck_action_proposal_revisions_revision"
-        ),
+        sa.CheckConstraint("revision > 0", name="ck_action_proposal_revisions_revision"),
         sa.CheckConstraint(
             "schema_version = 1", name="ck_action_proposal_revisions_schema_version"
         ),
-        sa.CheckConstraint(
-            "length(content_hash) = 64", name="ck_action_proposal_revisions_hash"
-        ),
-        sa.CheckConstraint(
-            "actor_id = owner_id", name="ck_action_proposal_revisions_actor"
-        ),
+        sa.CheckConstraint("length(content_hash) = 64", name="ck_action_proposal_revisions_hash"),
+        sa.CheckConstraint("actor_id = owner_id", name="ck_action_proposal_revisions_actor"),
         sa.ForeignKeyConstraint(
             ["owner_id", "proposal_id"],
             ["action_proposals.owner_id", "action_proposals.id"],
@@ -169,16 +153,12 @@ def upgrade() -> None:
             server_default=sa.func.now(),
             nullable=False,
         ),
-        sa.CheckConstraint(
-            "proposal_revision > 0", name="ck_action_proposal_events_revision"
-        ),
+        sa.CheckConstraint("proposal_revision > 0", name="ck_action_proposal_events_revision"),
         sa.CheckConstraint(
             "event IN ('created', 'edited', 'applied', 'rejected', 'expired')",
             name="ck_action_proposal_events_event",
         ),
-        sa.CheckConstraint(
-            "actor_id = owner_id", name="ck_action_proposal_events_actor"
-        ),
+        sa.CheckConstraint("actor_id = owner_id", name="ck_action_proposal_events_actor"),
         sa.ForeignKeyConstraint(
             ["owner_id", "proposal_id", "proposal_revision"],
             [
@@ -218,16 +198,12 @@ def upgrade() -> None:
             server_default=sa.func.now(),
             nullable=False,
         ),
-        sa.CheckConstraint(
-            "proposal_revision > 0", name="ck_action_command_receipts_revision"
-        ),
+        sa.CheckConstraint("proposal_revision > 0", name="ck_action_command_receipts_revision"),
         sa.CheckConstraint(
             "length(idempotency_key) BETWEEN 1 AND 128",
             name="ck_action_command_receipts_key",
         ),
-        sa.CheckConstraint(
-            "length(content_hash) = 64", name="ck_action_command_receipts_hash"
-        ),
+        sa.CheckConstraint("length(content_hash) = 64", name="ck_action_command_receipts_hash"),
         sa.ForeignKeyConstraint(
             ["owner_id", "proposal_id", "proposal_revision"],
             [
@@ -250,9 +226,7 @@ def upgrade() -> None:
         ),
     )
 
-    op.add_column(
-        "health_object_revisions", sa.Column("proposal_id", sa.Uuid(), nullable=True)
-    )
+    op.add_column("health_object_revisions", sa.Column("proposal_id", sa.Uuid(), nullable=True))
     op.create_foreign_key(
         "fk_health_object_revisions_owner_proposal",
         "health_object_revisions",
@@ -281,7 +255,5 @@ def downgrade() -> None:
     )
     op.drop_table("action_proposal_events")
     op.drop_table("action_proposal_revisions")
-    op.drop_index(
-        "ix_action_proposals_owner_state_created", table_name="action_proposals"
-    )
+    op.drop_index("ix_action_proposals_owner_state_created", table_name="action_proposals")
     op.drop_table("action_proposals")

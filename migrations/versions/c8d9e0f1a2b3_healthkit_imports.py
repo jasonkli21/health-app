@@ -59,12 +59,8 @@ def upgrade() -> None:
             "'resting_heart_rate', 'heart_rate_summary')",
             name="ck_healthkit_batches_resource_type",
         ),
-        sa.CheckConstraint(
-            "policy_version = 'healthkit-v1'", name="ck_healthkit_batches_policy"
-        ),
-        sa.CheckConstraint(
-            "length(content_hash) = 64", name="ck_healthkit_batches_hash"
-        ),
+        sa.CheckConstraint("policy_version = 'healthkit-v1'", name="ck_healthkit_batches_policy"),
+        sa.CheckConstraint("length(content_hash) = 64", name="ck_healthkit_batches_hash"),
         sa.CheckConstraint(
             "created_count >= 0 AND updated_count >= 0 AND unchanged_count >= 0 AND "
             "tombstoned_count >= 0 AND correction_count >= 0 AND conflict_count >= 0",
@@ -97,15 +93,11 @@ def upgrade() -> None:
         sa.Column("object_id", sa.Uuid(), nullable=False),
         sa.Column("device_installation_id", sa.Uuid(), nullable=False),
         sa.Column("content_hash", sa.String(length=64), nullable=False),
-        sa.Column(
-            "is_aggregate", sa.Boolean(), server_default=sa.false(), nullable=False
-        ),
+        sa.Column("is_aggregate", sa.Boolean(), server_default=sa.false(), nullable=False),
         sa.Column("aggregate_date", sa.Date(), nullable=True),
         sa.Column("aggregate_timezone", sa.String(length=64), nullable=True),
         sa.Column("policy_version", sa.String(length=32), nullable=False),
-        sa.Column(
-            "analytics_selected", sa.Boolean(), server_default=sa.true(), nullable=False
-        ),
+        sa.Column("analytics_selected", sa.Boolean(), server_default=sa.true(), nullable=False),
         sa.Column("tombstoned_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
             "updated_at",
@@ -113,20 +105,14 @@ def upgrade() -> None:
             server_default=sa.func.now(),
             nullable=False,
         ),
-        sa.CheckConstraint(
-            "platform = 'apple_healthkit'", name="ck_healthkit_identity_platform"
-        ),
+        sa.CheckConstraint("platform = 'apple_healthkit'", name="ck_healthkit_identity_platform"),
         sa.CheckConstraint(
             "resource_type IN ('workouts', 'sleep', 'steps', 'weight', "
             "'resting_heart_rate', 'heart_rate_summary')",
             name="ck_healthkit_identity_resource_type",
         ),
-        sa.CheckConstraint(
-            "length(content_hash) = 64", name="ck_healthkit_identity_hash"
-        ),
-        sa.CheckConstraint(
-            "policy_version = 'healthkit-v1'", name="ck_healthkit_identity_policy"
-        ),
+        sa.CheckConstraint("length(content_hash) = 64", name="ck_healthkit_identity_hash"),
+        sa.CheckConstraint("policy_version = 'healthkit-v1'", name="ck_healthkit_identity_policy"),
         sa.CheckConstraint(
             "(is_aggregate AND aggregate_date IS NOT NULL AND aggregate_timezone IS NOT NULL) OR "
             "(NOT is_aggregate AND aggregate_date IS NULL AND aggregate_timezone IS NULL AND analytics_selected)",
@@ -144,12 +130,8 @@ def upgrade() -> None:
             ondelete="CASCADE",
             name="fk_healthkit_identity_object",
         ),
-        sa.PrimaryKeyConstraint(
-            "owner_id", "platform", "resource_type", "source_sample_id"
-        ),
-        sa.UniqueConstraint(
-            "owner_id", "object_id", name="uq_healthkit_identity_object"
-        ),
+        sa.PrimaryKeyConstraint("owner_id", "platform", "resource_type", "source_sample_id"),
+        sa.UniqueConstraint("owner_id", "object_id", name="uq_healthkit_identity_object"),
     )
     op.create_index(
         "ix_healthkit_identity_owner_aggregate",
@@ -192,25 +174,17 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     connection = op.get_bind()
-    imported_rows = connection.scalar(
-        sa.text("SELECT 1 FROM healthkit_import_identities LIMIT 1")
-    )
-    batches = connection.scalar(
-        sa.text("SELECT 1 FROM healthkit_import_batches LIMIT 1")
-    )
+    imported_rows = connection.scalar(sa.text("SELECT 1 FROM healthkit_import_identities LIMIT 1"))
+    batches = connection.scalar(sa.text("SELECT 1 FROM healthkit_import_batches LIMIT 1"))
     if imported_rows or batches:
-        raise RuntimeError(
-            "refusing to discard imported HealthKit identities or batch history"
-        )
+        raise RuntimeError("refusing to discard imported HealthKit identities or batch history")
     op.drop_table("healthkit_source_preferences")
     op.drop_index(
         "ix_healthkit_identity_owner_aggregate",
         table_name="healthkit_import_identities",
     )
     op.drop_table("healthkit_import_identities")
-    op.drop_index(
-        "ix_healthkit_batches_owner_created", table_name="healthkit_import_batches"
-    )
+    op.drop_index("ix_healthkit_batches_owner_created", table_name="healthkit_import_batches")
     op.drop_table("healthkit_import_batches")
     op.drop_constraint("ck_observations_metric_unit", "observations", type_="check")
     op.create_check_constraint(

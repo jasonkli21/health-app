@@ -80,7 +80,7 @@ resource "google_cloud_run_v2_service" "api" {
   # application verifies bearer identity on every owner-scoped route.
   invoker_iam_disabled = true
   # Cloud Run readiness probes are currently a preview feature.
-  launch_stage         = "BETA"
+  launch_stage = "BETA"
 
   template {
     service_account                  = google_service_account.runtime.email

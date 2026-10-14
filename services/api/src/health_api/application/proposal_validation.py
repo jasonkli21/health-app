@@ -5,6 +5,10 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
+from pydantic import ValidationError
+from sqlalchemy import select, tuple_
+from sqlalchemy.orm import Session
+
 from health_api.application.daily_service import (
     CreateDailyEntry,
     CreateDailyEvent,
@@ -48,9 +52,6 @@ from health_api.persistence.models import (
     HealthObject,
     HealthObjectRevision,
 )
-from pydantic import ValidationError
-from sqlalchemy import select, tuple_
-from sqlalchemy.orm import Session
 
 
 def _validate_evidence(session: Session, owner_id: UUID, evidence: list[EvidenceReference]) -> None:

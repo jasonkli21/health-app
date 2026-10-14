@@ -7,11 +7,12 @@ from uuid import UUID
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+
 from health_api.api.dependencies import get_current_owner
 from health_api.config.settings import Settings
 from health_api.domain.ai import AIContextPack
 from health_api.main import create_app
-from sqlalchemy import create_engine
 
 OWNER_ID = UUID("00000000-0000-0000-0000-000000000304")
 

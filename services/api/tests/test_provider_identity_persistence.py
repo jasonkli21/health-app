@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 
-from health_api.application.provider_identity import resolve_provider_identity
-from health_api.persistence.models import ProviderIdentity, User
 from sqlalchemy import func, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
+
+from health_api.application.provider_identity import resolve_provider_identity
+from health_api.persistence.models import ProviderIdentity, User
 
 
 def test_concurrent_first_logins_create_one_internal_principal(

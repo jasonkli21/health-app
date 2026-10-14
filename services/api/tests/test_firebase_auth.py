@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+
 from health_api.integrations.firebase_auth import (
     FirebaseTokenVerifier,
     TokenVerificationError,
@@ -180,3 +181,41 @@ def test_verifier_saturation_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None
     finally:
         verifier._in_flight.release()
         verifier._in_flight.release()
+
+
+@pytest.mark.parametrize("invalid", ["unlinked", "disabled", "revoked", "unknown_revocation"])
+def test_google_delegation_rechecks_current_provider_link_and_revocation(
+    monkeypatch: pytest.MonkeyPatch, invalid: str
+) -> None:
+    _admin, auth, verifier = _wire_sdk(monkeypatch, {})
+    record = SimpleNamespace(
+        uid="synthetic-firebase-owner",
+        disabled=invalid == "disabled",
+        provider_data=[]
+        if invalid == "unlinked"
+        else [SimpleNamespace(provider_id="google.com", uid="synthetic-google-subject")],
+        tokens_valid_after_timestamp=101000
+        if invalid == "revoked"
+        else None
+        if invalid == "unknown_revocation"
+        else 0,
+    )
+    auth.get_user_by_provider_uid = lambda *_args, **_kwargs: record
+    with pytest.raises(TokenVerificationError):
+        verifier.resolve_google_delegation("synthetic-google-subject", 100)
+
+
+def test_google_delegation_preserves_recent_verified_authentication_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _admin, auth, verifier = _wire_sdk(monkeypatch, {})
+    auth.get_user_by_provider_uid = lambda *_args, **_kwargs: SimpleNamespace(
+        uid="synthetic-firebase-owner",
+        disabled=False,
+        provider_data=[SimpleNamespace(provider_id="google.com", uid="synthetic-google-subject")],
+        tokens_valid_after_timestamp=99000,
+    )
+    assert (
+        verifier.resolve_google_delegation("synthetic-google-subject", 100)
+        == "synthetic-firebase-owner"
+    )

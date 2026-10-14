@@ -427,6 +427,28 @@ export interface components {
       precision: "date_only";
       timezone: string;
     };
+    DelegatedSourceCommand: {
+      command_id: string;
+      context_choice_id: string;
+      destination_application_id?: "shopping";
+      expected_domain_version: string;
+      expected_source_version: string;
+      expires_at: string;
+      operation_contract_fingerprint: string;
+      operation_id: string;
+      operation_version: number;
+      payload: {
+        [key: string]: components["schemas"]["JsonValue"];
+      };
+      payload_schema_id: string;
+      rationale: string;
+      schema_version?: "suite-source-command-v1";
+      source_application_id: "finance" | "travel" | "health";
+      source_entity_id: string;
+      source_entity_type: string;
+      target_entity_id: string;
+      workspace_id?: null;
+    };
     DistanceQuantity: {
       unit: "m" | "km" | "mi";
       value: components["schemas"]["FiniteDailyNumber"];
@@ -442,6 +464,14 @@ export interface components {
     EnteredQuantity: {
       unit: components["schemas"]["ProfileUnit"];
       value: components["schemas"]["FiniteDailyNumber"];
+    };
+    ErgonomicTaskChoice: {
+      command_id: string;
+      context_choice_id: string;
+      expected_project_revision: number;
+      expected_source_version: string;
+      object_id: string;
+      shopping_project_id: string;
     };
     ErrorResponse: {
       code: string;
@@ -724,6 +754,9 @@ export interface components {
       resource_type: "steps" | "heart_rate_summary";
       revision: number;
     };
+    HTTPValidationError: {
+      detail?: Array<components["schemas"]["ValidationError"]>;
+    };
     InsightEvidenceReference: {
       object_id: string;
       object_type: "derived_signal" | "event" | "observation";
@@ -778,6 +811,7 @@ export interface components {
       precision: "instant";
       timezone: string;
     };
+    JsonValue: unknown;
     LifecycleUpdateRequest: {
       ai_use_allowed?: boolean | null;
       cross_domain_use_allowed?: boolean | null;
@@ -1442,6 +1476,30 @@ export interface components {
       label?: string;
       quality?: number | null;
     };
+    SourceTaskConfirmation: {
+      binding: string;
+      confirmation_id: string;
+    };
+    SourceTaskStatus: {
+      apply_available: boolean;
+      binding: string;
+      confirmation_id?: string | null;
+      domain_version?: string | null;
+      outcome_code?: string | null;
+      preview?: string | null;
+      proposal_id: string;
+      schema_version?: "suite-source-task-status-v1";
+      state:
+        | "proposed"
+        | "validated"
+        | "confirmed"
+        | "executing"
+        | "reconciling"
+        | "applied"
+        | "rejected"
+        | "uncertain"
+        | "expired";
+    };
     StepCountValueV1: {
       metric: "steps";
       unit?: "steps";
@@ -1607,6 +1665,13 @@ export interface components {
       unit: string;
     };
     UTCInstant: string;
+    ValidationError: {
+      ctx?: Record<string, never>;
+      input?: unknown;
+      loc: Array<string | number>;
+      msg: string;
+      type: string;
+    };
     WorkoutEventV1: {
       distance?: components["schemas"]["DistanceQuantity"] | null;
       duration?: components["schemas"]["DurationQuantity"] | null;
@@ -1804,6 +1869,17 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  controlShoppingSourceCommand: {
+    path: {
+      command_id: string;
+      action: "validate" | "confirm" | "apply" | "reconcile";
+    };
+    requestBody: components["schemas"]["SourceTaskConfirmation"] | null;
+    responses: {
+      "200": components["schemas"]["SourceTaskStatus"];
+      "422": components["schemas"]["HTTPValidationError"];
+    };
+  };
   createActionProposal: {
     requestBody: components["schemas"]["ProposalCreateRequest"];
     responses: {
@@ -1916,6 +1992,13 @@ export interface operations {
       "413": components["schemas"]["ErrorResponse"];
       "422": components["schemas"]["ErrorResponse"];
       "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  createShoppingSourceCommand: {
+    requestBody: components["schemas"]["ErgonomicTaskChoice"];
+    responses: {
+      "201": components["schemas"]["DelegatedSourceCommand"];
+      "422": components["schemas"]["HTTPValidationError"];
     };
   };
   createTracker: {
@@ -2251,6 +2334,22 @@ export interface operations {
       "413": components["schemas"]["ErrorResponse"];
       "422": components["schemas"]["ErrorResponse"];
       "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  getShoppingSourceCommandStatus: {
+    path: {
+      command_id: string;
+    };
+    responses: {
+      "200": components["schemas"]["SourceTaskStatus"];
+      "422": components["schemas"]["HTTPValidationError"];
+    };
+  };
+  getShoppingTaskCapabilities: {
+    responses: {
+      "200": {
+        [key: string]: boolean;
+      };
     };
   };
   getToday: {
@@ -2708,6 +2807,13 @@ export interface operations {
       "503": components["schemas"]["ErrorResponse"];
     };
   };
+  listShoppingTaskChoices: {
+    responses: {
+      "200": {
+        [key: string]: unknown;
+      };
+    };
+  };
   listTrackerHistory: {
     path: {
       tracker_id: string;
@@ -2861,6 +2967,15 @@ export interface operations {
       "413": components["schemas"]["ErrorResponse"];
       "422": components["schemas"]["ErrorResponse"];
       "503": components["schemas"]["ErrorResponse"];
+    };
+  };
+  submitShoppingSourceCommand: {
+    path: {
+      command_id: string;
+    };
+    responses: {
+      "200": components["schemas"]["SourceTaskStatus"];
+      "422": components["schemas"]["HTTPValidationError"];
     };
   };
   transitionContext: {
@@ -3231,6 +3346,18 @@ export class HealthApiClient {
     );
   }
 
+  async controlShoppingSourceCommand(
+    path: operations["controlShoppingSourceCommand"]["path"],
+    requestBody: operations["controlShoppingSourceCommand"]["requestBody"],
+  ): Promise<components["schemas"]["SourceTaskStatus"]> {
+    return this.request<components["schemas"]["SourceTaskStatus"]>(
+      "POST",
+      `/shopping-tasks/commands/${encodeURIComponent(path.command_id)}/${encodeURIComponent(path.action)}`,
+      undefined,
+      requestBody,
+    );
+  }
+
   async createActionProposal(
     requestBody: operations["createActionProposal"]["requestBody"],
   ): Promise<components["schemas"]["ProposalState"]> {
@@ -3336,6 +3463,17 @@ export class HealthApiClient {
     return this.request<components["schemas"]["RegimenResponse"]>(
       "POST",
       `/regimens`,
+      undefined,
+      requestBody,
+    );
+  }
+
+  async createShoppingSourceCommand(
+    requestBody: operations["createShoppingSourceCommand"]["requestBody"],
+  ): Promise<components["schemas"]["DelegatedSourceCommand"]> {
+    return this.request<components["schemas"]["DelegatedSourceCommand"]>(
+      "POST",
+      `/shopping-tasks/commands`,
       undefined,
       requestBody,
     );
@@ -3624,6 +3762,25 @@ export class HealthApiClient {
       undefined,
       undefined,
     );
+  }
+
+  async getShoppingSourceCommandStatus(
+    path: operations["getShoppingSourceCommandStatus"]["path"],
+  ): Promise<components["schemas"]["SourceTaskStatus"]> {
+    return this.request<components["schemas"]["SourceTaskStatus"]>(
+      "GET",
+      `/shopping-tasks/commands/${encodeURIComponent(path.command_id)}`,
+      undefined,
+      undefined,
+    );
+  }
+
+  async getShoppingTaskCapabilities(): Promise<{
+    [key: string]: boolean;
+  }> {
+    return this.request<{
+      [key: string]: boolean;
+    }>("GET", `/shopping-tasks/capabilities`, undefined, undefined);
   }
 
   async getToday(
@@ -3947,6 +4104,14 @@ export class HealthApiClient {
     );
   }
 
+  async listShoppingTaskChoices(): Promise<{
+    [key: string]: unknown;
+  }> {
+    return this.request<{
+      [key: string]: unknown;
+    }>("GET", `/shopping-tasks/choices`, undefined, undefined);
+  }
+
   async listTrackerHistory(
     path: operations["listTrackerHistory"]["path"],
     query?: operations["listTrackerHistory"]["query"],
@@ -4077,6 +4242,17 @@ export class HealthApiClient {
     return this.request<
       components["schemas"]["HealthKitSourcePreferenceResponse"]
     >("PUT", `/imports/healthkit/source-preferences`, undefined, requestBody);
+  }
+
+  async submitShoppingSourceCommand(
+    path: operations["submitShoppingSourceCommand"]["path"],
+  ): Promise<components["schemas"]["SourceTaskStatus"]> {
+    return this.request<components["schemas"]["SourceTaskStatus"]>(
+      "POST",
+      `/shopping-tasks/commands/${encodeURIComponent(path.command_id)}/submit`,
+      undefined,
+      undefined,
+    );
   }
 
   async transitionContext(

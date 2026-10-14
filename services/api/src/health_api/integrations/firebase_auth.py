@@ -111,6 +111,13 @@ class FirebaseTokenVerifier:
             self._in_flight.release()
 
     def resolve_google_provider_uid(self, google_subject: str) -> str:
+        return self._resolve_google_owner(google_subject, authenticated_at=None)
+
+    def resolve_google_delegation(self, google_subject: str, authenticated_at: int) -> str:
+        """Current linked account and revocation epoch for a verified upstream event."""
+        return self._resolve_google_owner(google_subject, authenticated_at=authenticated_at)
+
+    def _resolve_google_owner(self, google_subject: str, *, authenticated_at: int | None) -> str:
         """Resolve only a Google identity already linked to a Firebase account."""
         if not google_subject or len(google_subject) > 128:
             raise TokenVerificationError
@@ -132,9 +139,7 @@ class FirebaseTokenVerifier:
                 except ValueError:
                     app = firebase_admin.get_app(self._app_name)
             try:
-                user = firebase_auth.get_user_by_provider_uid(
-                    "google.com", google_subject, app=app
-                )
+                user = firebase_auth.get_user_by_provider_uid("google.com", google_subject, app=app)
             except (
                 firebase_auth.UserNotFoundError,
                 firebase_auth.UserDisabledError,
@@ -143,9 +148,10 @@ class FirebaseTokenVerifier:
                 raise TokenVerificationError from exc
             except firebase_admin.exceptions.FirebaseError as exc:
                 raise VerifierUnavailable from exc
+            user_uid = getattr(user, "uid", None)
             if (
                 getattr(user, "disabled", True)
-                or not isinstance(getattr(user, "uid", None), str)
+                or not isinstance(user_uid, str)
                 or not any(
                     getattr(provider, "provider_id", None) == "google.com"
                     and getattr(provider, "uid", None) == google_subject
@@ -153,7 +159,16 @@ class FirebaseTokenVerifier:
                 )
             ):
                 raise TokenVerificationError
-            return user.uid
+            if authenticated_at is not None:
+                revoked_after = getattr(user, "tokens_valid_after_timestamp", None)
+                if (
+                    type(authenticated_at) is not int
+                    or type(revoked_after) is not int
+                    or revoked_after < 0
+                    or authenticated_at * 1000 < revoked_after
+                ):
+                    raise TokenVerificationError
+            return user_uid
         except (TokenVerificationError, VerifierUnavailable):
             raise
         except Exception as exc:

@@ -3,6 +3,7 @@
 from typing import Any
 
 from sqlalchemy import Engine, create_engine, event
+from sqlalchemy.engine import URL
 from sqlalchemy.orm import Session, sessionmaker
 
 _PRE_PING_STATEMENT_TIMEOUT = "1000ms"
@@ -14,7 +15,7 @@ def _set_local_statement_timeout(dbapi_connection: Any, value: str) -> None:
 
 
 def create_database_engine(
-    database_url: str,
+    database_url: str | URL,
     *,
     pool_size: int = 5,
     max_overflow: int = 0,

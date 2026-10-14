@@ -6,6 +6,10 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 from uuid import UUID
 
+from sqlalchemy import and_, or_, select, tuple_
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
 from health_api.application.envelope_service import unit_of_work
 from health_api.application.errors import (
     ActionProposalConflict,
@@ -33,9 +37,6 @@ from health_api.persistence.models import (
     ActionProposalEvent,
     ActionProposalRevision,
 )
-from sqlalchemy import and_, or_, select, tuple_
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
 
 def create_action_proposal(

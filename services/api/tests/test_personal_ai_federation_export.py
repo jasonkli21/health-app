@@ -77,7 +77,9 @@ def _row(entity_id: UUID, value: object):
 
 def test_health_federation_export_is_a_narrow_complete_source_projection() -> None:
     entity_id = uuid4()
-    session = _QueryCheckingSession(_row(entity_id, {"type": "text_list", "value": ["synthetic allergy"]}))
+    session = _QueryCheckingSession(
+        _row(entity_id, {"type": "text_list", "value": ["synthetic allergy"]})
+    )
 
     response = read_health_federation_export(
         session, OWNER_ID, _request(entity_id), now=datetime(2026, 10, 11, tzinfo=UTC)
@@ -86,9 +88,7 @@ def test_health_federation_export_is_a_narrow_complete_source_projection() -> No
     assert response.complete is True
     assert response.authoritative_empty is False
     assert response.continuation is None
-    assert response.item.payload.model_dump() == {
-        "dietary_restrictions": ("synthetic allergy",)
-    }
+    assert response.item.payload.model_dump() == {"dietary_restrictions": ("synthetic allergy",)}
     assert response.item.source_revision == 3
     assert response.item.sensitivity == "restricted"
     assert len(response.item.permission_dependencies) == 1
@@ -122,9 +122,7 @@ def test_health_federation_export_keeps_authoritative_empty_and_verifies_current
 def test_health_federation_export_denies_missing_revoked_or_unsupported_values() -> None:
     entity_id = uuid4()
     with pytest.raises(HealthFederationExportDenied, match="health_federation_export_denied"):
-        read_health_federation_export(
-            _QueryCheckingSession(None), OWNER_ID, _request(entity_id)
-        )
+        read_health_federation_export(_QueryCheckingSession(None), OWNER_ID, _request(entity_id))
 
     unsupported = _QueryCheckingSession(_row(entity_id, {"type": "boolean", "value": True}))
     with pytest.raises(HealthFederationExportDenied, match="value_type_unsupported"):

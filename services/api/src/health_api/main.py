@@ -22,6 +22,7 @@ from health_api.api.personal_ai_context import router as personal_ai_context_rou
 from health_api.api.planning import router as planning_router
 from health_api.api.profile import router as profile_router
 from health_api.api.proposals import router as proposals_router
+from health_api.api.shopping_tasks import router as shopping_tasks_router
 from health_api.config.settings import Settings, get_settings
 from health_api.integrations.firebase_auth import FirebaseTokenVerifier, IdentityVerifier
 from health_api.integrations.object_storage import create_object_storage
@@ -94,7 +95,11 @@ def create_app(
     app.include_router(analytics_router)
     app.include_router(healthkit_import_router)
     app.include_router(account_data_router)
-    if configured_settings.personal_ai_context_read_enabled:
+    app.include_router(shopping_tasks_router)
+    if (
+        configured_settings.personal_ai_context_read_enabled
+        or configured_settings.personal_ai_federation_export_enabled
+    ):
         app.include_router(personal_ai_context_router)
 
     @app.get("/healthz", tags=["system"], operation_id="healthcheck")

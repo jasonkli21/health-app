@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from uuid import UUID, uuid4
 
-from health_api.persistence.models import ProviderIdentity, User
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
+
+from health_api.persistence.models import ProviderIdentity, User
 
 
 def resolve_provider_identity(

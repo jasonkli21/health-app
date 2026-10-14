@@ -7,6 +7,10 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import UUID
 
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
 from health_api.application.daily_service import (
     CreateDailyEntry,
     CreateDailyEvent,
@@ -68,9 +72,6 @@ from health_api.persistence.models import (
     Source,
     User,
 )
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
 
 @dataclass(frozen=True)

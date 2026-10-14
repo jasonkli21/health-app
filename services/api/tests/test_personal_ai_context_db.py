@@ -38,6 +38,7 @@ FIREBASE_ISSUER = "https://securetoken.google.com/health-test1"
 
 def _seed_owner(session: Session) -> None:
     session.add(User(id=OWNER_ID, display_timezone="America/Los_Angeles"))
+    session.flush()
     session.add(
         ProviderIdentity(
             issuer=FIREBASE_ISSUER,
@@ -205,20 +206,22 @@ def test_catalog_and_profile_read_require_both_health_permissions(db_session: Se
     # alter the local preview's established ai_use_allowed rule.
     local_object = db_session.get(HealthObject, local_only.id)
     assert local_object is not None and local_object.ai_use_allowed is True
-    local_candidate = db_session.scalar(
-        select(HealthObject.id).where(
-            *_eligibility_conditions(
-                OWNER_ID,
-                object_type="profile_item",
-                payload=ProfileItem.payload,
-                as_of=now,
-                start_date=now.date(),
-                start_at=now,
-                end_date=now.date(),
+    local_candidates = set(
+        db_session.scalars(
+            select(HealthObject.id).where(
+                *_eligibility_conditions(
+                    OWNER_ID,
+                    object_type="profile_item",
+                    payload=ProfileItem.payload,
+                    as_of=now,
+                    start_date=now.date(),
+                    start_at=now,
+                    end_date=now.date(),
+                )
             )
         )
     )
-    assert local_candidate == local_only.id
+    assert local_only.id in local_candidates
 
 
 def test_health_federation_export_is_narrow_owner_scoped_revisioned_and_revocable(
@@ -250,9 +253,7 @@ def test_health_federation_export_is_narrow_owner_scoped_revisioned_and_revocabl
     assert response.authoritative_empty is False
     assert response.continuation is None
     assert response.item.category == "dietary_restrictions"
-    assert response.item.payload.model_dump() == {
-        "dietary_restrictions": ("synthetic allergy",)
-    }
+    assert response.item.payload.model_dump() == {"dietary_restrictions": ("synthetic allergy",)}
     assert response.item.sensitivity == "restricted"
     assert response.item.source_revision == shared.revision
     assert response.item.permission_dependencies[0].version.endswith(
@@ -303,9 +304,7 @@ def test_health_federation_export_is_narrow_owner_scoped_revisioned_and_revocabl
         fields=("permission_version",),
     )
     with pytest.raises(HealthFederationExportDenied):
-        read_health_federation_export(
-            db_session, OWNER_ID, verify, now=datetime.now(UTC)
-        )
+        read_health_federation_export(db_session, OWNER_ID, verify, now=datetime.now(UTC))
 
 
 def test_bounded_daily_read_preserves_time_units_quality_and_unknown_uncertainty(

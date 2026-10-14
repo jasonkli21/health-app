@@ -9,6 +9,9 @@ from uuid import uuid4
 import pytest
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 from health_api.api.dependencies import get_current_owner, get_session, get_settings
 from health_api.api.errors import APIError
 from health_api.api.proposals import create_proposal, get_proposal, reject_proposal, router
@@ -29,8 +32,6 @@ from health_api.domain.proposals import (
 from health_api.domain.schemas import ProfilePayloadV1
 from health_api.main import create_app
 from health_api.persistence.models import ActionCommandReceipt, ActionProposal, HealthObject, User
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 
 def _profile() -> ProfilePayloadV1:

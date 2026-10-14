@@ -9,6 +9,10 @@ from typing import Any, Literal, cast
 from uuid import UUID, uuid5
 from zoneinfo import ZoneInfo
 
+from sqlalchemy import and_, or_, select
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.orm import Session
+
 from health_api.application.analytics_computation import _tracker_metric_parts
 from health_api.application.analytics_contracts import (
     AnalyticsConflict,
@@ -46,9 +50,6 @@ from health_api.persistence.models import (
     Source,
     User,
 )
-from sqlalchemy import and_, or_, select
-from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.orm import Session
 
 
 def _source(session: Session, owner_id: UUID, kind: Literal["manual", "system"]) -> Source:

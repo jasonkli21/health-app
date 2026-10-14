@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -83,8 +84,44 @@ class RequestBoundaryMiddleware:
         chunks: list[bytes] = []
         total = 0
         more_body = True
+        # asyncio deadlines use the loop clock; uvloop can have a different
+        # epoch from time.monotonic(), which is used only for log durations.
+        body_deadline = asyncio.get_running_loop().time() + (
+            3.0
+            if scope.get("path")
+            in {
+                "/internal/personal-ai/commands/read",
+                "/v1/integrations/personal-ai/federation-export",
+            }
+            else 10.0
+        )
         while more_body:
-            message = await receive()
+            try:
+                async with asyncio.timeout_at(body_deadline):
+                    message = await receive()
+            except TimeoutError:
+                status = 408
+                body = json.dumps(
+                    {
+                        "code": "request_body_timeout",
+                        "message": "Request body timed out.",
+                        "field_errors": None,
+                        "request_id": request_id,
+                    }
+                ).encode()
+                await send(
+                    {
+                        "type": "http.response.start",
+                        "status": status,
+                        "headers": [
+                            (b"content-type", b"application/json"),
+                            (b"x-request-id", request_id.encode("ascii")),
+                        ],
+                    }
+                )
+                await send({"type": "http.response.body", "body": body, "more_body": False})
+                log_completion()
+                return
             if message["type"] == "http.disconnect":
                 return
             chunk = message.get("body", b"")

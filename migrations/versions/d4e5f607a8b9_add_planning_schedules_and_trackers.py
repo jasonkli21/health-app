@@ -38,9 +38,7 @@ def upgrade() -> None:
         "('planning', 'nutrition', 'exercise', 'sleep', 'symptoms', 'measurements', 'general'))",
     )
 
-    op.alter_column(
-        "observations", "numeric_value", existing_type=sa.Float(), nullable=True
-    )
+    op.alter_column("observations", "numeric_value", existing_type=sa.Float(), nullable=True)
     op.add_column("observations", sa.Column("tracker_id", sa.Uuid(), nullable=True))
     op.add_column(
         "observations",
@@ -48,9 +46,7 @@ def upgrade() -> None:
     )
     op.add_column(
         "observations",
-        sa.Column(
-            "tracker_values", postgresql.JSONB(astext_type=sa.Text()), nullable=True
-        ),
+        sa.Column("tracker_values", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     )
     op.drop_constraint("ck_observations_metric", "observations", type_="check")
     op.create_check_constraint(
@@ -80,9 +76,7 @@ def upgrade() -> None:
         "(metric_key <> 'symptom_severity' OR "
         "(numeric_value >= 0 AND numeric_value <= 10 AND numeric_value = trunc(numeric_value))))",
     )
-    op.drop_constraint(
-        "ck_observations_payload_consistency", "observations", type_="check"
-    )
+    op.drop_constraint("ck_observations_payload_consistency", "observations", type_="check")
     op.create_check_constraint(
         "ck_observations_payload_consistency",
         "observations",
@@ -180,9 +174,7 @@ def upgrade() -> None:
             name="ck_planning_links_target",
         ),
         sa.CheckConstraint("position >= 0", name="ck_planning_links_position"),
-        sa.CheckConstraint(
-            "priority BETWEEN 0 AND 100", name="ck_planning_links_priority"
-        ),
+        sa.CheckConstraint("priority BETWEEN 0 AND 100", name="ck_planning_links_priority"),
         sa.ForeignKeyConstraint(
             ["owner_id", "parent_object_id"],
             ["planning_resources.owner_id", "planning_resources.object_id"],
@@ -260,9 +252,7 @@ def upgrade() -> None:
         sa.Column("parent_object_id", sa.Uuid(), nullable=False),
         sa.Column("item_id", sa.Uuid(), nullable=True),
         sa.Column("effective_from", sa.Date(), nullable=False),
-        sa.Column(
-            "definition", postgresql.JSONB(astext_type=sa.Text()), nullable=False
-        ),
+        sa.Column("definition", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -313,9 +303,7 @@ def upgrade() -> None:
         sa.Column("occurrence_key", sa.String(length=160), nullable=False),
         sa.Column("schedule_id", sa.Uuid(), nullable=False),
         sa.Column("expected_schedule_revision", sa.SmallInteger(), nullable=False),
-        sa.Column(
-            "override_revision", sa.SmallInteger(), server_default="1", nullable=False
-        ),
+        sa.Column("override_revision", sa.SmallInteger(), server_default="1", nullable=False),
         sa.Column("state", sa.String(length=16), nullable=False),
         sa.Column("rescheduled_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("linked_event_id", sa.Uuid(), nullable=True),
@@ -380,9 +368,7 @@ def upgrade() -> None:
             "revision > 0 AND schedule_revision > 0",
             name="ck_occurrence_actions_revision",
         ),
-        sa.CheckConstraint(
-            "actor_id = owner_id", name="ck_occurrence_actions_owner_actor"
-        ),
+        sa.CheckConstraint("actor_id = owner_id", name="ck_occurrence_actions_owner_actor"),
         sa.CheckConstraint(
             "action IN ('completed', 'skipped', 'rescheduled')",
             name="ck_occurrence_actions_state",
@@ -415,9 +401,7 @@ def upgrade() -> None:
         sa.Column("owner_id", sa.Uuid(), nullable=False),
         sa.Column("tracker_id", sa.Uuid(), nullable=False),
         sa.Column("version", sa.SmallInteger(), nullable=False),
-        sa.Column(
-            "definition", postgresql.JSONB(astext_type=sa.Text()), nullable=False
-        ),
+        sa.Column("definition", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -462,9 +446,7 @@ def downgrade() -> None:
         table_name="planning_occurrence_overrides",
     )
     op.drop_table("planning_occurrence_overrides")
-    op.drop_index(
-        "ix_planning_schedules_owner_parent_effective", table_name="planning_schedules"
-    )
+    op.drop_index("ix_planning_schedules_owner_parent_effective", table_name="planning_schedules")
     op.drop_table("planning_schedules")
     op.drop_index(
         "uq_planning_schedule_identity_parent_without_item",
@@ -473,14 +455,10 @@ def downgrade() -> None:
     op.drop_table("planning_schedule_identities")
     op.drop_index("ix_planning_links_owner_target", table_name="planning_links")
     op.drop_table("planning_links")
-    op.drop_index(
-        "ix_planning_resources_owner_kind_lifecycle", table_name="planning_resources"
-    )
+    op.drop_index("ix_planning_resources_owner_kind_lifecycle", table_name="planning_resources")
     op.drop_table("planning_resources")
     op.drop_constraint("ck_observations_tracker_shape", "observations", type_="check")
-    op.drop_constraint(
-        "fk_observations_owner_tracker", "observations", type_="foreignkey"
-    )
+    op.drop_constraint("fk_observations_owner_tracker", "observations", type_="foreignkey")
     for name in (
         "ck_observations_payload_consistency",
         "ck_observations_numeric_value",
@@ -518,9 +496,7 @@ def downgrade() -> None:
     op.drop_column("observations", "tracker_values")
     op.drop_column("observations", "tracker_schema_version")
     op.drop_column("observations", "tracker_id")
-    op.alter_column(
-        "observations", "numeric_value", existing_type=sa.Float(), nullable=False
-    )
+    op.alter_column("observations", "numeric_value", existing_type=sa.Float(), nullable=False)
     op.drop_constraint("ck_health_objects_domain_type", "health_objects", type_="check")
     op.drop_constraint("ck_health_objects_type", "health_objects", type_="check")
     op.create_check_constraint(

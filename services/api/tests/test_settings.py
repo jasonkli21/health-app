@@ -1,8 +1,9 @@
 from uuid import UUID
 
 import pytest
-from health_api.config.settings import Settings, migration_database_url
 from pydantic import ValidationError
+
+from health_api.config.settings import Settings, migration_database_url
 
 POOL_URL = "postgresql+psycopg://api:secret@ep-health-pooler.us-east-2.aws.neon.tech/health?sslmode=verify-full"
 DIRECT_URL = "postgresql+psycopg://migrator:secret@ep-health.us-east-2.aws.neon.tech/health?sslmode=verify-full"

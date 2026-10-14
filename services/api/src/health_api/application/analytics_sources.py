@@ -7,6 +7,10 @@ from typing import Any
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
+from pydantic import ValidationError
+from sqlalchemy import and_, or_, select, text
+from sqlalchemy.orm import Session
+
 from health_api.application.analytics_computation import (
     _series_from_snapshot,
     _tracker_metric_label,
@@ -47,9 +51,6 @@ from health_api.persistence.models import (
     TrackerSchemaVersion,
     User,
 )
-from pydantic import ValidationError
-from sqlalchemy import and_, or_, select, text
-from sqlalchemy.orm import Session
 
 ANALYTICS_QUERY_TIMEOUT_MS = 2_000
 

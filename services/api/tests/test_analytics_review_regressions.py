@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+
 from health_api.application.analytics_artifacts import _snapshot
 from health_api.application.analytics_computation import (
     _series_from_snapshot,

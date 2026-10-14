@@ -6,12 +6,13 @@ from uuid import UUID, uuid4
 
 import pytest
 import pytest_asyncio
-from health_api.config.settings import Settings
-from health_api.main import create_app
-from health_api.persistence.models import HealthObject
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import Engine, update
 from sqlalchemy.orm import Session
+
+from health_api.config.settings import Settings
+from health_api.main import create_app
+from health_api.persistence.models import HealthObject
 
 OWNER_ID = UUID("00000000-0000-0000-0000-000000000303")
 

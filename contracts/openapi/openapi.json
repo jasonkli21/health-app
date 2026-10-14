@@ -2032,6 +2032,129 @@
         "title": "DateOnlyTimePoint",
         "type": "object"
       },
+      "DelegatedSourceCommand": {
+        "additionalProperties": false,
+        "description": "Immutable, source-owned user choice. Grant handles are selectors, not proofs.",
+        "properties": {
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "context_choice_id": {
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "title": "Context Choice Id",
+            "type": "string"
+          },
+          "destination_application_id": {
+            "const": "shopping",
+            "default": "shopping",
+            "title": "Destination Application Id",
+            "type": "string"
+          },
+          "expected_domain_version": {
+            "pattern": "^[1-9][0-9]{0,17}$",
+            "title": "Expected Domain Version",
+            "type": "string"
+          },
+          "expected_source_version": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Expected Source Version",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "operation_contract_fingerprint": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Operation Contract Fingerprint",
+            "type": "string"
+          },
+          "operation_id": {
+            "pattern": "^[a-z][a-z0-9_.-]{1,80}$",
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "operation_version": {
+            "minimum": 1.0,
+            "title": "Operation Version",
+            "type": "integer"
+          },
+          "payload": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Payload",
+            "type": "object"
+          },
+          "payload_schema_id": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Payload Schema Id",
+            "type": "string"
+          },
+          "rationale": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Rationale",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "suite-source-command-v1",
+            "default": "suite-source-command-v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source_application_id": {
+            "enum": ["finance", "travel", "health"],
+            "title": "Source Application Id",
+            "type": "string"
+          },
+          "source_entity_id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Source Entity Id",
+            "type": "string"
+          },
+          "source_entity_type": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Source Entity Type",
+            "type": "string"
+          },
+          "target_entity_id": {
+            "format": "uuid",
+            "title": "Target Entity Id",
+            "type": "string"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "null"
+          }
+        },
+        "required": [
+          "source_application_id",
+          "command_id",
+          "context_choice_id",
+          "source_entity_type",
+          "source_entity_id",
+          "expected_source_version",
+          "target_entity_id",
+          "expected_domain_version",
+          "operation_id",
+          "operation_version",
+          "operation_contract_fingerprint",
+          "payload_schema_id",
+          "payload",
+          "rationale",
+          "expires_at"
+        ],
+        "title": "DelegatedSourceCommand",
+        "type": "object"
+      },
       "DistanceQuantity": {
         "additionalProperties": false,
         "properties": {
@@ -2092,6 +2215,52 @@
         },
         "required": ["value", "unit"],
         "title": "EnteredQuantity",
+        "type": "object"
+      },
+      "ErgonomicTaskChoice": {
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "context_choice_id": {
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "title": "Context Choice Id",
+            "type": "string"
+          },
+          "expected_project_revision": {
+            "maximum": 1e18,
+            "minimum": 1.0,
+            "title": "Expected Project Revision",
+            "type": "integer"
+          },
+          "expected_source_version": {
+            "pattern": "^health-object-v1:r[0-9]+:schema-[0-9]+$",
+            "title": "Expected Source Version",
+            "type": "string"
+          },
+          "object_id": {
+            "format": "uuid",
+            "title": "Object Id",
+            "type": "string"
+          },
+          "shopping_project_id": {
+            "format": "uuid",
+            "title": "Shopping Project Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "object_id",
+          "expected_source_version",
+          "context_choice_id",
+          "shopping_project_id",
+          "expected_project_revision"
+        ],
+        "title": "ErgonomicTaskChoice",
         "type": "object"
       },
       "ErrorResponse": {
@@ -3080,6 +3249,19 @@
         "title": "GoalUpdateRequest",
         "type": "object"
       },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
       "HealthKitImportBatchRequest": {
         "additionalProperties": false,
         "properties": {
@@ -3876,6 +4058,7 @@
         "title": "InstantTimePoint",
         "type": "object"
       },
+      "JsonValue": {},
       "LifecycleUpdateRequest": {
         "additionalProperties": false,
         "properties": {
@@ -7504,6 +7687,116 @@
         "title": "SleepEventV1",
         "type": "object"
       },
+      "SourceTaskConfirmation": {
+        "additionalProperties": false,
+        "properties": {
+          "binding": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Binding",
+            "type": "string"
+          },
+          "confirmation_id": {
+            "format": "uuid",
+            "title": "Confirmation Id",
+            "type": "string"
+          }
+        },
+        "required": ["confirmation_id", "binding"],
+        "title": "SourceTaskConfirmation",
+        "type": "object"
+      },
+      "SourceTaskStatus": {
+        "additionalProperties": false,
+        "description": "Small source-facing status; private orchestration metadata is excluded.",
+        "properties": {
+          "apply_available": {
+            "title": "Apply Available",
+            "type": "boolean"
+          },
+          "binding": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Binding",
+            "type": "string"
+          },
+          "confirmation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmation Id"
+          },
+          "domain_version": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain Version"
+          },
+          "outcome_code": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z][a-z0-9_]{0,99}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome Code"
+          },
+          "preview": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview"
+          },
+          "proposal_id": {
+            "format": "uuid",
+            "title": "Proposal Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "suite-source-task-status-v1",
+            "default": "suite-source-task-status-v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "proposed",
+              "validated",
+              "confirmed",
+              "executing",
+              "reconciling",
+              "applied",
+              "rejected",
+              "uncertain",
+              "expired"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": ["proposal_id", "state", "binding", "apply_available"],
+        "title": "SourceTaskStatus",
+        "type": "object"
+      },
       "StepCountValueV1": {
         "additionalProperties": false,
         "properties": {
@@ -8395,6 +8688,42 @@
       "UTCInstant": {
         "format": "date-time",
         "type": "string"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": ["loc", "msg", "type"],
+        "title": "ValidationError",
+        "type": "object"
       },
       "WorkoutEventV1": {
         "additionalProperties": false,
@@ -17583,6 +17912,269 @@
         ],
         "summary": "Search Ai Eligible Health Data",
         "tags": ["assistant"]
+      }
+    },
+    "/shopping-tasks/capabilities": {
+      "get": {
+        "operationId": "getShoppingTaskCapabilities",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Getshoppingtaskcapabilities",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Capabilities",
+        "tags": ["Delegated Shopping tasks"]
+      }
+    },
+    "/shopping-tasks/choices": {
+      "get": {
+        "operationId": "listShoppingTaskChoices",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Listshoppingtaskchoices",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Choices",
+        "tags": ["Delegated Shopping tasks"]
+      }
+    },
+    "/shopping-tasks/commands": {
+      "post": {
+        "operationId": "createShoppingSourceCommand",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErgonomicTaskChoice"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DelegatedSourceCommand"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Create",
+        "tags": ["Delegated Shopping tasks"]
+      }
+    },
+    "/shopping-tasks/commands/{command_id}": {
+      "get": {
+        "operationId": "getShoppingSourceCommandStatus",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "command_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Command Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceTaskStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Status",
+        "tags": ["Delegated Shopping tasks"]
+      }
+    },
+    "/shopping-tasks/commands/{command_id}/submit": {
+      "post": {
+        "operationId": "submitShoppingSourceCommand",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "command_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Command Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceTaskStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Submit",
+        "tags": ["Delegated Shopping tasks"]
+      }
+    },
+    "/shopping-tasks/commands/{command_id}/{action}": {
+      "post": {
+        "operationId": "controlShoppingSourceCommand",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "command_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Command Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "action",
+            "required": true,
+            "schema": {
+              "enum": ["validate", "confirm", "apply", "reconcile"],
+              "title": "Action",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/SourceTaskConfirmation"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Confirmation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceTaskStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Control",
+        "tags": ["Delegated Shopping tasks"]
       }
     },
     "/today": {

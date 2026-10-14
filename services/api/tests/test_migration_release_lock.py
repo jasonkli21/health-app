@@ -3,8 +3,9 @@ from __future__ import annotations
 from unittest.mock import Mock
 
 import pytest
-from health_api.persistence.migration_lock import LOCK_KEY, migration_release_lock
 from sqlalchemy import Engine, text
+
+from health_api.persistence.migration_lock import LOCK_KEY, migration_release_lock
 
 
 def connection(*answers: bool) -> Mock:

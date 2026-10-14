@@ -5,6 +5,8 @@ from logging.config import fileConfig
 from typing import cast
 
 from alembic import context
+from sqlalchemy import Connection, engine_from_config, pool
+
 from health_api.config.settings import get_settings
 from health_api.config.settings import (
     migration_database_url as resolve_migration_database_url,
@@ -12,7 +14,6 @@ from health_api.config.settings import (
 from health_api.persistence.migration_compare import include_schema_object
 from health_api.persistence.migration_lock import migration_release_lock
 from health_api.persistence.models import Base
-from sqlalchemy import Connection, engine_from_config, pool
 
 config = context.config
 if config.config_file_name is not None:

@@ -31,15 +31,16 @@ from health_api.integrations.personal_ai_context_auth import (
 )
 from health_api.integrations.personal_ai_federation_auth import (
     PersonalAIFederationIdentityVerifier,
-    VerifiedDelegatedGoogleIdentity,
 )
 
 FIREBASE_PROJECT = "health-test1"
 FIREBASE_ISSUER = f"https://securetoken.google.com/{FIREBASE_PROJECT}"
 DELEGATION_PRIVATE_KEY = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
-DELEGATION_PUBLIC_KEY = base64.urlsafe_b64encode(
-    DELEGATION_PRIVATE_KEY.public_key().public_bytes_raw()
-).decode().rstrip("=")
+DELEGATION_PUBLIC_KEY = (
+    base64.urlsafe_b64encode(DELEGATION_PRIVATE_KEY.public_key().public_bytes_raw())
+    .decode()
+    .rstrip("=")
+)
 
 
 def _settings(**overrides: object) -> Settings:
@@ -171,7 +172,9 @@ def test_health_federation_contract_accepts_only_narrow_declared_scopes(
 def test_health_read_gate_is_independent_and_cannot_enable_assistant_messages() -> None:
     assert Settings(_env_file=None, app_env="test").personal_ai_context_read_enabled is False
     assert _settings().personal_ai_enabled is False
-    with pytest.raises(ValidationError, match="personal_ai_context_identity_configuration_required"):
+    with pytest.raises(
+        ValidationError, match="personal_ai_context_identity_configuration_required"
+    ):
         Settings(
             _env_file=None,
             app_env="test",
@@ -190,7 +193,9 @@ def test_federation_export_gate_is_independent_and_defaults_off() -> None:
     assert federation_only.personal_ai_federation_export_enabled is True
     assert federation_only.personal_ai_context_read_enabled is False
 
-    with pytest.raises(ValidationError, match="personal_ai_context_identity_configuration_required"):
+    with pytest.raises(
+        ValidationError, match="personal_ai_context_identity_configuration_required"
+    ):
         Settings(
             _env_file=None,
             app_env="test",
@@ -219,9 +224,20 @@ def test_dual_auth_requires_exact_google_service_and_recent_firebase_identity() 
     assert (identity.issuer, identity.subject) == (FIREBASE_ISSUER, "firebase-subject")
 
     for service_claims, delegated_identity in (
-        (_service_claims(email="unexpected@example.iam.gserviceaccount.com"), user_verifier.identity),
-        (_service_claims(), VerifiedIdentity("https://accounts.google.com", "google-subject", issued_at=int(time.time()))),
-        (_service_claims(), VerifiedIdentity(FIREBASE_ISSUER, "firebase-subject", issued_at=int(time.time()) - 601)),
+        (
+            _service_claims(email="unexpected@example.iam.gserviceaccount.com"),
+            user_verifier.identity,
+        ),
+        (
+            _service_claims(),
+            VerifiedIdentity(
+                "https://accounts.google.com", "google-subject", issued_at=int(time.time())
+            ),
+        ),
+        (
+            _service_claims(),
+            VerifiedIdentity(FIREBASE_ISSUER, "firebase-subject", issued_at=int(time.time()) - 601),
+        ),
     ):
         with pytest.raises(PersonalAIContextAuthorizationError):
             FixedIdentityVerifier(service_claims).verify(
@@ -252,7 +268,9 @@ async def test_invalid_owner_identity_is_rejected_before_opening_a_database_sess
 
     app.state.session_factory = session_factory
     app.include_router(router)
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://testserver"
+    ) as client:
         response = await client.post(
             "/v1/integrations/personal-ai/context",
             headers={
@@ -287,7 +305,9 @@ async def test_invalid_federation_owner_is_rejected_before_opening_a_database_se
 
     app.state.session_factory = session_factory
     app.include_router(router)
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://testserver"
+    ) as client:
         response = await client.post(
             "/v1/integrations/personal-ai/federation-export",
             headers={
@@ -314,7 +334,9 @@ async def test_federation_only_gate_keeps_the_broad_context_route_closed() -> No
         personal_ai_federation_export_enabled=True,
     )
     app.include_router(router)
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://testserver"
+    ) as client:
         response = await client.post(
             "/v1/integrations/personal-ai/context",
             json={"operation": "catalog"},
@@ -330,6 +352,14 @@ def test_request_cannot_use_a_profile_item_reference_for_another_object_type() -
             entity_refs=(("event", uuid4()),),
             fields=("record",),
         )
+
+
+def test_projection_allows_omitted_daily_domain_but_checks_selected_domain() -> None:
+    projected = HealthContextPayload(category="nutrition", object_type="event")
+    assert projected.domain is None
+
+    with pytest.raises(ValidationError, match="health_context_daily_domain_mismatch"):
+        HealthContextPayload(category="nutrition", object_type="event", domain="exercise")
 
 
 def test_projection_rejects_custom_tracker_values_outside_the_shared_schema() -> None:
@@ -372,14 +402,18 @@ def _signed_delegation(request_body: dict[str, object], **claim_overrides: objec
     }
 
     def encode(value: object) -> str:
-        return base64.urlsafe_b64encode(
-            json.dumps(value, separators=(",", ":")).encode()
-        ).decode().rstrip("=")
+        return (
+            base64.urlsafe_b64encode(json.dumps(value, separators=(",", ":")).encode())
+            .decode()
+            .rstrip("=")
+        )
 
     signing_input = f"{encode(header)}.{encode(claims)}"
-    signature = base64.urlsafe_b64encode(
-        DELEGATION_PRIVATE_KEY.sign(signing_input.encode("ascii"))
-    ).decode().rstrip("=")
+    signature = (
+        base64.urlsafe_b64encode(DELEGATION_PRIVATE_KEY.sign(signing_input.encode("ascii")))
+        .decode()
+        .rstrip("=")
+    )
     return f"{signing_input}.{signature}"
 
 
@@ -406,20 +440,29 @@ def test_signed_delegation_binds_google_user_service_audience_and_exact_request(
     monkeypatch.setattr(
         PersonalAIContextIdentityVerifier,
         "_google_claims",
-        staticmethod(lambda token, audience: _service_claims()
-                     if token == "service-token" and audience == settings.personal_ai_context_service_audience
-                     else {}),
+        staticmethod(
+            lambda token, audience: (
+                _service_claims()
+                if token == "service-token"
+                and audience == settings.personal_ai_context_service_audience
+                else {}
+            )
+        ),
     )
     body = _federation_body()
+    delegation = _signed_delegation(body)
     identity = PersonalAIFederationIdentityVerifier().verify(
         service_token="service-token",
-        delegation=_signed_delegation(body),
+        delegation=delegation,
         request_body=body,
         settings=settings,
     )
-    assert identity == VerifiedDelegatedGoogleIdentity(
-        issuer="https://accounts.google.com", subject="google-user-1"
-    )
+    assert identity.issuer == "https://accounts.google.com"
+    assert identity.subject == "google-user-1"
+    assert identity.authenticated_at is not None
+    encoded_claims = delegation.split(".")[1]
+    claims = json.loads(base64.urlsafe_b64decode(encoded_claims + "=" * (-len(encoded_claims) % 4)))
+    assert identity.authenticated_at == claims["auth_time"]
 
 
 @pytest.mark.parametrize(
@@ -518,7 +561,8 @@ def test_firebase_google_identity_mapping_requires_an_active_linked_provider() -
     assert fake_auth.lookup == ("google.com", "google-user-1")
 
     fake_auth.user = SimpleNamespace(
-        disabled=False, uid="firebase-owner-uid",
+        disabled=False,
+        uid="firebase-owner-uid",
         provider_data=[SimpleNamespace(provider_id="password", uid="google-user-1")],
     )
     with pytest.raises(TokenVerificationError):

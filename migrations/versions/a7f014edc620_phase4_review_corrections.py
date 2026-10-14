@@ -105,9 +105,7 @@ def downgrade() -> None:
         )
     ).scalar_one()
     if review_data:
-        raise RuntimeError(
-            "refusing to downgrade recorded Phase 4 review-correction data"
-        )
+        raise RuntimeError("refusing to downgrade recorded Phase 4 review-correction data")
     op.drop_constraint(
         "fk_occurrence_actions_owner_observation",
         "planning_occurrence_actions",

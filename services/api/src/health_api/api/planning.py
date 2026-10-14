@@ -10,6 +10,9 @@ from typing import Annotated, Any, Literal, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response
+from pydantic import BaseModel, ValidationError
+from sqlalchemy.orm import Session
+
 from health_api.api.dependencies import get_current_owner, get_session
 from health_api.api.errors import APIError
 from health_api.api.schemas import (
@@ -71,8 +74,6 @@ from health_api.domain.planning import (
     RegimenLifecycle,
     TrackerDefinitionV1,
 )
-from pydantic import BaseModel, ValidationError
-from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["planning"])
 COMMON_ERRORS: dict[int | str, dict[str, Any]] = {

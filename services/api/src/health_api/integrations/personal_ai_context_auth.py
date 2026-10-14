@@ -86,9 +86,7 @@ class PersonalAIContextIdentityVerifier:
         try:
             identity = user_verifier.verify(user_token)
         except TokenVerificationError as error:
-            raise PersonalAIContextAuthorizationError(
-                "personal_ai_context_user_denied"
-            ) from error
+            raise PersonalAIContextAuthorizationError("personal_ai_context_user_denied") from error
         except VerifierUnavailable as error:
             raise PersonalAIContextAuthorizationError(
                 "personal_ai_context_identity_unavailable"

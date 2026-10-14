@@ -5,6 +5,14 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID
 
+from sqlalchemy import (
+    and_,
+    or_,
+    select,
+    text,
+)
+from sqlalchemy.orm import Session
+
 from health_api.application.ai_context_admission import _eligible_candidates
 from health_api.application.ai_context_contracts import SEARCH_MAX_LOOKBACK_DAYS
 from health_api.application.ai_context_projection import _excerpt, _payload_search_value
@@ -16,13 +24,6 @@ from health_api.domain.ai import (
 from health_api.domain.schemas import (
     validate_iana_timezone,
 )
-from sqlalchemy import (
-    and_,
-    or_,
-    select,
-    text,
-)
-from sqlalchemy.orm import Session
 
 
 def search_ai_resources(

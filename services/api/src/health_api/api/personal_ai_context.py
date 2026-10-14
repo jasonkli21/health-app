@@ -60,9 +60,7 @@ async def _bounded_body(request: Request) -> bytes:
         "requestBody": {
             "required": True,
             "content": {
-                "application/json": {
-                    "schema": HealthContextReadRequest.model_json_schema()
-                }
+                "application/json": {"schema": HealthContextReadRequest.model_json_schema()}
             },
         }
     },
@@ -130,7 +128,9 @@ async def read_health_context(request: Request) -> Response:
     except HealthContextSelectionError as error:
         if str(error) == "health_context_response_limit_exceeded":
             raise HTTPException(status_code=413, detail="Response is too large") from error
-        raise HTTPException(status_code=422, detail="Health context selection is invalid") from error
+        raise HTTPException(
+            status_code=422, detail="Health context selection is invalid"
+        ) from error
     except SQLAlchemyError:
         raise
     return Response(
@@ -149,9 +149,7 @@ async def read_health_context(request: Request) -> Response:
         "requestBody": {
             "required": True,
             "content": {
-                "application/json": {
-                    "schema": HealthFederationExportRequest.model_json_schema()
-                }
+                "application/json": {"schema": HealthFederationExportRequest.model_json_schema()}
             },
         }
     },
@@ -205,7 +203,14 @@ async def read_health_federation_export_route(request: Request) -> Response:
     if not callable(firebase_uid_resolver):
         raise HTTPException(status_code=503, detail="Identity service unavailable")
     try:
-        firebase_uid = await run_in_threadpool(firebase_uid_resolver, identity.subject)
+        recent_resolver = getattr(user_verifier, "resolve_google_delegation", None)
+        if callable(recent_resolver) and identity.authenticated_at is not None:
+            firebase_uid = await run_in_threadpool(
+                recent_resolver, identity.subject, identity.authenticated_at
+            )
+        else:
+            # Explicitly injected legacy fixtures have no SDK revocation surface.
+            firebase_uid = await run_in_threadpool(firebase_uid_resolver, identity.subject)
     except TokenVerificationError as error:
         raise HTTPException(status_code=401, detail="Authentication required") from error
     except VerifierUnavailable as error:

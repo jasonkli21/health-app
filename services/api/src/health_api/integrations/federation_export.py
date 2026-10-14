@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Final, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
 
-HEALTH_FEDERATION_EXPORT_SCHEMA = "health-federation-export-v1"
+HEALTH_FEDERATION_EXPORT_SCHEMA: Final = "health-federation-export-v1"
 HEALTH_FEDERATION_EXPORT_PATH = "/v1/integrations/personal-ai/federation-export"
 
 
@@ -44,9 +44,8 @@ class HealthFederationExportRequest(BaseModel):
             ),
         }[self.purpose]
         selected_field = "permission_version" if self.operation == "verify" else expected[2]
-        if (
-            (self.category, self.destination_application_id) != expected[:2]
-            or self.fields != (selected_field,)
+        if (self.category, self.destination_application_id) != expected[:2] or self.fields != (
+            selected_field,
         ):
             raise ValueError("health_federation_export_scope_invalid")
         return self
@@ -98,9 +97,7 @@ class HealthFederationExportRecord(BaseModel):
     source_version: str = Field(min_length=1, max_length=100)
     sensitivity: Literal["restricted"] = "restricted"
     payload: HealthFederationPayload | None = None
-    source_refs: tuple[HealthFederationSourceReference, ...] = Field(
-        min_length=2, max_length=2
-    )
+    source_refs: tuple[HealthFederationSourceReference, ...] = Field(min_length=2, max_length=2)
     permission_dependencies: tuple[HealthFederationPermissionDependency, ...] = Field(
         min_length=1, max_length=1
     )

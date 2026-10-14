@@ -31,9 +31,7 @@ def downgrade() -> None:
         )
     )
     if duplicate_keys:
-        raise RuntimeError(
-            "refusing to discard alternate proposal receipt keys during downgrade"
-        )
+        raise RuntimeError("refusing to discard alternate proposal receipt keys during downgrade")
     op.create_unique_constraint(
         "uq_action_command_receipts_proposal_revision",
         "action_command_receipts",

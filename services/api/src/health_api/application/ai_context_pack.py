@@ -8,6 +8,14 @@ from typing import Any, cast
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
+from sqlalchemy import (
+    and_,
+    func,
+    select,
+    text,
+)
+from sqlalchemy.orm import Session
+
 from health_api.application.ai_context_admission import _eligible_candidates
 from health_api.application.ai_context_contracts import (
     MAX_CONTEXT_BYTES,
@@ -43,13 +51,6 @@ from health_api.persistence.models import (
     HealthObject,
     Source,
 )
-from sqlalchemy import (
-    and_,
-    func,
-    select,
-    text,
-)
-from sqlalchemy.orm import Session
 
 
 def _serialized_size(pack: AIContextPack) -> int:

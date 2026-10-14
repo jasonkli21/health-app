@@ -11,13 +11,14 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
+from pydantic import ValidationError
+from sqlalchemy import and_, select
+from sqlalchemy.orm import Session
+
 from health_api.application.errors import DailyNotFound, DailyValidationError, PlanningNotFound
 from health_api.domain.planning import TrackerDefinitionV1, validate_tracker_values
 from health_api.domain.schemas import CustomTrackerValueV1, ObservationSchemaV1
 from health_api.persistence.models import HealthObject, PlanningResource, TrackerSchemaVersion
-from pydantic import ValidationError
-from sqlalchemy import and_, select
-from sqlalchemy.orm import Session
 
 
 def append_tracker_schema_version(

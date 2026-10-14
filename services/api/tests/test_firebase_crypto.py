@@ -17,6 +17,7 @@ from cryptography.x509.oid import NameOID
 from firebase_admin import auth, credentials
 from google.auth import crypt, jwt
 from google.auth.credentials import AnonymousCredentials
+
 from health_api.integrations.firebase_auth import (
     FirebaseTokenVerifier,
     TokenVerificationError,
@@ -130,12 +131,13 @@ def test_signed_two_subjects_resolve_distinct_owners_and_isolate_all_routes(
     signed_verifier, postgres_engine, db_session
 ):
     from fastapi.testclient import TestClient
-    from health_api.config.settings import Settings
-    from health_api.main import create_app
-    from health_api.persistence.models import ProviderIdentity
     from sqlalchemy import select
     from test_daily_api import event_request, meal_event, observation
     from test_profile_api import request_body
+
+    from health_api.config.settings import Settings
+    from health_api.main import create_app
+    from health_api.persistence.models import ProviderIdentity
 
     verifier, token, _, _ = signed_verifier
     settings = Settings(

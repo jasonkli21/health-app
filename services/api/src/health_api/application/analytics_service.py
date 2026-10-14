@@ -5,6 +5,9 @@ from __future__ import annotations
 from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
+from sqlalchemy import and_, or_, select
+from sqlalchemy.orm import Session
+
 from health_api.application.analytics_artifacts import (
     _artifact_aggregate,
     _persist_signal,
@@ -56,8 +59,6 @@ from health_api.domain.analytics import (
 )
 from health_api.domain.daily import local_day_bounds
 from health_api.persistence.models import HealthObject, PlanningResource
-from sqlalchemy import and_, or_, select
-from sqlalchemy.orm import Session
 
 __all__ = [
     "AnalyticsConflict",

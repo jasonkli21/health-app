@@ -4,6 +4,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { profileApi, profileErrorMessage } from "../api";
+import { ShoppingTaskCard } from "../components/ShoppingTaskCard";
 import { ProfileValueDisplay } from "../components/ProfileValueDisplay";
 import { ActionButton, LoadingMessage, StatusMessage } from "../components/Ui";
 import { formatInstant, type ProfileItem } from "../model";
@@ -117,6 +118,7 @@ export default function ProfileItemScreen() {
             {item.profile.category.slice(1)} · {item.profile.kind}
           </Text>
           <ProfileValueDisplay value={item.profile.value} />
+          <ShoppingTaskCard key={item.id} item={item} />
           {item.notes ? <Definition label="Notes" value={item.notes} /> : null}
           <Definition
             label="Effective start"

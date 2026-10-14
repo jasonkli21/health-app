@@ -8,6 +8,11 @@ from datetime import UTC, date, datetime
 from typing import Any, cast
 from uuid import UUID, uuid5
 
+from pydantic import ValidationError
+from sqlalchemy import delete, func, select, update
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
 from health_api.application.analytics_service import invalidate_analytics
 from health_api.application.daily_service import (
     CreateDailyEntry,
@@ -57,10 +62,6 @@ from health_api.persistence.models import (
     Source,
     User,
 )
-from pydantic import ValidationError
-from sqlalchemy import delete, func, select, update
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
 AGGREGATE_TYPES = {"steps", "heart_rate_summary"}
 RESOURCE_TYPES = (

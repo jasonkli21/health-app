@@ -8,20 +8,22 @@ from io import StringIO
 from typing import Any, cast
 from uuid import UUID
 
+from sqlalchemy import Select, literal_column, select, text
+from sqlalchemy.engine import CursorResult
+from sqlalchemy.orm import Session
+
 from health_api.integrations.object_storage import (
     ObjectCleanupPending,
     ObjectStorage,
     ObjectStorageUnavailable,
 )
 from health_api.persistence.models import Base, OwnerDeletionJob, OwnerErasureLedger, User
-from sqlalchemy import Select, literal_column, select, text
-from sqlalchemy.engine import CursorResult
-from sqlalchemy.orm import Session
 
 _INTERNAL_OWNER_TABLES = {"owner_deletion_jobs", "owner_erasure_ledger"}
 _OWNER_DATA_TABLE_NAMES = frozenset(
     {
         "action_proposals",
+        "delegated_source_commands",
         "daily_snapshot_markers",
         "healthkit_import_batches",
         "sources",

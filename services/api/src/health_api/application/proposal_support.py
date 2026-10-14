@@ -8,6 +8,10 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import UUID, uuid5
 
+from pydantic import ValidationError
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
 from health_api.application.errors import (
     ActionProposalValidationError,
 )
@@ -44,9 +48,6 @@ from health_api.persistence.models import (
     HealthObjectRevision,
     PlanningScheduleIdentity,
 )
-from pydantic import ValidationError
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
 
 type ProposalStatus = Literal["pending", "applied", "rejected", "expired", "superseded"]
 

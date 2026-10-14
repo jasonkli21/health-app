@@ -103,9 +103,7 @@ def upgrade() -> None:
         sa.Column("evidence_object_id", sa.Uuid(), nullable=False),
         sa.Column("evidence_revision", sa.Integer(), nullable=False),
         sa.Column("evidence_object_type", sa.String(length=16), nullable=False),
-        sa.CheckConstraint(
-            "evidence_revision > 0", name="ck_analytics_evidence_revision"
-        ),
+        sa.CheckConstraint("evidence_revision > 0", name="ck_analytics_evidence_revision"),
         sa.CheckConstraint(
             "evidence_object_type IN ('derived_signal', 'event', 'observation')",
             name="ck_analytics_evidence_object_type",
@@ -139,13 +137,9 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     connection = op.get_bind()
-    existing_artifacts = connection.scalar(
-        sa.text("SELECT 1 FROM analytics_artifacts LIMIT 1")
-    )
+    existing_artifacts = connection.scalar(sa.text("SELECT 1 FROM analytics_artifacts LIMIT 1"))
     if existing_artifacts:
-        raise RuntimeError(
-            "refusing to discard Phase 7 analytical history during downgrade"
-        )
+        raise RuntimeError("refusing to discard Phase 7 analytical history during downgrade")
     op.drop_index("ix_analytics_evidence_owner_source", table_name="analytics_evidence")
     op.drop_table("analytics_evidence")
     op.drop_index(

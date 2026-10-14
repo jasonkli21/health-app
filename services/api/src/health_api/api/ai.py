@@ -10,6 +10,8 @@ from typing import Annotated, Any, cast, get_args
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy.orm import Session
+
 from health_api.api.dependencies import get_current_owner, get_session
 from health_api.api.errors import APIError
 from health_api.api.schemas import (
@@ -27,7 +29,6 @@ from health_api.domain.ai import (
     AssistantStatusResponse,
 )
 from health_api.integrations.personal_ai import PersonalAIIntegrationStatus
-from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["assistant"])
 

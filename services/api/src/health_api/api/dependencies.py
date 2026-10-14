@@ -9,6 +9,8 @@ from uuid import UUID
 
 from fastapi import Depends, Request, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.orm import Session
+
 from health_api.api.errors import APIError
 from health_api.application.local_principal import ensure_local_principal
 from health_api.application.provider_identity import resolve_provider_identity
@@ -18,7 +20,6 @@ from health_api.integrations.firebase_auth import (
     TokenVerificationError,
     VerifierUnavailable,
 )
-from sqlalchemy.orm import Session
 
 _bearer_scheme = HTTPBearer(
     auto_error=False,
@@ -81,6 +82,7 @@ def get_current_owner(
         display_timezone=settings.local_principal_timezone,
         allow_erasure_status=allow_erasure_status,
     )
+    request.state.verified_identity = identity
     request.state.auth_time = identity.auth_time
     if owner_id is None:
         raise APIError(401, "principal_unavailable", "The authenticated account is unavailable.")

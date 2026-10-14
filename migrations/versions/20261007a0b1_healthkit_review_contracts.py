@@ -26,15 +26,11 @@ def upgrade() -> None:
     )
     op.add_column(
         "healthkit_import_identities",
-        sa.Column(
-            "source_revision", sa.BigInteger(), server_default="0", nullable=False
-        ),
+        sa.Column("source_revision", sa.BigInteger(), server_default="0", nullable=False),
     )
     op.add_column(
         "healthkit_import_identities",
-        sa.Column(
-            "user_archived", sa.Boolean(), server_default=sa.false(), nullable=False
-        ),
+        sa.Column("user_archived", sa.Boolean(), server_default=sa.false(), nullable=False),
     )
     op.alter_column(
         "healthkit_import_identities",
@@ -66,9 +62,7 @@ def downgrade() -> None:
         raise RuntimeError(
             "refusing to discard HealthKit deletion identities or aggregate ordering revisions"
         )
-    op.drop_constraint(
-        "ck_observations_steps_numeric_bound", "observations", type_="check"
-    )
+    op.drop_constraint("ck_observations_steps_numeric_bound", "observations", type_="check")
     op.drop_constraint("ck_observations_steps_date_only", "observations", type_="check")
     op.drop_constraint(
         "ck_healthkit_identity_object_or_tombstone",

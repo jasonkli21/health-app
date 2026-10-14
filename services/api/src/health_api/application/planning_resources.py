@@ -8,6 +8,11 @@ from datetime import UTC, datetime
 from typing import Any, Literal, cast
 from uuid import UUID
 
+from pydantic import BaseModel, ValidationError
+from sqlalchemy import and_, or_, select, update
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
 from health_api.application.envelope_service import manual_source, unit_of_work
 from health_api.application.errors import (
     PlanningConflict,
@@ -31,10 +36,6 @@ from health_api.persistence.models import (
     Source,
     User,
 )
-from pydantic import BaseModel, ValidationError
-from sqlalchemy import and_, or_, select, update
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
 PlanningKind = Literal["goal", "regimen", "plan", "context", "tracker_definition"]
 PlanningPayload = (

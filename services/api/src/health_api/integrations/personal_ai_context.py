@@ -53,13 +53,9 @@ HealthConfirmation = Literal["unconfirmed", "user_confirmed"]
 HealthAuthority = Literal["authoritative"]
 HealthSensitivity = Literal["personal", "sensitive", "restricted"]
 
-PROFILE_CATEGORIES = frozenset(
-    {"profile_background", "profile_constraints", "profile_preferences"}
-)
+PROFILE_CATEGORIES = frozenset({"profile_background", "profile_constraints", "profile_preferences"})
 DAILY_CATEGORIES = frozenset({"measurements", "nutrition", "exercise", "sleep", "symptoms"})
-PROFILE_FIELDS = frozenset(
-    {"record", "notes", "source_kind", "confirmation_status", "validity"}
-)
+PROFILE_FIELDS = frozenset({"record", "notes", "source_kind", "confirmation_status", "validity"})
 DAILY_FIELDS = frozenset(
     {
         "record",
@@ -130,11 +126,16 @@ class HealthContextReadRequest(BaseModel):
                 raise ValueError("health_context_verify_scope_invalid")
             if self.window_start is not None:
                 raise ValueError("health_context_verify_window_invalid")
-            if self.category in PROFILE_CATEGORIES and self.entity_refs[0].object_type != "profile_item":
+            if (
+                self.category in PROFILE_CATEGORIES
+                and self.entity_refs[0].object_type != "profile_item"
+            ):
                 raise ValueError("health_context_verify_entity_type_invalid")
             if self.category == "measurements" and self.entity_refs[0].object_type != "observation":
                 raise ValueError("health_context_verify_entity_type_invalid")
-            if self.category in DAILY_CATEGORIES - {"measurements"} and self.entity_refs[0].object_type not in {"event", "observation"}:
+            if self.category in DAILY_CATEGORIES - {"measurements"} and self.entity_refs[
+                0
+            ].object_type not in {"event", "observation"}:
                 raise ValueError("health_context_verify_entity_type_invalid")
             return self
 
@@ -232,7 +233,7 @@ class HealthContextPayload(BaseModel):
                 raise ValueError("health_context_daily_type_mismatch")
             if self.category == "measurements" and self.object_type != "observation":
                 raise ValueError("health_context_measurement_type_mismatch")
-            if self.domain != self.category:
+            if self.domain is not None and self.domain != self.category:
                 raise ValueError("health_context_daily_domain_mismatch")
             if self.record is not None:
                 try:
@@ -261,7 +262,9 @@ class HealthContextPayload(BaseModel):
                     raise ValueError("health_context_daily_payload_invalid") from error
                 if expected_daily_category != self.category:
                     raise ValueError("health_context_daily_category_mismatch")
-        if self.object_type == "profile_item" and (self.time is not None or self.interval_end is not None):
+        if self.object_type == "profile_item" and (
+            self.time is not None or self.interval_end is not None
+        ):
             raise ValueError("health_context_profile_time_invalid")
         return self
 
@@ -287,7 +290,9 @@ class HealthContextRecord(BaseModel):
         min_length=1, max_length=12
     )
     source_refs: tuple[HealthContextSourceReference, ...] = Field(min_length=2, max_length=2)
-    permission_dependencies: tuple[HealthContextPermissionDependency, ...] = Field(min_length=1, max_length=1)
+    permission_dependencies: tuple[HealthContextPermissionDependency, ...] = Field(
+        min_length=1, max_length=1
+    )
     payload: HealthContextPayload
 
     @model_validator(mode="after")
@@ -331,18 +336,31 @@ class HealthContextReadResponse(BaseModel):
     application_id: Literal["health"] = "health"
     workspace_id: None = None
     operation: Literal["catalog", "profile", "history", "time_series", "verify"]
-    items: tuple[HealthContextRecord, ...] = Field(default=(), max_length=HEALTH_CONTEXT_MAX_RESULTS)
+    items: tuple[HealthContextRecord, ...] = Field(
+        default=(), max_length=HEALTH_CONTEXT_MAX_RESULTS
+    )
     categories: tuple[HealthContextCategoryOption, ...] = Field(default=(), max_length=8)
-    permission_versions: tuple[HealthContextPermissionVersion, ...] = Field(default=(), max_length=16)
+    permission_versions: tuple[HealthContextPermissionVersion, ...] = Field(
+        default=(), max_length=16
+    )
     truncated: StrictBool = False
 
     @model_validator(mode="after")
     def response_shape_matches_operation(self) -> HealthContextReadResponse:
         if self.operation == "catalog":
-            if self.items or self.permission_versions or len({item.category for item in self.categories}) != len(self.categories):
+            if (
+                self.items
+                or self.permission_versions
+                or len({item.category for item in self.categories}) != len(self.categories)
+            ):
                 raise ValueError("health_context_catalog_response_invalid")
         elif self.operation == "verify":
-            if self.items or self.categories or len({item.object_id for item in self.permission_versions}) != len(self.permission_versions):
+            if (
+                self.items
+                or self.categories
+                or len({item.object_id for item in self.permission_versions})
+                != len(self.permission_versions)
+            ):
                 raise ValueError("health_context_verify_response_invalid")
         elif self.categories or self.permission_versions:
             raise ValueError("health_context_categories_unexpected")

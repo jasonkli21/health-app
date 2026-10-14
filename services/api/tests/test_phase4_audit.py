@@ -7,6 +7,9 @@ from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy import CheckConstraint, ForeignKeyConstraint, MetaData, create_engine, select
+from sqlalchemy.orm import Session
+
 from health_api.application import planning_schedules
 from health_api.application import planning_service as planning
 from health_api.application.errors import PlanningConflict, PlanningNotFound
@@ -20,8 +23,6 @@ from health_api.persistence.models import (
     PlanningSchedule,
     PlanningScheduleIdentity,
 )
-from sqlalchemy import CheckConstraint, ForeignKeyConstraint, MetaData, create_engine, select
-from sqlalchemy.orm import Session
 
 
 def test_retired_manual_task_constraint_and_repeated_reorder() -> None:

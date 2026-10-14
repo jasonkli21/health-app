@@ -30,7 +30,9 @@ Current product surfaces support:
 - owner-authored, typed action proposals with explicit review and confirmation.
 
 Live Personal AI messaging and AI-originated proposal submission are not
-available in the current build. Phase 7 insights remain planned.
+available in the current build. Phase 7 trends, insights, recommendations, and
+experiments are implemented locally; see [current state](docs/current-state.md)
+for their verification and open acceptance boundaries.
 
 The broader product model is designed to represent nutrition, exercise, sleep, symptoms, measurements, medications/supplements, habits, goals, active contexts, and individualized trackers without treating missing data as false or zero.
 

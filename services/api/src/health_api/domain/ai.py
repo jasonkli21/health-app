@@ -6,10 +6,11 @@ from datetime import date, datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
+from pydantic import AwareDatetime, Field, StrictBool, StrictInt, model_validator
+
 from health_api.domain.analytics import AnalysisMetricId, TrendResult
 from health_api.domain.daily_rollups import MetricSummaryV1
 from health_api.domain.schemas import ConfirmationStatus, StrictModel
-from pydantic import AwareDatetime, Field, StrictBool, StrictInt, model_validator
 
 AIResourceType = Literal[
     "profile_item",

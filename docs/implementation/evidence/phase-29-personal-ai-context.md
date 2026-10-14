@@ -85,7 +85,6 @@ OpenAPI export and generated client were not verified: the export could not
 write its target under the restricted execution context, and the installed
 pnpm 11.25.0 does not match the repository's supported `>=9 <10` range.
 
-
 ## Post-implementation review follow-up — 2026-10-11
 
 The review follow-up adds a revisioned owner path for daily cross-domain
