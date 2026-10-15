@@ -449,6 +449,10 @@ export interface components {
       target_entity_id: string;
       workspace_id?: null;
     };
+    DelegatedTargetChoicesResult: {
+      choices: Array<components["schemas"]["ShoppingTargetChoice"]>;
+      schema_version?: "suite-task-target-choices-v1";
+    };
     DistanceQuantity: {
       unit: "m" | "km" | "mi";
       value: components["schemas"]["FiniteDailyNumber"];
@@ -1470,6 +1474,18 @@ export interface components {
       schedule: components["schemas"]["ScheduleDefinitionV1"];
       schedule_id: string;
       schedule_revision: number;
+    };
+    ShoppingTargetChoice: {
+      label: string;
+      project_id: string;
+      revision: number;
+    };
+    ShoppingTaskChoiceOption: {
+      category_label: string;
+      id: string;
+    };
+    ShoppingTaskChoicesResult: {
+      choices: Array<components["schemas"]["ShoppingTaskChoiceOption"]>;
     };
     SleepEventV1: {
       kind: "sleep";
@@ -2808,11 +2824,10 @@ export interface operations {
     };
   };
   listShoppingTaskChoices: {
-    responses: {
-      "200": {
-        [key: string]: unknown;
-      };
-    };
+    responses: { "200": components["schemas"]["ShoppingTaskChoicesResult"] };
+  };
+  listShoppingTaskProjects: {
+    responses: { "200": components["schemas"]["DelegatedTargetChoicesResult"] };
   };
   listTrackerHistory: {
     path: {
@@ -4104,12 +4119,26 @@ export class HealthApiClient {
     );
   }
 
-  async listShoppingTaskChoices(): Promise<{
-    [key: string]: unknown;
-  }> {
-    return this.request<{
-      [key: string]: unknown;
-    }>("GET", `/shopping-tasks/choices`, undefined, undefined);
+  async listShoppingTaskChoices(): Promise<
+    components["schemas"]["ShoppingTaskChoicesResult"]
+  > {
+    return this.request<components["schemas"]["ShoppingTaskChoicesResult"]>(
+      "GET",
+      `/shopping-tasks/choices`,
+      undefined,
+      undefined,
+    );
+  }
+
+  async listShoppingTaskProjects(): Promise<
+    components["schemas"]["DelegatedTargetChoicesResult"]
+  > {
+    return this.request<components["schemas"]["DelegatedTargetChoicesResult"]>(
+      "GET",
+      `/shopping-tasks/projects`,
+      undefined,
+      undefined,
+    );
   }
 
   async listTrackerHistory(

@@ -1,6 +1,6 @@
 # Current implementation state — Health
 
-Updated2026-10-14. This is the living delivery boundary. Code, contracts,
+Updated 2026-10-14. This is the living delivery boundary. Code, contracts,
 migrations and tests take precedence over plans. The stabilization patch is based
 on `7fb84c76217c772b2bce6715744b8294afafa771`; final commit/source identity and exact checks are recorded in the
 [verification record](stabilization-2026-10-14.md). Independent final review and
@@ -27,7 +27,13 @@ into an isolated restore and keeps pending private cleanup unaccepted. It does
 not promote a cloud restore. Baseline readiness preserves the SQLAlchemy URL
 object (including its password); owner creation flushes before provider binding.
 Timezone/domain and unordered membership assertions preserve their intended rules.
-API/native/static/mobile checks and JS bundle evidence are recorded separately
+The mobile task card now chooses a linked user's active Shopping project via
+the generated API client instead of asking for a UUID and revision. SecureStore
+recovery separates create, submit, validation, confirmation and effect-unknown
+phases, preserves the original IDs, and clears stored task state when the
+authenticated owner changes. `migrations/historical-sha256.txt` freezes each
+existing migration's bytes; Ruff formatting excludes those exact files while
+keeping new migrations under normal formatting rules. API/native/static/mobile checks and JS bundle evidence are recorded separately
 from HealthKit device, cloud IAM/storage, Terraform provider and recovery gates.
 
 ## Verification and release boundary
@@ -37,14 +43,15 @@ Read [the local stabilization evidence](stabilization-2026-10-14.md) and
 The all-five synthetic PostgreSQL/loopback HTTPS paths do not prove real IAM,
 provider, cloud, browser or native-device behavior. Feature gates remain off by
 default. No cloud deployment or live-provider operation was run. The user
-authorized commits and pushes to remote main; hosted CI is separate evidence.
+authorized local commits followed by pushes to each remote `main`. Hosted CI is
+separate evidence.
 
 ## Minimum context
 
 Read [the router](README.md), the owning module/contract and focused tests.
 [Suite contracts](https://github.com/jasonkli21/personal-ai-agent/blob/main/stabilization/CROSS-REPO-CONTRACTS.md),
 [operations](https://github.com/jasonkli21/personal-ai-agent/blob/main/stabilization/OPERATIONS.md) and the
-[review handoff](https://github.com/jasonkli21/personal-ai-agent/blob/main/stabilization/REVIEW-HANDOFF.md) explain
+[fresh re-review handoff](https://github.com/jasonkli21/personal-ai-agent/blob/main/stabilization/FRESH-REVIEW-HANDOFF.md) explain
 cross-app assumptions and remaining acceptance. The
 [previous status](history/stabilization/current-state-before-2026-10-14.md)
 preserves detailed predecessor phase evidence and unresolved gates. This status

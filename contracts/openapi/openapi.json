@@ -2155,6 +2155,28 @@
         "title": "DelegatedSourceCommand",
         "type": "object"
       },
+      "DelegatedTargetChoicesResult": {
+        "additionalProperties": false,
+        "properties": {
+          "choices": {
+            "items": {
+              "$ref": "#/components/schemas/ShoppingTargetChoice"
+            },
+            "maxItems": 32,
+            "title": "Choices",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": "suite-task-target-choices-v1",
+            "default": "suite-task-target-choices-v1",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": ["choices"],
+        "title": "DelegatedTargetChoicesResult",
+        "type": "object"
+      },
       "DistanceQuantity": {
         "additionalProperties": false,
         "properties": {
@@ -7652,6 +7674,67 @@
           "schedule"
         ],
         "title": "ScheduleResponse",
+        "type": "object"
+      },
+      "ShoppingTargetChoice": {
+        "additionalProperties": false,
+        "description": "The minimal Shopping-owned information needed to confirm a target.",
+        "properties": {
+          "label": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "revision": {
+            "maximum": 2147483647.0,
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": ["project_id", "label", "revision"],
+        "title": "ShoppingTargetChoice",
+        "type": "object"
+      },
+      "ShoppingTaskChoiceOption": {
+        "additionalProperties": false,
+        "properties": {
+          "category_label": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Category Label",
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": ["id", "category_label"],
+        "title": "ShoppingTaskChoiceOption",
+        "type": "object"
+      },
+      "ShoppingTaskChoicesResult": {
+        "additionalProperties": false,
+        "properties": {
+          "choices": {
+            "items": {
+              "$ref": "#/components/schemas/ShoppingTaskChoiceOption"
+            },
+            "maxItems": 100,
+            "title": "Choices",
+            "type": "array"
+          }
+        },
+        "required": ["choices"],
+        "title": "ShoppingTaskChoicesResult",
         "type": "object"
       },
       "SleepEventV1": {
@@ -17950,9 +18033,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Listshoppingtaskchoices",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ShoppingTaskChoicesResult"
                 }
               }
             },
@@ -18174,6 +18255,31 @@
           }
         ],
         "summary": "Control",
+        "tags": ["Delegated Shopping tasks"]
+      }
+    },
+    "/shopping-tasks/projects": {
+      "get": {
+        "description": "Relay Shopping's minimal owner-scoped project choices through PAI.",
+        "operationId": "listShoppingTaskProjects",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DelegatedTargetChoicesResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "FirebaseBearer": []
+          }
+        ],
+        "summary": "Projects",
         "tags": ["Delegated Shopping tasks"]
       }
     },

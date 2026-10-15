@@ -5,7 +5,8 @@ import time
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
@@ -25,12 +26,24 @@ from health_api.integrations.task_wire import (
     COMMAND_READ_FINGERPRINT,
     DelegatedCommandRead,
     DelegatedSourceCommand,
+    DelegatedTargetChoicesResult,
 )
 
 router = APIRouter(prefix="", tags=["Delegated Shopping tasks"])
 SessionDependency = Annotated[Session, Depends(get_session)]
 OwnerDependency = Annotated[UUID, Depends(get_current_owner)]
 PREFIX = "/shopping-tasks"
+
+
+class ShoppingTaskChoiceOption(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    id: str = Field(pattern=r"^[A-Za-z0-9_-]{43}$")
+    category_label: str = Field(min_length=1, max_length=100)
+
+
+class ShoppingTaskChoicesResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    choices: tuple[ShoppingTaskChoiceOption, ...] = Field(max_length=100)
 
 
 def _relay(
@@ -63,11 +76,29 @@ def capabilities(request: Request, owner_id: OwnerDependency) -> dict[str, bool]
     }
 
 
-@router.get(PREFIX + "/choices", operation_id="listShoppingTaskChoices")
+@router.get(
+    PREFIX + "/choices",
+    response_model=ShoppingTaskChoicesResult,
+    operation_id="listShoppingTaskChoices",
+)
 def choices(
     request: Request, session: SessionDependency, owner_id: OwnerDependency
 ) -> dict[str, Any]:
     return _relay(request, session, owner_id, "GET", "/v1/federation/grants/choices")
+
+
+@router.get(
+    PREFIX + "/projects",
+    response_model=DelegatedTargetChoicesResult,
+    operation_id="listShoppingTaskProjects",
+)
+def projects(
+    request: Request, session: SessionDependency, owner_id: OwnerDependency, response: Response
+) -> dict[str, Any]:
+    """Relay Shopping's minimal owner-scoped project choices through PAI."""
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    return _relay(request, session, owner_id, "GET", "/v1/mutations/target-choices")
 
 
 @router.post(

@@ -32,4 +32,23 @@ known-first-party = ["health_api"]
 # the repository CI root and services/api. Lint/type checks still include them.
 [tool.ruff.format]
 exclude = [
-    "**/health_api/integrations/task_control.py", "**/health_api/integrations/task_wire.py"]
+    "**/health_api/integrations/task_control.py",
+    "**/health_api/integrations/task_wire.py",
+    "**/migrations/versions/20261006b1a2_proposal_receipt_replay_keys.py",
+    "**/migrations/versions/20261007a0b1_healthkit_review_contracts.py",
+    "**/migrations/versions/20261007b1c2_owner_export_erasure.py",
+    "**/migrations/versions/20261014c1d2_delegated_source_commands.py",
+    "**/migrations/versions/22dad79c2ee1_initial_profile_persistence.py",
+    "**/migrations/versions/4c168e5219d2_require_profile_payload_identity_fields.py",
+    "**/migrations/versions/6a0b1c2d3e4f_ai_search_safe_relationship_projection.py",
+    "**/migrations/versions/8e31c7c9a0b2_add_daily_event_observation_storage.py",
+    "**/migrations/versions/a7f014edc620_phase4_review_corrections.py",
+    "**/migrations/versions/b8a125fec731_allow_retired_manual_plan_items.py",
+    "**/migrations/versions/b9f5e1a72c4d_daily_snapshot_commit_boundaries.py",
+    "**/migrations/versions/c3721f5a9a01_add_firebase_identity_mapping.py",
+    "**/migrations/versions/c8d9e0f1a2b3_healthkit_imports.py",
+    "**/migrations/versions/d4e5f607a8b9_add_planning_schedules_and_trackers.py",
+    "**/migrations/versions/e7f6a5b4c3d2_action_proposal_store.py",
+    "**/migrations/versions/f5c0a1e2d3b4_add_ai_full_text_indexes.py",
+    "**/migrations/versions/f7c8d9e0a1b2_phase7_analytics_artifacts.py",
+]
