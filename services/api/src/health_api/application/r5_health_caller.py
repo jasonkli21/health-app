@@ -80,19 +80,22 @@ def reserve_r5_operation_keys(
     authority: R5SourceAuthority,
     target: R5CallerTarget | R5VerifiedCallerTarget,
     create_request_digest: str | None = None,
+    current_intent: Callable[[R5OriginalKeys], bool] | None = None,
     reauthorize: Callable[
         [], tuple[R5SourceAuthority, R5CallerTarget | R5VerifiedCallerTarget] | None
     ],
 ) -> R5OriginalKeys:
     """Commit both keys and the exact fixed create request before transport.
 
+    A wire reservation requires a current authority witness before exposing its original keys.
     Older callers can retain their local reservation, which cannot acquire a wire binding.
     """
     if not re.fullmatch(r"[0-9a-f]{64}", target.recipient_digest):
         raise R5PreviewUnavailable
     if isinstance(target, R5VerifiedCallerTarget):
         if (
-            create_request_digest is not None
+            current_intent is None
+            or create_request_digest is not None
             or not re.fullmatch(r"usr_[0-9a-f]{32}", target.pas_owner_id)
             or not target.client_namespace
             or len(target.client_namespace) > 200
@@ -180,7 +183,12 @@ def reserve_r5_operation_keys(
                     session, create, target.pas_owner_id, final_digest, conversation_id=None
                 )
             _require_wire_binding(session, create, target.pas_owner_id, final_digest, None)
-        return R5OriginalKeys(create.original_key, preview.original_key)
+        original = R5OriginalKeys(create.original_key, preview.original_key)
+    if isinstance(target, R5VerifiedCallerTarget):
+        if current_intent is None or not current_intent(original):
+            raise R5PreviewUnavailable
+        require_current_r5_source_authority(settings, authority, reauthorize_source())
+    return original
 
 
 def _binding_digest(

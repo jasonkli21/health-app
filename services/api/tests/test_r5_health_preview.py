@@ -29,6 +29,9 @@ from health_api.application.profile_service import (
 from health_api.application.r5_health_caller import (
     R5CallerTarget,
     R5OriginalKeys,
+    R5VerifiedCallerTarget,
+    bind_r5_preview_request,
+    r5_create_request,
     reserve_r5_operation_keys,
 )
 from health_api.application.r5_health_source import (
@@ -42,7 +45,12 @@ from health_api.config.settings import Settings
 from health_api.domain.schemas import ProfilePayloadV1, ProfileValidity
 from health_api.integrations.firebase_auth import VerifiedIdentity
 from health_api.integrations.object_storage import LocalObjectStorage
-from health_api.persistence.models import ProviderIdentity, R5PreviewReservation, User
+from health_api.persistence.models import (
+    ProviderIdentity,
+    R5PreviewReservation,
+    R5PreviewWireBinding,
+    User,
+)
 
 ISSUER = "https://securetoken.google.com/health-test"
 BODY = {
@@ -419,3 +427,135 @@ def test_r5_native_reservations_retry_isolation_immutability_export_erasure(
         assert session.scalars(select(R5PreviewReservation)).all() == []
     with pytest.raises(R5PreviewUnavailable):
         reserve()
+
+
+def test_native_exact_create_wire_export_immutability_and_legacy_quarantine(
+    db_session: Session, postgres_engine: Engine, settings: Settings, tmp_path: Path
+) -> None:
+    owner = seed_owner(db_session, "wire-owner")
+    other = seed_owner(db_session, "unrelated-owner")
+    selected = seed_profile(db_session, owner)
+    db_session.commit()
+    sessions = sessionmaker(bind=postgres_engine, expire_on_commit=False)
+    authority = make_authority(selected, subject="wire-owner")
+    recipient = hashlib.sha256(b"synthetic plan").hexdigest()
+    legacy_target = R5CallerTarget(uuid4(), uuid4(), uuid4(), recipient)
+    exact_target = R5VerifiedCallerTarget(
+        "usr_" + "1" * 32,
+        "fixture-client",
+        legacy_target.branch_id,
+        recipient,
+        "https://accounts.google.com|wire-fixture",
+        "source-fixture",
+        "policy-fixture",
+    )
+    reservation = {
+        "intent_id": uuid4(),
+        "request": wire(selected),
+        "authority": authority,
+    }
+    legacy = reserve_r5_operation_keys(
+        sessions,
+        settings,
+        **reservation,
+        target=legacy_target,
+        create_request_digest=CREATE_DIGEST,
+        reauthorize=lambda: (authority, legacy_target),
+    )
+    with pytest.raises(R5PreviewUnavailable):
+        reserve_r5_operation_keys(
+            sessions,
+            settings,
+            **reservation,
+            target=exact_target,
+            current_intent=lambda _: True,
+            reauthorize=lambda: (authority, exact_target),
+        )
+    with sessions() as session:
+        assert session.get(R5PreviewWireBinding, legacy.create) is None
+    with pytest.raises(R5PreviewUnavailable):
+        bind_r5_preview_request(
+            sessions,
+            settings,
+            intent_id=reservation["intent_id"],
+            source_request=wire(selected),
+            authority=authority,
+            target=exact_target,
+            reauthorize=lambda: (authority, exact_target),
+            original=legacy,
+            current_intent=lambda _: True,
+            receipt_keys={},
+            create_response=b"{}",
+            create_receipt="",
+            request={
+                "idempotency_key": str(legacy.preview),
+                "choice": {"mode": "user_owned_plan"},
+                "content": "Fixture preview",
+            },
+        )
+
+    args = reservation | {"intent_id": uuid4()}
+    original = reserve_r5_operation_keys(
+        sessions,
+        settings,
+        **args,
+        target=exact_target,
+        current_intent=lambda _: True,
+        reauthorize=lambda: (authority, exact_target),
+    )
+    assert (
+        reserve_r5_operation_keys(
+            sessions,
+            settings,
+            **args,
+            target=exact_target,
+            current_intent=lambda _: True,
+            reauthorize=lambda: (authority, exact_target),
+        )
+        == original
+    )
+    with pytest.raises(R5PreviewUnavailable):
+        reserve_r5_operation_keys(
+            sessions,
+            settings,
+            **args,
+            target=exact_target,
+            current_intent=lambda _: False,
+            reauthorize=lambda: (authority, exact_target),
+        )
+    expected_digest = hashlib.sha256(r5_create_request(original)).hexdigest()
+    with sessions() as session:
+        bindings = json.loads(export_owner_snapshot(session, owner))["data"][
+            "r5_preview_wire_bindings"
+        ]
+        assert bindings == [
+            {
+                "owner_id": str(owner),
+                "pas_owner_id": exact_target.pas_owner_id,
+                "original_key": str(original.create),
+                "request_digest": expected_digest,
+                "conversation_id": None,
+            }
+        ]
+    with sessions() as session:
+        assert not json.loads(export_owner_snapshot(session, other))["data"][
+            "r5_preview_wire_bindings"
+        ]
+    with (
+        pytest.raises(DBAPIError, match="R5 preview wire binding is invalid or immutable"),
+        sessions() as session,
+        session.begin(),
+    ):
+        session.execute(
+            update(R5PreviewWireBinding)
+            .where(R5PreviewWireBinding.original_key == original.create)
+            .values(request_digest="0" * 64)
+        )
+    with sessions() as session:
+        job = begin_owner_deletion(session, owner, uuid4())
+        completed = process_owner_deletion(
+            session, owner, job.id, LocalObjectStorage(tmp_path, max_size_bytes=1024)
+        )
+        assert completed.status == "completed"
+    with sessions() as session:
+        assert session.get(R5PreviewWireBinding, original.create) is None

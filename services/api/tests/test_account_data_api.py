@@ -65,11 +65,12 @@ def _seed_remaining_owner_inventory(db_session: Session) -> None:
     )
 
     preview_intent = uuid4()
+    create_key = uuid4()
     db_session.execute(
         tables["r5_preview_reservations"].insert(),
         [
             {
-                "original_key": uuid4(),
+                "original_key": create_key if operation == "create" else uuid4(),
                 "owner_id": OWNER_ID,
                 "intent_id": preview_intent,
                 "operation": operation,
@@ -80,6 +81,17 @@ def _seed_remaining_owner_inventory(db_session: Session) -> None:
             }
             for operation in ("create", "preview")
         ],
+    )
+
+    db_session.execute(
+        tables["r5_preview_wire_bindings"]
+        .insert()
+        .values(
+            original_key=create_key,
+            owner_id=OWNER_ID,
+            pas_owner_id="usr_" + "2" * 32,
+            request_digest="1" * 64,
+        )
     )
 
     def add_health_object(object_id: UUID, object_type: str, domain: str, title: str) -> None:

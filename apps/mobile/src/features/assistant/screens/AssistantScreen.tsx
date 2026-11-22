@@ -8,12 +8,16 @@ import {
   ContextScopeSection,
 } from "../components/AssistantContextSections";
 import { Button } from "../components/AssistantControls";
+import { PlanPreviewPanel } from "../components/PlanPreviewPanel";
+import type { PlanPreviewObserver } from "../planPreviewSession";
 import { ProposalReviewSection } from "../components/ProposalReviewSection";
 import { styles } from "../components/assistantStyles";
 import { useAssistantController } from "../useAssistantController";
 import type { ProposalStateFilter } from "../components/ProposalReviewSection";
 
-export default function AssistantScreen() {
+export default function AssistantScreen({
+  observePlanPreview,
+}: { observePlanPreview?: PlanPreviewObserver } = {}) {
   const assistant = useAssistantController();
 
   return (
@@ -90,6 +94,10 @@ export default function AssistantScreen() {
           </Link>
         </View>
       </View>
+
+      {observePlanPreview ? (
+        <PlanPreviewPanel observe={observePlanPreview} />
+      ) : null}
 
       <ProposalReviewSection
         proposals={assistant.proposals}

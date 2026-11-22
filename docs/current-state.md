@@ -41,7 +41,10 @@ the original create and preview request digests in PostgreSQL. It verifies
 purpose-specific PAS receipts before accepting a conversation or returning
 original-key status metadata. This isolated boundary requires a current source
 and external authority witness. Hosted dual proof, callback routing and
-independent generation authority remain release dependencies.
+independent generation authority remain release dependencies. The mobile
+Assistant can display this read-only metadata in an isolated composition. The
+ordinary app has no observer configured and the preview holds no durable client
+state.
 [Offline preview decision](architecture/adr/0009-r5-health-offline-preview-boundary.md)
 
 ## Verification and release boundary
