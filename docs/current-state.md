@@ -40,11 +40,13 @@ The test-only Health preview caller binds the actual opaque PAS principal and
 the original create and preview request digests in PostgreSQL. It verifies
 purpose-specific PAS receipts before accepting a conversation or returning
 original-key status metadata. This isolated boundary requires a current source
-and external authority witness. Hosted dual proof, callback routing and
-independent generation authority remain release dependencies. The mobile
-Assistant can display this read-only metadata in an isolated composition. The
-ordinary app has no observer configured and the preview holds no durable client
-state.
+and external authority witness after each journal commit and at the isolated
+preview transport boundary. Health compares independent, immutable authority
+snapshots around status adoption. The mobile Assistant can display the
+read-only metadata in an isolated composition. Session, observer and selection
+changes each end the display lifetime. The ordinary app has no configured
+observer. Hosted dual proof, callback routing, source-writer serialization and
+independent generation authority remain release dependencies.
 [Offline preview decision](architecture/adr/0009-r5-health-offline-preview-boundary.md)
 
 ## Verification and release boundary

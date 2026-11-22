@@ -721,9 +721,13 @@ def test_identical_deletion_starts_serialize_and_foreign_id_collision_is_hidden(
 def test_recent_authentication_gates_discovery_and_same_request_resumes(
     db_session: Session,
     postgres_engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    now = int(time())
+    monkeypatch.setattr("health_api.api.account_data.time", lambda: now)
+
     class MutableVerifier:
-        auth_time: int | None = int(time())
+        auth_time: int | None = now
 
         def verify(self, _token: str) -> VerifiedIdentity:
             return VerifiedIdentity(
@@ -748,12 +752,12 @@ def test_recent_authentication_gates_discovery_and_same_request_resumes(
     assert missing_time.status_code == 401
     assert missing_time.json()["code"] == "recent_authentication_required"
 
-    verifier.auth_time = int(time()) - 301
+    verifier.auth_time = now - 301
     old_time = client.get("/deletion-requests/current", headers=headers)
     assert old_time.status_code == 401
     assert old_time.json()["code"] == "recent_authentication_required"
 
-    verifier.auth_time = int(time()) + 61
+    verifier.auth_time = now + 61
     future_time = client.get("/deletion-requests/current", headers=headers)
     assert future_time.status_code == 401
     assert future_time.json()["code"] == "recent_authentication_required"
@@ -766,7 +770,7 @@ def test_recent_authentication_gates_discovery_and_same_request_resumes(
     assert stale_start.status_code == 401
     assert stale_start.json()["code"] == "recent_authentication_required"
 
-    verifier.auth_time = int(time())
+    verifier.auth_time = now
     resumed = client.post(
         "/deletion-requests",
         headers=headers,

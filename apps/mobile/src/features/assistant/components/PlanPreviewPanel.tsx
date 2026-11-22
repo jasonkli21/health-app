@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { Text, View } from "react-native";
 
 import { sessionStore, type SessionSnapshot } from "../../../auth/sessionStore";
@@ -38,39 +44,64 @@ export function PlanPreviewDetails({
 }
 
 type Observation = {
-  session: SessionSnapshot;
-  observer: PlanPreviewObserver;
   state: "loading" | "unavailable" | "declined" | "observed";
   value?: PlanPreviewMetadata;
 };
 
+export type PlanPreviewPanelProps = {
+  observe: PlanPreviewObserver;
+  /** In-memory scope for the selected preview. Change it whenever selection changes. */
+  selectionScope: string;
+};
+
 export function PlanPreviewPanel({
   observe,
-}: {
-  observe: PlanPreviewObserver;
-}) {
+  selectionScope,
+}: PlanPreviewPanelProps) {
   const session = useSyncExternalStore(
     sessionStore.subscribe,
     sessionStore.getSnapshot,
     sessionStore.getSnapshot,
   );
-  const [observation, setObservation] = useState<Observation | null>(null);
+  const [lifetime, setLifetime] = useState({
+    observe,
+    selectionScope,
+    version: 0,
+  });
+  if (
+    lifetime.observe !== observe ||
+    lifetime.selectionScope !== selectionScope
+  ) {
+    setLifetime({ observe, selectionScope, version: lifetime.version + 1 });
+  }
+  if (!matchesPreviewSession(session, session)) return null;
+  return (
+    <PlanPreviewObservation
+      key={`${session.epoch}:${lifetime.version}`}
+      session={session}
+      observe={observe}
+    />
+  );
+}
+
+function PlanPreviewObservation({
+  session,
+  observe,
+}: {
+  session: SessionSnapshot;
+  observe: PlanPreviewObserver;
+}) {
+  const [current, setObservation] = useState<Observation | null>(null);
   const pending = useRef<AbortController | null>(null);
-  const current =
-    observation &&
-    observation.observer === observe &&
-    matchesPreviewSession(observation.session, session)
-      ? observation
-      : null;
   const value = current?.value;
   const expires = value ? previewExpiry(value) : null;
 
-  useEffect(
+  useLayoutEffect(
     () => () => {
       pending.current?.abort();
       pending.current = null;
     },
-    [session.epoch, observe],
+    [],
   );
 
   useEffect(() => {
@@ -78,13 +109,7 @@ export function PlanPreviewPanel({
     const timer = setTimeout(
       () =>
         setObservation((state) =>
-          state === current
-            ? {
-                session: current.session,
-                observer: current.observer,
-                state: "unavailable",
-              }
-            : state,
+          state === current ? { state: "unavailable" } : state,
         ),
       Math.max(0, expires - Date.now()),
     );
@@ -95,7 +120,7 @@ export function PlanPreviewPanel({
     pending.current?.abort();
     const request = new AbortController();
     pending.current = request;
-    setObservation({ session, observer: observe, state: "loading" });
+    setObservation({ state: "loading" });
     const found = await observeCurrentPlanPreview(
       sessionStore,
       session,
@@ -106,13 +131,10 @@ export function PlanPreviewPanel({
     pending.current = null;
     if (!matchesPreviewSession(session, sessionStore.getSnapshot())) return;
     setObservation(
-      found
-        ? { session, observer: observe, state: "observed", value: found }
-        : { session, observer: observe, state: "unavailable" },
+      found ? { state: "observed", value: found } : { state: "unavailable" },
     );
   };
 
-  if (!matchesPreviewSession(session, session)) return null;
   return (
     <View style={styles.notice}>
       <Text accessibilityRole="header" style={styles.sectionTitle}>
@@ -154,7 +176,7 @@ export function PlanPreviewPanel({
           onPress={() => {
             pending.current?.abort();
             pending.current = null;
-            setObservation({ session, observer: observe, state: "declined" });
+            setObservation({ state: "declined" });
           }}
         />
       </View>

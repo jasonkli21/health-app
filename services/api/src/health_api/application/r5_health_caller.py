@@ -9,6 +9,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from hashlib import sha256
+from types import MappingProxyType
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -184,10 +185,17 @@ def reserve_r5_operation_keys(
                 )
             _require_wire_binding(session, create, target.pas_owner_id, final_digest, None)
         original = R5OriginalKeys(create.original_key, preview.original_key)
-    if isinstance(target, R5VerifiedCallerTarget):
-        if current_intent is None or not current_intent(original):
-            raise R5PreviewUnavailable
-        require_current_r5_source_authority(settings, authority, reauthorize_source())
+    current_owner, current_source = read_r5_health_preference(
+        sessions, settings, request, authority, reauthorize_source
+    )
+    if _binding_digest(
+        current_owner, authority, target,
+        current_source.items[0].permission_dependencies[0].version,
+    ) != binding_digest or (
+        isinstance(target, R5VerifiedCallerTarget)
+        and (current_intent is None or not current_intent(original))
+    ):
+        raise R5PreviewUnavailable
     return original
 
 
@@ -358,7 +366,46 @@ def bind_r5_preview_request(
             session, preview, target.pas_owner_id, request_digest, conversation_id
         ):
             raise R5PreviewUnavailable
+    require_current_r5_preview_request(
+        sessions, settings,
+        intent_id=intent_id, source_request=source_request, authority=authority,
+        target=target, reauthorize=reauthorize, original=original,
+        conversation_id=conversation_id, request_digest=request_digest,
+        current_intent=current_intent,
+    )
     return conversation_id, request_digest
+
+
+def require_current_r5_preview_request(
+    sessions: sessionmaker[Session],
+    settings: Settings,
+    *,
+    intent_id: UUID,
+    source_request: bytes,
+    authority: R5SourceAuthority,
+    target: R5VerifiedCallerTarget,
+    reauthorize: Callable[
+        [], tuple[R5SourceAuthority, R5CallerTarget | R5VerifiedCallerTarget] | None
+    ],
+    original: R5OriginalKeys,
+    conversation_id: UUID,
+    request_digest: str,
+    current_intent: Callable[[R5OriginalKeys], bool],
+) -> None:
+    """Check the committed binding and live authority immediately before transport.
+
+    Independent source writers are not locked across the transport call.
+    """
+    _require_receivable_binding(
+        sessions, settings, intent_id, source_request, authority, target, reauthorize,
+        original, preview=(conversation_id, request_digest),
+    )
+    if not current_intent(original):
+        raise R5PreviewUnavailable
+    current = reauthorize()
+    require_current_r5_source_authority(
+        settings, authority, current[0] if current is not None and current[1] == target else None
+    )
 
 
 def _receipt_binding(
@@ -463,6 +510,14 @@ class R5PreviewEpochs:
     source_grants: Mapping[str, str]
     memory_grants: Mapping[str, str]
 
+    def snapshot(self) -> R5PreviewEpochs:
+        return R5PreviewEpochs(
+            self.branch_digest,
+            MappingProxyType(dict(self.destination)),
+            MappingProxyType(dict(self.source_grants)),
+            MappingProxyType(dict(self.memory_grants)),
+        )
+
 
 @dataclass(frozen=True)
 class R5PreviewMetadata:
@@ -509,6 +564,7 @@ def observe_r5_preview(
     epochs = current_epochs(original.preview)
     if epochs is None:
         return None
+    epochs = epochs.snapshot()
     try:
         status, body, receipt = get_status(
             f"{PROFILE_PATH}/{conversation_id}/context-preview/{original.preview}"
@@ -589,10 +645,11 @@ def observe_r5_preview(
         original,
         preview=binding,
     )
-    if current_epochs(original.preview) != epochs:
+    current = current_epochs(original.preview)
+    if current is None or current.snapshot() != epochs:
         return None
     receipt_expiry = datetime.fromtimestamp(claims["exp"], UTC)
     deadline = min(expires, receipt_expiry)
     if deadline <= datetime.now(UTC):
         return None
-    return R5PreviewMetadata(turns, dict(epochs.destination), deadline)
+    return R5PreviewMetadata(turns, dict(value["destination"]), deadline)
