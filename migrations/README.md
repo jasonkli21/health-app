@@ -18,8 +18,12 @@ revision `20261007a0b1` adds bounded aggregate source revisions, deletion
 identities without fabricated health objects, user-archive protection, and
 step bounds/date-only checks. Phase 9 revision `20261007b1c2` adds durable
 owner deletion status, a health-free erasure-intent ledger, lifecycle
-states for deletion, and database write guards for every current owner table;
-it is the current head. The Phase 8 downgrade
+states for deletion, and database write guards for the owner tables at that revision.
+The R5 offline reservations migration `20261122f5a1` follows the delegated
+source-command migration `20261014c1d2`. It adds an owner-fenced, immutable
+original-key journal and refuses downgrade while reservations exist. See
+[ADR 0009](../docs/architecture/adr/0009-r5-health-offline-preview-boundary.md).
+The Phase 8 downgrade
 refuses when imported identities, batch history, or unrepresentable aggregate
 revision state exists. Phase 7 downgrade refuses when alternate receipt keys
 have already been accepted for one proposal revision.

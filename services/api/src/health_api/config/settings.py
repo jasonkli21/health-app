@@ -98,6 +98,7 @@ class Settings(BaseSettings):
     task_control: SourceTaskSettings | None = None
     task_google_subject: str = Field(default="", max_length=128)
     personal_ai_context_read_enabled: bool = False
+    personal_ai_r5_preview_enabled: bool = False
     personal_ai_federation_export_enabled: bool = False
     personal_ai_context_service_audience: str = Field(default="", max_length=500)
     personal_ai_context_service_account: str = Field(default="", max_length=254)
@@ -159,6 +160,10 @@ class Settings(BaseSettings):
                 "Contract's live identity, delegation, and messaging acceptance are implemented "
                 "and reviewed"
             )
+        if self.personal_ai_r5_preview_enabled and (
+            self.app_env != "test" or not self.personal_ai_context_read_enabled
+        ):
+            raise ValueError("personal_ai_r5_preview_requires_offline_test_context")
         if (
             self.personal_ai_context_read_enabled or self.personal_ai_federation_export_enabled
         ) and (

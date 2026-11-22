@@ -40,6 +40,7 @@ _OWNER_DATA_TABLE_NAMES = frozenset(
         "observations",
         "planning_resources",
         "profile_items",
+        "r5_preview_reservations",
         "tracker_schema_versions",
         "analytics_evidence",
         "event_observation_links",

@@ -64,6 +64,24 @@ def _seed_remaining_owner_inventory(db_session: Session) -> None:
         )
     )
 
+    preview_intent = uuid4()
+    db_session.execute(
+        tables["r5_preview_reservations"].insert(),
+        [
+            {
+                "original_key": uuid4(),
+                "owner_id": OWNER_ID,
+                "intent_id": preview_intent,
+                "operation": operation,
+                "object_id": profile.object_id,
+                "object_revision": 1,
+                "binding_digest": "0" * 64,
+                "request_digest": "1" * 64 if operation == "create" else None,
+            }
+            for operation in ("create", "preview")
+        ],
+    )
+
     def add_health_object(object_id: UUID, object_type: str, domain: str, title: str) -> None:
         db_session.execute(
             tables["health_objects"]

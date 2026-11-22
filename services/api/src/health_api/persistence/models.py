@@ -1481,5 +1481,38 @@ class OwnerErasureLedger(Base):
     )
 
 
+class R5PreviewReservation(Base):
+    __tablename__ = "r5_preview_reservations"
+
+    original_key: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    owner_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    intent_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    operation: Mapped[str] = mapped_column(String(7), nullable=False)
+    object_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    object_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    binding_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    request_digest: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "intent_id", "operation", name="uq_r5_preview_reservations_intent_operation"
+        ),
+        CheckConstraint("operation IN ('create', 'preview')", name="ck_r5_preview_operation"),
+        CheckConstraint("object_revision > 0", name="ck_r5_preview_revision"),
+        CheckConstraint("binding_digest ~ '^[0-9a-f]{64}$'", name="ck_r5_preview_binding_digest"),
+        CheckConstraint(
+            "(operation = 'create' AND request_digest IS NOT NULL "
+            "AND request_digest ~ '^[0-9a-f]{64}$') "
+            "OR (operation = 'preview' AND request_digest IS NULL)",
+            name="ck_r5_preview_request_digest",
+        ),
+    )
+
+
 # Register the separate source-command owner table for migrations and erasure.
 from health_api.persistence.source_commands import DelegatedSourceCommand  # noqa: F401
