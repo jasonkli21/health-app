@@ -36,6 +36,14 @@ existing migration's bytes; Ruff formatting excludes those exact files while
 keeping new migrations under normal formatting rules. API/native/static/mobile checks and JS bundle evidence are recorded separately
 from HealthKit device, cloud IAM/storage, Terraform provider and recovery gates.
 
+The test-only Health preview caller binds the actual opaque PAS principal and
+the original create and preview request digests in PostgreSQL. It verifies
+purpose-specific PAS receipts before accepting a conversation or returning
+original-key status metadata. This isolated boundary requires a current source
+and external authority witness. Hosted dual proof, callback routing and
+independent generation authority remain release dependencies.
+[Offline preview decision](architecture/adr/0009-r5-health-offline-preview-boundary.md)
+
 ## Verification and release boundary
 
 Read [the local stabilization evidence](stabilization-2026-10-14.md) and

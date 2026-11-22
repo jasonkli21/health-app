@@ -1514,5 +1514,26 @@ class R5PreviewReservation(Base):
     )
 
 
+class R5PreviewWireBinding(Base):
+    __tablename__ = "r5_preview_wire_bindings"
+
+    original_key: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("r5_preview_reservations.original_key", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    owner_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    pas_owner_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    request_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    conversation_id: Mapped[UUID | None] = mapped_column(Uuid)
+
+    __table_args__ = (
+        CheckConstraint("pas_owner_id ~ '^usr_[0-9a-f]{32}$'", name="ck_r5_wire_owner_format"),
+        CheckConstraint("request_digest ~ '^[0-9a-f]{64}$'", name="ck_r5_wire_digest"),
+    )
+
+
 # Register the separate source-command owner table for migrations and erasure.
 from health_api.persistence.source_commands import DelegatedSourceCommand  # noqa: F401

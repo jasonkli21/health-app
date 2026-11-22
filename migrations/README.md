@@ -49,3 +49,8 @@ planning resources or custom tracker observations exist, because their history
 requires a compatible application image or backup restore. Tests require a separate database named
 with `test` or `phase1` and may truncate it. Never point `TEST_DATABASE_URL` at
 personal data.
+
+The follow-up migration `20261122f5b1` adds append-only exact wire bindings
+for already reserved keys. It participates in active-owner write fencing,
+account export and erasure. A populated downgrade is refused. Existing
+UUID-only reservations receive no wire binding and stay quarantined.
