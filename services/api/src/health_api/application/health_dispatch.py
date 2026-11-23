@@ -417,12 +417,7 @@ class HealthDispatchCaller:
         started_at = monotonic()
         start = self._now()
         with self._nonce_lock:
-            if (
-                phase not in _PHASES
-                or nonce.version != 4
-                or nonce in self._nonces
-                or len(self._nonces) >= 8192
-            ):
+            if phase not in _PHASES or nonce in self._nonces or len(self._nonces) >= 8192:
                 raise DispatchUnavailable
             self._nonces.add(nonce)
         try:

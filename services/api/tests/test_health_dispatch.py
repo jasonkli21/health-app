@@ -499,6 +499,8 @@ def test_identity_recipient_replay_source_and_original_artifacts(case: Case) -> 
     case.live = good
     nonce = uuid4()
     assert caller.current(case.scope, "preview", nonce)["current"] is True
+    another_nonce = UUID("00000000-0000-7000-8000-000000000001")
+    assert caller.current(case.scope, "preview", another_nonce)["current"] is True
     assert caller.current(case.scope, "release", uuid4())["current"] is False
     with pytest.raises(DispatchUnavailable):
         caller.current(case.scope, "preview", nonce)
