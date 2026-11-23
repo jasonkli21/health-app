@@ -99,6 +99,7 @@ class LiveAuthority:
     service: Principal
     service_audience: str
     firebase_revocation_checked: bool
+    foreground: bool
     pas_human: Principal
     pas_scope: R5VerifiedCallerTarget
     source: R5SourceAuthority
@@ -268,6 +269,7 @@ class HealthDispatchCaller:
             or current.service.subject != self._settings.personal_ai_context_service_account
             or current.service_audience != self._settings.personal_ai_context_service_audience
             or current.firebase_revocation_checked is not True
+            or current.foreground is not True
             or current.source != scope.authority
             or current.pas_scope != scope.target
             or (current.pas_human.issuer, current.pas_human.subject)
