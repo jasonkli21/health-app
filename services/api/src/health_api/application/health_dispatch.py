@@ -270,7 +270,6 @@ class HealthDispatchCaller:
             or current.service_audience != self._settings.personal_ai_context_service_audience
             or current.firebase_revocation_checked is not True
             or current.foreground is not True
-            or current.source != scope.authority
             or current.pas_scope != scope.target
             or (current.pas_human.issuer, current.pas_human.subject)
             != (expect["actor_issuer"], expect["subject"])
@@ -428,7 +427,7 @@ class HealthDispatchCaller:
             self._nonces.add(nonce)
         try:
             owner, authority = self._require_current(scope)
-            if phase in {"release", "send", "disclose"}:
+            if phase != "preview":
                 row = self._load(scope, owner)
                 if row is None or not self._witness.current(
                     authority.continuity_generation,

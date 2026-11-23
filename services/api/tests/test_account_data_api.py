@@ -65,12 +65,12 @@ def _seed_remaining_owner_inventory(db_session: Session) -> None:
     )
 
     preview_intent = uuid4()
-    create_key = uuid4()
+    create_key, preview_key, conversation_id = uuid4(), uuid4(), uuid4()
     db_session.execute(
         tables["r5_preview_reservations"].insert(),
         [
             {
-                "original_key": create_key if operation == "create" else uuid4(),
+                "original_key": create_key if operation == "create" else preview_key,
                 "owner_id": OWNER_ID,
                 "intent_id": preview_intent,
                 "operation": operation,
@@ -84,13 +84,45 @@ def _seed_remaining_owner_inventory(db_session: Session) -> None:
     )
 
     db_session.execute(
-        tables["r5_preview_wire_bindings"]
+        tables["r5_preview_wire_bindings"].insert(),
+        [
+            {
+                "original_key": key,
+                "owner_id": OWNER_ID,
+                "pas_owner_id": "usr_" + "2" * 32,
+                "request_digest": digest,
+                "conversation_id": conversation,
+            }
+            for key, digest, conversation in (
+                (create_key, "1" * 64, None),
+                (preview_key, "2" * 64, conversation_id),
+            )
+        ],
+    )
+    db_session.execute(
+        tables["health_dispatch_intents"]
         .insert()
         .values(
-            original_key=create_key,
+            original_key=preview_key,
+            create_key=create_key,
             owner_id=OWNER_ID,
-            pas_owner_id="usr_" + "2" * 32,
-            request_digest="1" * 64,
+            conversation_id=conversation_id,
+            attempt=uuid4(),
+            root=uuid4(),
+            binding_digest="3" * 64,
+            body_digest="4" * 64,
+            confirmation_digest="5" * 64,
+            create_receipt_digest="6" * 64,
+            create_response_digest="7" * 64,
+            create_version="health-application-plan-create-receipt-v1",
+            create_signer="urn:fixture:pas:health-preview",
+            create_kid="synthetic-r5",
+            preview_receipt_digest="8" * 64,
+            preview_response_digest="9" * 64,
+            preview_version="health-application-plan-preview-receipt-v1",
+            preview_signer="urn:fixture:pas:health-preview",
+            preview_kid="synthetic-r5",
+            continuity_generation=1,
         )
     )
 
