@@ -189,7 +189,9 @@ def reserve_r5_operation_keys(
         sessions, settings, request, authority, reauthorize_source
     )
     if _binding_digest(
-        current_owner, authority, target,
+        current_owner,
+        authority,
+        target,
         current_source.items[0].permission_dependencies[0].version,
     ) != binding_digest or (
         isinstance(target, R5VerifiedCallerTarget)
@@ -324,28 +326,16 @@ def bind_r5_preview_request(
     owner_id = _require_receivable_binding(
         sessions, settings, intent_id, source_request, authority, target, reauthorize, original
     )
-    try:
-        response = strict_object(create_response, MAX_RESPONSE_BYTES, canonical=False)
-        conversation_id = UUID(response["conversation_id"])
-        if response != {"conversation_id": str(conversation_id)}:
-            raise ValueError("unexpected create response")
-        verify_health_preview_receipt(
-            create_receipt,
-            create_response,
-            expected=_receipt_binding(
-                owner_id,
-                authority,
-                target,
-                original,
-                conversation_id,
-                sha256(r5_create_request(original)).hexdigest(),
-                purpose="create",
-            ),
-            keys=receipt_keys,
-            now=int(datetime.now(UTC).timestamp()),
-        )
-    except (ValueError, TypeError, KeyError, AttributeError, RecursionError):
-        raise R5PreviewUnavailable from None
+    conversation_id, _ = verify_r5_create_artifact(
+        owner_id,
+        authority,
+        target,
+        original,
+        create_response,
+        create_receipt,
+        receipt_keys,
+        int(datetime.now(UTC).timestamp()),
+    )
     _require_receivable_binding(
         sessions, settings, intent_id, source_request, authority, target, reauthorize, original
     )
@@ -367,13 +357,55 @@ def bind_r5_preview_request(
         ):
             raise R5PreviewUnavailable
     require_current_r5_preview_request(
-        sessions, settings,
-        intent_id=intent_id, source_request=source_request, authority=authority,
-        target=target, reauthorize=reauthorize, original=original,
-        conversation_id=conversation_id, request_digest=request_digest,
+        sessions,
+        settings,
+        intent_id=intent_id,
+        source_request=source_request,
+        authority=authority,
+        target=target,
+        reauthorize=reauthorize,
+        original=original,
+        conversation_id=conversation_id,
+        request_digest=request_digest,
         current_intent=current_intent,
     )
     return conversation_id, request_digest
+
+
+def verify_r5_create_artifact(
+    owner: UUID,
+    authority: R5SourceAuthority,
+    target: R5VerifiedCallerTarget,
+    original: R5OriginalKeys,
+    body: bytes,
+    header: str,
+    keys: Mapping[str, Ed25519PublicKey],
+    now: int,
+) -> tuple[UUID, dict[str, Any]]:
+    """Verify the historical create format over its exact response bytes."""
+    try:
+        response = strict_object(body, MAX_RESPONSE_BYTES, canonical=False)
+        conversation = UUID(response["conversation_id"])
+        if response != {"conversation_id": str(conversation)}:
+            raise ValueError("unexpected create response")
+        claims = verify_health_preview_receipt(
+            header,
+            body,
+            expected=_receipt_binding(
+                owner,
+                authority,
+                target,
+                original,
+                conversation,
+                sha256(r5_create_request(original)).hexdigest(),
+                purpose="create",
+            ),
+            keys=keys,
+            now=now,
+        )
+    except (ValueError, TypeError, KeyError, AttributeError, RecursionError):
+        raise R5PreviewUnavailable from None
+    return conversation, claims
 
 
 def require_current_r5_preview_request(
@@ -397,8 +429,15 @@ def require_current_r5_preview_request(
     Independent source writers are not locked across the transport call.
     """
     _require_receivable_binding(
-        sessions, settings, intent_id, source_request, authority, target, reauthorize,
-        original, preview=(conversation_id, request_digest),
+        sessions,
+        settings,
+        intent_id,
+        source_request,
+        authority,
+        target,
+        reauthorize,
+        original,
+        preview=(conversation_id, request_digest),
     )
     if not current_intent(original):
         raise R5PreviewUnavailable
@@ -524,7 +563,7 @@ class R5PreviewMetadata:
     """Only the bounded inventory category, field names and recipient metadata."""
 
     history_turns: int
-    destination: dict[str, str]
+    destination: Mapping[str, str]
     expires_at: datetime
     source_sensitivity: str = "restricted"
 
@@ -574,11 +613,57 @@ def observe_r5_preview(
     if status != 200 or receipt is None:
         return None
     try:
+        metadata, _ = verify_r5_preview_artifact(
+            owner,
+            authority,
+            target,
+            original,
+            conversation_id,
+            request_digest,
+            epochs,
+            body,
+            receipt,
+            receipt_keys,
+            datetime.now(UTC),
+        )
+    except R5PreviewUnavailable:
+        return None
+    _require_receivable_binding(
+        sessions,
+        settings,
+        intent_id,
+        source_request,
+        authority,
+        target,
+        reauthorize,
+        original,
+        preview=binding,
+    )
+    current = current_epochs(original.preview)
+    if current is None or current.snapshot() != epochs:
+        return None
+    return metadata if metadata.expires_at > datetime.now(UTC) else None
+
+
+def verify_r5_preview_artifact(
+    owner: UUID,
+    authority: R5SourceAuthority,
+    target: R5VerifiedCallerTarget,
+    original: R5OriginalKeys,
+    conversation_id: UUID,
+    request_digest: str,
+    epochs: R5PreviewEpochs,
+    body: bytes,
+    header: str,
+    keys: Mapping[str, Ed25519PublicKey],
+    now: datetime,
+) -> tuple[R5PreviewMetadata, dict[str, Any]]:
+    """Verify the historical preview format and the inventory it actually discloses."""
+    try:
         value = strict_object(body, MAX_RESPONSE_BYTES, canonical=False)
         inventory = value["selected_context"]
         turns = inventory[0]["turns"]
         expires = datetime.fromisoformat(value["expires_at"])
-        now = datetime.now(UTC)
         if (
             set(value)
             != {
@@ -604,12 +689,12 @@ def observe_r5_preview(
             or not re.fullmatch(r"[0-9a-f]{64}", value["confirmation"])
             or expires <= now
         ):
-            return None
+            raise ValueError("invalid preview inventory")
         revision = authority.selection.revision
         claims = verify_health_preview_receipt(
-            receipt,
+            header,
             body,
-            keys=receipt_keys,
+            keys=keys,
             now=int(now.timestamp()),
             expected=_receipt_binding(
                 owner,
@@ -633,23 +718,6 @@ def observe_r5_preview(
             },
         )
     except (ValueError, KeyError, TypeError, IndexError, RecursionError):
-        return None
-    _require_receivable_binding(
-        sessions,
-        settings,
-        intent_id,
-        source_request,
-        authority,
-        target,
-        reauthorize,
-        original,
-        preview=binding,
-    )
-    current = current_epochs(original.preview)
-    if current is None or current.snapshot() != epochs:
-        return None
-    receipt_expiry = datetime.fromtimestamp(claims["exp"], UTC)
-    deadline = min(expires, receipt_expiry)
-    if deadline <= datetime.now(UTC):
-        return None
-    return R5PreviewMetadata(turns, dict(value["destination"]), deadline)
+        raise R5PreviewUnavailable from None
+    deadline = min(expires, datetime.fromtimestamp(claims["exp"], UTC))
+    return R5PreviewMetadata(turns, dict(value["destination"]), deadline), claims

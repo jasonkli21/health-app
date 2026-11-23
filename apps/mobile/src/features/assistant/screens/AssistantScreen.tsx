@@ -12,6 +12,10 @@ import {
   PlanPreviewPanel,
   type PlanPreviewPanelProps,
 } from "../components/PlanPreviewPanel";
+import {
+  PlanDispatchPanel,
+  type PlanDispatchPanelProps,
+} from "../components/PlanDispatchPanel";
 import { ProposalReviewSection } from "../components/ProposalReviewSection";
 import { styles } from "../components/assistantStyles";
 import { useAssistantController } from "../useAssistantController";
@@ -19,7 +23,11 @@ import type { ProposalStateFilter } from "../components/ProposalReviewSection";
 
 export default function AssistantScreen({
   planPreview,
-}: { planPreview?: PlanPreviewPanelProps } = {}) {
+  planDispatch,
+}: {
+  planPreview?: PlanPreviewPanelProps;
+  planDispatch?: PlanDispatchPanelProps;
+} = {}) {
   const assistant = useAssistantController();
 
   return (
@@ -98,6 +106,7 @@ export default function AssistantScreen({
       </View>
 
       {planPreview ? <PlanPreviewPanel {...planPreview} /> : null}
+      {planDispatch ? <PlanDispatchPanel {...planDispatch} /> : null}
 
       <ProposalReviewSection
         proposals={assistant.proposals}

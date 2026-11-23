@@ -1535,5 +1535,65 @@ class R5PreviewWireBinding(Base):
     )
 
 
+class HealthDispatchIntent(Base):
+    """One committed submission opportunity for a verified original preview."""
+
+    __tablename__ = "health_dispatch_intents"
+
+    original_key: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("r5_preview_wire_bindings.original_key", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    create_key: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("r5_preview_wire_bindings.original_key", ondelete="CASCADE"),
+        nullable=False,
+    )
+    owner_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    conversation_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    attempt: Mapped[UUID] = mapped_column(Uuid, nullable=False, unique=True)
+    root: Mapped[UUID] = mapped_column(Uuid, nullable=False, unique=True)
+    binding_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    body_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    confirmation_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    create_receipt_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    create_response_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    create_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    create_signer: Mapped[str] = mapped_column(String(96), nullable=False)
+    create_kid: Mapped[str] = mapped_column(String(256), nullable=False)
+    preview_receipt_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    preview_response_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    preview_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    preview_signer: Mapped[str] = mapped_column(String(96), nullable=False)
+    preview_kid: Mapped[str] = mapped_column(String(256), nullable=False)
+    continuity_generation: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    submitted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint("continuity_generation > 0", name="ck_health_dispatch_generation"),
+        CheckConstraint(
+            "create_version = 'health-application-plan-create-receipt-v1' "
+            "AND preview_version = 'health-application-plan-preview-receipt-v1' "
+            "AND create_signer = 'urn:fixture:pas:health-preview' "
+            "AND preview_signer = 'urn:fixture:pas:health-preview'",
+            name="ck_health_dispatch_provenance",
+        ),
+        CheckConstraint(
+            "binding_digest ~ '^[0-9a-f]{64}$' AND body_digest ~ '^[0-9a-f]{64}$' "
+            "AND confirmation_digest ~ '^[0-9a-f]{64}$' "
+            "AND create_receipt_digest ~ '^[0-9a-f]{64}$' "
+            "AND create_response_digest ~ '^[0-9a-f]{64}$' "
+            "AND preview_receipt_digest ~ '^[0-9a-f]{64}$' "
+            "AND preview_response_digest ~ '^[0-9a-f]{64}$'",
+            name="ck_health_dispatch_digests",
+        ),
+    )
+
+
 # Register the separate source-command owner table for migrations and erasure.
 from health_api.persistence.source_commands import DelegatedSourceCommand  # noqa: F401
