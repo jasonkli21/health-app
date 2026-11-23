@@ -6,6 +6,10 @@ on `7fb84c76217c772b2bce6715744b8294afafa771`; final commit/source identity and 
 [verification record](stabilization-2026-10-14.md). Independent final review and
 external acceptance remain open.
 
+## Private synthetic dispatch
+
+The isolated fixture verifies the original R5 receipts and the negotiated dispatch envelope, checks the Firebase/PAS enrollment and both source consents, and journals the confirmed original key before one submission. Recovery uses authenticated original-key reads, checks terminal expiry at publication, and retains contradictory evidence as a one-way quarantine. The native PostgreSQL dispatch, wire and R5 review suite passed 32 tests. Ordinary startup keeps dispatch disabled. PAS+Health paired and external acceptance remain pending.
+
 ## Implemented locally
 
 Health owns profile/history, daily observations, planning, analytics, typed

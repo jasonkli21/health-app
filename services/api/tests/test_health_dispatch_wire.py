@@ -84,8 +84,7 @@ def test_golden_raw_transcript(domain: str) -> None:
         binding=binding,
         body_digest=digest(confirmation),
         trust=terminal_key,
-        committed_at=1001,
-        now=1100,
+        now=1001,
     )
     assert terminal is not None
     fields = binding.fields
@@ -103,7 +102,6 @@ def test_golden_raw_transcript(domain: str) -> None:
             binding=binding,
             body_digest=digest(confirmation),
             trust=terminal_key,
-            committed_at=None,
             now=1100,
         )
 

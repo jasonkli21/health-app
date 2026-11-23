@@ -1574,6 +1574,8 @@ class HealthDispatchIntent(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
+    quarantined_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     __table_args__ = (
         CheckConstraint("continuity_generation > 0", name="ck_health_dispatch_generation"),
         CheckConstraint(

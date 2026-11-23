@@ -209,6 +209,11 @@ def verify_preview(raw: bytes, binding: Binding, trust: PinnedKey, now: int) -> 
 class Terminal:
     message_id: str
     result_sha256: str
+    expires: int
+
+
+class DispatchEvidenceConflict(ValueError):
+    """A complete response contradicts the original attempt or its terminal."""
 
 
 def verify_status(
@@ -217,7 +222,6 @@ def verify_status(
     binding: Binding,
     body_digest: str,
     trust: PinnedKey,
-    committed_at: int | None,
     now: int,
 ) -> Terminal | None:
     status = _shape(
@@ -237,21 +241,27 @@ def verify_status(
     if (
         status["state"] not in _STATES
         or any(status[field] != fields[field] for field in ("original_key", "attempt", "root"))
-        or status["body_sha256"] != body_digest
+        or (
+            status["body_sha256"] != body_digest
+            and (status["state"], status["body_sha256"]) != ("unknown", None)
+        )
     ):
-        raise ValueError("dispatch status binding mismatch")
+        raise DispatchEvidenceConflict("dispatch status binding mismatch")
     if status["state"] != "completed":
         if any(status[name] is not None for name in ("message_id", "terminal", "signature")):
-            raise ValueError("nonterminal response carries content")
+            raise DispatchEvidenceConflict("nonterminal response carries content")
+        if status["state"] == "quarantined":
+            raise DispatchEvidenceConflict("dispatch status quarantined")
         return None
-    if committed_at is None or not is_epoch(committed_at) or committed_at > now:
-        raise ValueError("missing canonical commit witness")
     if trust.purpose != "terminal":
-        raise ValueError("wrong dispatch terminal key")
-    claims = trust.verify(canonical_json(status["terminal"]), status["signature"], committed_at)
-    _shape(
-        claims,
-        {
+        raise DispatchEvidenceConflict("wrong dispatch terminal key")
+    try:
+        claims = trust.verify(canonical_json(status["terminal"]), status["signature"], now)
+    except ValueError:
+        raise DispatchEvidenceConflict("dispatch terminal signature or expiry invalid") from None
+    if (
+        set(claims)
+        != {
             "issuer",
             "purpose",
             "audience",
@@ -264,10 +274,8 @@ def verify_status(
             "binding_sha256",
             "body_sha256",
             "result_sha256",
-        },
-    )
-    if (
-        not _uuid(claims["message_id"])
+        }
+        or not _uuid(claims["message_id"])
         or claims["message_id"] != status["message_id"]
         or claims["attempt"] != fields["attempt"]
         or claims["root"] != fields["root"]
@@ -275,19 +283,20 @@ def verify_status(
         or claims["body_sha256"] != body_digest
         or not is_digest(claims["result_sha256"])
     ):
-        raise ValueError("dispatch terminal binding mismatch")
-    return Terminal(claims["message_id"], claims["result_sha256"])
+        raise DispatchEvidenceConflict("dispatch terminal binding mismatch")
+    return Terminal(claims["message_id"], claims["result_sha256"], claims["expires"])
 
 
 def verify_detail(raw: bytes, binding: Binding, terminal: Terminal) -> str:
-    detail = _shape(_object(raw), {"message_id", "attempt", "root", "original_key", "result"})
+    detail = _object(raw)
     fields = binding.fields
-    result = detail["result"]
+    result = detail.get("result")
     if (
-        detail["message_id"] != terminal.message_id
+        set(detail) != {"message_id", "attempt", "root", "original_key", "result"}
+        or detail["message_id"] != terminal.message_id
         or any(detail[name] != fields[name] for name in ("attempt", "root", "original_key"))
         or not isinstance(result, str)
         or digest(result.encode("utf-8")) != terminal.result_sha256
     ):
-        raise ValueError("dispatch detail binding mismatch")
+        raise DispatchEvidenceConflict("dispatch detail binding mismatch")
     return result

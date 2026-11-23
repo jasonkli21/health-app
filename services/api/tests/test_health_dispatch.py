@@ -51,6 +51,7 @@ from health_api.integrations.object_storage import LocalObjectStorage
 from health_api.integrations.pas_dispatch import (
     MEDIA_TYPE,
     ORIGINAL_KEY_HEADER,
+    PREVIEW_HEADER,
     VERSION,
     Binding,
     PinnedKey,
@@ -123,12 +124,21 @@ class RecordingTransport:
         self.replies: list[FixtureResponse] = []
         self.post_failure: Exception | None = None
         self.after_status = lambda: None
+        self.after_detail = lambda: None
+        self.preview = lambda: FixtureResponse(404, b"")
 
-    def post(self, path: str, media_type: str, body: bytes) -> FixtureResponse:
+    def post(self, path: str, headers: Mapping[str, str], body: bytes) -> FixtureResponse:
+        assert headers == {
+            "Accept": MEDIA_TYPE,
+            "Content-Type": MEDIA_TYPE,
+            "X-Application-ID": "health",
+        }
+        self.posts.append((path, headers["Content-Type"], body))
+        if path.endswith("/context-preview"):
+            return self.preview()
         with self.sessions() as session:
             row = session.get(HealthDispatchIntent, self.scope.original.preview)
             assert row and row.body_digest == digest(body) and row.submitted_at
-        self.posts.append((path, media_type, body))
         if self.post_failure is not None:
             raise self.post_failure
         return FixtureResponse(202, b"")
@@ -136,7 +146,11 @@ class RecordingTransport:
     def get(self, path: str, headers: Mapping[str, str]) -> FixtureResponse:
         self.gets.append((path, dict(headers)))
         if path.endswith(str(self.scope.original.preview)):
+            assert ORIGINAL_KEY_HEADER not in headers
             self.after_status()
+        else:
+            assert headers[ORIGINAL_KEY_HEADER] == str(self.scope.original.preview)
+            self.after_detail()
         return self.replies.pop(0) if self.replies else FixtureResponse(404, b"")
 
 
@@ -182,7 +196,7 @@ class Case:
 
 
 @pytest.fixture
-def case(db_session: Session, postgres_engine: Engine) -> Case:
+def case(db_session: Session, postgres_engine: Engine, request: pytest.FixtureRequest) -> Case:
     settings = Settings(
         app_env="test",
         auth_mode="firebase",
@@ -214,7 +228,7 @@ def case(db_session: Session, postgres_engine: Engine) -> Case:
         "usr_" + "a" * 32,
         "health-fixture",
         uuid4(),
-        destination_digest,
+        digest(b"original PAS target fingerprint"),
         "fixture-actor-handle",
         "source-1",
         "policy-1",
@@ -248,33 +262,36 @@ def case(db_session: Session, postgres_engine: Engine) -> Case:
         now,
         old_key,
     )
-    _, request_digest = bind_r5_preview_request(
-        sessions,
-        settings,
-        intent_id=intent,
-        source_request=source_request,
-        authority=authority,
-        target=target,
-        reauthorize=lambda: (authority, target),
-        original=original,
-        current_intent=lambda _: True,
-        create_response=create_response,
-        create_receipt=create_header,
-        receipt_keys={"old-r5": old_key.public_key()},
-        request={
-            "idempotency_key": str(original.preview),
-            "choice": {"mode": "user_owned_plan"},
-            "content": "Synthetic dispatch",
-        },
-    )
+    preview_request = {
+        "idempotency_key": str(original.preview),
+        "choice": {"mode": "user_owned_plan"},
+        "content": "Synthetic dispatch",
+    }
+    request_digest = digest(canonical_json(preview_request))
+    if getattr(request, "param", None) != "unbound":
+        assert bind_r5_preview_request(
+            sessions,
+            settings,
+            intent_id=intent,
+            source_request=source_request,
+            authority=authority,
+            target=target,
+            reauthorize=lambda: (authority, target),
+            original=original,
+            current_intent=lambda _: True,
+            create_response=create_response,
+            create_receipt=create_header,
+            receipt_keys={"old-r5": old_key.public_key()},
+            request=preview_request,
+        ) == (conversation, request_digest)
     epochs = R5PreviewEpochs(
         digest(b"active branch"),
         {
             "application": "health",
             "provider": "fake",
             "model": "fake",
-            "runtime": "r1",
-            "recipient": "fixture",
+            "runtime": "local:r1",
+            "recipient": "openai-responses:fixture",
         },
         {"source": "grant-1"},
         {"memory": "grant-1"},
@@ -442,10 +459,7 @@ def test_native_concurrent_confirmation_durable_and_get_only(case: Case) -> None
     caller.confirm(reviewed, body)
     assert len(case.transport.posts) == 1
     assert len(case.transport.gets) == 2
-    assert all(
-        headers[ORIGINAL_KEY_HEADER] == str(case.scope.original.preview)
-        for _, headers in case.transport.gets
-    )
+    assert all(headers["X-Application-ID"] == "health" for _, headers in case.transport.gets)
 
     with case.sessions() as session:
         evidence = json.loads(export_owner_snapshot(session, case.owner))["data"][
@@ -599,7 +613,10 @@ def test_expiration_and_erasure_suppress_read_and_keep_checkpoint(
     assert not case.transport.gets
 
 
-def test_terminal_scope_bytes_and_reauthorization(case: Case) -> None:
+@pytest.mark.parametrize(
+    "outcome", ["valid", "wrong-root", "wrong-result", "expired", "expires-at-detail"]
+)
+def test_terminal_scope_bytes_and_reauthorization(case: Case, outcome: str) -> None:
     caller = case.caller()
     reviewed = caller.prepare(case.scope, **case.artifacts)
     body = reviewed.preview.confirmation_body
@@ -631,6 +648,12 @@ def test_terminal_scope_bytes_and_reauthorization(case: Case) -> None:
         "result": result,
     }
 
+    response_headers = (
+        ("Content-Type", MEDIA_TYPE),
+        ("Cache-Control", "no-store"),
+        ("x-pas-committed-at", str(case.now - 1)),
+    )
+
     def status_response(claims: dict[str, Any]) -> FixtureResponse:
         return FixtureResponse(
             200,
@@ -641,28 +664,123 @@ def test_terminal_scope_bytes_and_reauthorization(case: Case) -> None:
                     "signature": encoded(case.runtime.sign(canonical_json(claims))),
                 }
             ),
-            case.now,
+            response_headers,
         )
 
-    case.transport.replies = [status_response(terminal | {"root": str(uuid4())})]
-    assert caller.observe(case.scope) is None
-    assert len(case.transport.gets) == 1
+    if outcome == "wrong-root":
+        altered = terminal | {"root": str(uuid4())}
+    elif outcome == "expired":
+        altered = terminal | {"expires": case.now}
+    else:
+        altered = terminal
+    if outcome == "wrong-result":
+        detail["result"] = "wrong"
+    if outcome == "expires-at-detail":
+        case.transport.after_detail = lambda: setattr(case, "now", terminal["expires"])
     case.transport.replies = [
-        status_response(terminal),
-        FixtureResponse(200, canonical_json(detail | {"result": "wrong"}), case.now),
+        status_response(altered),
+        FixtureResponse(200, canonical_json(detail), response_headers),
     ]
-    assert caller.observe(case.scope) is None
-    case.transport.replies = [
-        status_response(terminal),
-        FixtureResponse(200, canonical_json(detail), case.now),
-    ]
-    assert caller.observe(case.scope) == result
-    good = case.live
-    case.transport.replies = [status_response(terminal)]
-    case.transport.after_status = lambda: setattr(case, "live", None)
-    assert caller.observe(case.scope) is None
-    case.live = good
-    case.key_active = False
-    with pytest.raises(DispatchUnavailable):
-        caller.observe(case.scope)
+    if outcome == "valid":
+        assert caller.observe(case.scope) == result
+        good = case.live
+        case.transport.replies = [status_response(terminal)]
+        case.transport.after_status = lambda: setattr(case, "live", None)
+        assert caller.observe(case.scope) is None
+        case.live = good
+        case.key_active = False
+        with pytest.raises(DispatchUnavailable):
+            caller.observe(case.scope)
+    else:
+        assert caller.observe(case.scope) is None
+        assert len(case.transport.gets) == (1 if outcome in ("wrong-root", "expired") else 2)
+        with case.sessions() as session:
+            row = session.get(HealthDispatchIntent, case.scope.original.preview)
+            assert row is not None and row.quarantined_at is not None
+        case.transport.replies = [
+            status_response(terminal),
+            FixtureResponse(200, canonical_json(detail | {"result": result}), response_headers),
+        ]
+        with pytest.raises(DispatchUnavailable):
+            case.caller().observe(case.scope)
     assert len(case.transport.posts) == 1
+
+
+@pytest.mark.parametrize("case", ["unbound"], indirect=True)
+def test_acquire_private_preview_with_original_proof_and_pending_callback(case: Case) -> None:
+    caller = case.caller()
+    pending = replace(
+        case.scope,
+        binding=Binding(canonical_json(case.scope.binding.fields | {"preview_receipt": "0" * 64})),
+    )
+    callback = caller.registered_source(
+        lambda conversation, original: (
+            pending
+            if (conversation, original) == (pending.conversation, pending.original.preview)
+            else None
+        )
+    )
+
+    def reply() -> FixtureResponse:
+        path, media, body = case.transport.posts[0]
+        assert (
+            path
+            == f"/private/application-plan/v1/conversations/{pending.conversation}/context-preview"
+        )
+        assert media == MEDIA_TYPE
+        assert body == canonical_json(
+            {
+                "content": "Synthetic dispatch",
+                "idempotency_key": str(pending.original.preview),
+                "choice": {"mode": "user_owned_plan"},
+            }
+        )
+        nonce = str(uuid4())
+        assert callback(case.scope.binding.raw, "preview", nonce) == {
+            "binding_sha256": case.scope.binding.sha256,
+            "phase": "preview",
+            "nonce": nonce,
+            "current": True,
+            "expires": case.now + 1,
+        }
+        with pytest.raises(DispatchUnavailable):
+            callback(case.scope.binding.raw, "preview", nonce)
+        with pytest.raises(DispatchUnavailable):
+            callback(
+                canonical_json(case.scope.binding.fields | {"root": str(uuid4())}),
+                "preview",
+                str(uuid4()),
+            )
+        return FixtureResponse(
+            200,
+            case.artifacts["preview_response"],
+            (
+                ("content-type", MEDIA_TYPE),
+                ("cache-control", "no-store"),
+                ("x-application-plan-receipt", case.artifacts["preview_header"]),
+                (PREVIEW_HEADER, case.artifacts["dispatch_envelope"].decode("ascii")),
+            ),
+        )
+
+    case.transport.preview = reply
+    kwargs = {
+        "content": "Synthetic dispatch",
+        "create_response": case.artifacts["create_response"],
+        "create_header": case.artifacts["create_header"],
+    }
+    reviewed = caller.acquire_preview(pending, **kwargs)
+    assert reviewed.scope == case.scope
+    assert reviewed.original_preview.digest == receipt_digest(case.artifacts["preview_header"])
+    with pytest.raises(DispatchUnavailable):
+        caller.acquire_preview(pending, **kwargs)
+    # A restarted callback can independently resolve the exact submitted binding.
+    caller.confirm(reviewed, reviewed.preview.confirmation_body)
+    recovered = case.caller().registered_source(
+        lambda conversation, original: (
+            case.scope
+            if (conversation, original) == (case.scope.conversation, case.scope.original.preview)
+            else None
+        )
+    )
+    assert recovered(case.scope.binding.raw, "send", str(uuid4()))["current"] is True
+    assert len(case.transport.posts) == 2

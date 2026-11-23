@@ -13,7 +13,7 @@ from typing import Protocol
 from uuid import UUID
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-from sqlalchemy import text
+from sqlalchemy import text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
@@ -23,6 +23,7 @@ from health_api.application.r5_health_caller import (
     R5PreviewEpochs,
     R5PreviewMetadata,
     R5VerifiedCallerTarget,
+    bind_r5_preview_request,
     require_current_r5_preview_request,
     verify_r5_create_artifact,
     verify_r5_preview_artifact,
@@ -38,7 +39,9 @@ from health_api.config.settings import Settings
 from health_api.integrations.pas_dispatch import (
     MEDIA_TYPE,
     ORIGINAL_KEY_HEADER,
+    PREVIEW_HEADER,
     Binding,
+    DispatchEvidenceConflict,
     PinnedKey,
     VerifiedPreview,
     digest,
@@ -50,9 +53,13 @@ from health_api.integrations.pas_dispatch import (
 )
 from health_api.integrations.personal_ai_context import HealthContextReadResponse
 from health_api.integrations.personal_ai_context_auth import GOOGLE_ISSUERS
-from health_api.integrations.personal_ai_preview_receipt import PROFILE_PATH, canonical_json
+from health_api.integrations.personal_ai_preview_receipt import (
+    PROFILE_PATH,
+    canonical_json,
+)
 from health_api.persistence.models import HealthDispatchIntent, OwnerErasureLedger
 
+_ORIGINAL_RECEIPT_HEADER = "x-application-plan-receipt"
 _PHASES = {"preview", "confirm", "release", "send", "disclose"}
 
 
@@ -170,14 +177,27 @@ class ContinuityWitness(Protocol):
 class FixtureResponse:
     status: int
     raw: bytes
-    # Authenticated PAS response header x-pas-committed-at, parsed by the fixture channel.
-    committed_at: int | None = None
+    # Preserve header multiplicity across the fixture boundary.
+    headers: tuple[tuple[str, str], ...] = ()
+
+    def is_private_response(self) -> bool:
+        return (
+            self.status == 200
+            and self.header("content-type") == MEDIA_TYPE
+            and self.header("cache-control") == "no-store"
+        )
+
+    def header(self, name: str) -> str:
+        values = [value for key, value in self.headers if key.lower() == name.lower()]
+        if len(values) != 1:
+            raise DispatchUnavailable
+        return values[0]
 
 
 class FixtureTransport(Protocol):
-    """Internal paired-fixture seam with a pinned endpoint and no redirects or retries."""
+    """Pinned fixture channel adding app authentication and the original R5 operation proof."""
 
-    def post(self, path: str, media_type: str, body: bytes) -> FixtureResponse: ...
+    def post(self, path: str, headers: Mapping[str, str], body: bytes) -> FixtureResponse: ...
 
     def get(self, path: str, headers: Mapping[str, str]) -> FixtureResponse: ...
 
@@ -308,7 +328,6 @@ class HealthDispatchCaller:
             or destination["model"] != "fake"
             or destination["endpoint"] != "loopback-fixture"
             or current.destination_commitment != digest(canonical_json(destination))
-            or scope.target.recipient_digest != current.destination_commitment
         ):
             raise DispatchUnavailable
         current_epochs = current.preview_epochs.snapshot()
@@ -316,8 +335,8 @@ class HealthDispatchCaller:
             "application": "health",
             "provider": destination["provider"],
             "model": destination["model"],
-            "runtime": destination["runtime"],
-            "recipient": destination["account"],
+            "runtime": f"local:{destination['runtime']}",
+            "recipient": f"openai-responses:{destination['account']}",
         }:
             raise DispatchUnavailable
         firebase = Principal(current.source.identity.issuer, current.source.identity.subject)
@@ -412,6 +431,30 @@ class HealthDispatchCaller:
             raise DispatchUnavailable
         return owner, current
 
+    def registered_source(
+        self, resolve: Callable[[UUID, UUID], PrivatePreview | None]
+    ) -> Callable[[bytes, str, str], dict[str, object]]:
+        """Resolve the original R5 scope in Health for each authenticated PAS callback."""
+
+        def current(binding_bytes: bytes, phase: str, nonce: str) -> dict[str, object]:
+            binding = Binding(binding_bytes)
+            fields = binding.fields
+            key = UUID(nonce)
+            if str(key) != nonce:
+                raise DispatchUnavailable
+            scope = resolve(UUID(fields["conversation"]), UUID(fields["original_key"]))
+            if scope is None:
+                raise DispatchUnavailable
+            expected = scope.binding.fields
+            # At preview the independently reserved scope has no PAS receipt yet.
+            if phase == "preview":
+                expected["preview_receipt"] = fields["preview_receipt"]
+            if expected != fields:
+                raise DispatchUnavailable
+            return self.current(replace(scope, binding=binding), phase, key)
+
+        return current
+
     def current(self, scope: PrivatePreview, phase: str, nonce: UUID) -> dict[str, object]:
         """The trusted, registered in-process reverse callback never returns source data."""
         started_at = monotonic()
@@ -445,6 +488,78 @@ class HealthDispatchCaller:
             "current": allowed,
             "expires": start + 1,
         }
+
+    def acquire_preview(
+        self,
+        scope: PrivatePreview,
+        *,
+        content: str,
+        create_response: bytes,
+        create_header: str,
+    ) -> ReviewedPreview:
+        """Bind and submit one private preview, retaining the original R5 proof."""
+        request = {
+            "content": content,
+            "idempotency_key": str(scope.original.preview),
+            "choice": {"mode": "user_owned_plan"},
+        }
+        body = canonical_json(request)
+        if digest(body) != scope.preview_request_digest:
+            raise DispatchUnavailable
+        live = self._authority()
+
+        def reauthorize() -> tuple[R5SourceAuthority, R5VerifiedCallerTarget] | None:
+            current = self._authority()
+            if current is None or current != live or current.pas_scope != scope.target:
+                return None
+            return current.source, current.pas_scope
+
+        try:
+            if receipt_digest(create_header) != scope.binding.fields["create_receipt"]:
+                raise DispatchUnavailable
+            conversation, _ = bind_r5_preview_request(
+                self._sessions,
+                self._settings,
+                intent_id=scope.intent_id,
+                source_request=scope.source_request,
+                authority=scope.authority,
+                target=scope.target,
+                reauthorize=reauthorize,
+                original=scope.original,
+                current_intent=self._current_intent,
+                create_response=create_response,
+                create_receipt=create_header,
+                receipt_keys=self._original_keys,
+                request=request,
+            )
+            if conversation != scope.conversation:
+                raise DispatchUnavailable
+            self._require_current(scope)
+            reply = self._transport.post(
+                f"{PROFILE_PATH}/{scope.conversation}/context-preview",
+                {
+                    "Accept": MEDIA_TYPE,
+                    "Content-Type": MEDIA_TYPE,
+                    "X-Application-ID": "health",
+                },
+                body,
+            )
+            if not reply.is_private_response():
+                raise DispatchUnavailable
+            preview_header = reply.header(_ORIGINAL_RECEIPT_HEADER)
+            fields = scope.binding.fields
+            fields["preview_receipt"] = receipt_digest(preview_header)
+            reviewed_scope = replace(scope, binding=Binding(canonical_json(fields)))
+            return self.prepare(
+                reviewed_scope,
+                create_response=create_response,
+                create_header=create_header,
+                preview_response=reply.raw,
+                preview_header=preview_header,
+                dispatch_envelope=reply.header(PREVIEW_HEADER).encode("ascii"),
+            )
+        except (ValueError, OSError, EOFError):
+            raise DispatchUnavailable from None
 
     def prepare(
         self,
@@ -539,7 +654,8 @@ class HealthDispatchCaller:
             if row is not None:
                 fields = scope.binding.fields
                 if (
-                    row.owner_id != owner
+                    row.quarantined_at is not None
+                    or row.owner_id != owner
                     or row.create_key != scope.original.create
                     or row.conversation_id != scope.conversation
                     or str(row.attempt) != fields["attempt"]
@@ -642,7 +758,15 @@ class HealthDispatchCaller:
         ):
             raise DispatchUnavailable
         try:
-            self._transport.post(f"{PROFILE_PATH}/{scope.conversation}/continue", MEDIA_TYPE, body)
+            self._transport.post(
+                f"{PROFILE_PATH}/{scope.conversation}/continue",
+                {
+                    "Accept": MEDIA_TYPE,
+                    "Content-Type": MEDIA_TYPE,
+                    "X-Application-ID": "health",
+                },
+                body,
+            )
         except (OSError, TimeoutError, EOFError):
             pass  # The irrevocable committed intent can only be observed through GET.
 
@@ -673,7 +797,7 @@ class HealthDispatchCaller:
                 and self._terminal_key.active()
             )
 
-        headers = {"Accept": MEDIA_TYPE, ORIGINAL_KEY_HEADER: str(scope.original.preview)}
+        headers = {"Accept": MEDIA_TYPE, "X-Application-ID": "health"}
         if not current():
             raise DispatchUnavailable
         try:
@@ -681,26 +805,49 @@ class HealthDispatchCaller:
                 f"/v1/conversations/{scope.conversation}/continuations/{scope.original.preview}",
                 headers,
             )
-            if response.status != 200 or not current():
+            if not response.is_private_response() or not current():
                 return None
             terminal = verify_status(
                 response.raw,
                 binding=scope.binding,
                 body_digest=row.body_digest,
                 trust=self._terminal_key,
-                committed_at=response.committed_at,
                 now=self._now(),
             )
             if terminal is None or not current():
                 return None
-            detail = self._transport.get(f"/v1/conversations/{scope.conversation}", headers)
-            if (
-                detail.status != 200
-                or detail.committed_at != response.committed_at
-                or not current()
-            ):
+            detail = self._transport.get(
+                f"/v1/conversations/{scope.conversation}",
+                headers | {ORIGINAL_KEY_HEADER: str(scope.original.preview)},
+            )
+            if not detail.is_private_response() or not current():
                 return None
             result = verify_detail(detail.raw, scope.binding, terminal)
+            if not current():
+                return None
+            if self._now() >= terminal.expires:
+                raise DispatchEvidenceConflict("dispatch terminal expired")
+            return result
+        except DispatchEvidenceConflict:
+            self._quarantine(owner, record)
         except (ValueError, OSError, TimeoutError, EOFError, TypeError, RecursionError):
-            return None
-        return result if current() else None
+            pass
+        return None
+
+    def _quarantine(self, owner: UUID, record: ContinuityRecord) -> None:
+        try:
+            with self._sessions() as session, session.begin():
+                session.execute(
+                    update(HealthDispatchIntent)
+                    .where(
+                        HealthDispatchIntent.owner_id == owner,
+                        HealthDispatchIntent.original_key == record.original_key,
+                        HealthDispatchIntent.binding_digest == record.binding_digest,
+                        HealthDispatchIntent.body_digest == record.body_digest,
+                        HealthDispatchIntent.quarantined_at.is_(None),
+                    )
+                    .values(quarantined_at=datetime.fromtimestamp(self._now(), UTC))
+                )
+        except SQLAlchemyError:
+            # Owner deletion can revoke the intent concurrently.
+            pass
